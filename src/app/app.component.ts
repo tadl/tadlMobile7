@@ -1,27 +1,48 @@
-
 import { Component } from '@angular/core';
-import { RouterLink, RouterLinkActive } from '@angular/router';
-import { IonApp, IonSplitPane, IonMenu, IonContent, IonList, IonListHeader, IonNote, IonMenuToggle, IonItem, IonIcon, IonLabel, IonRouterOutlet, IonRouterLink } from '@ionic/angular/standalone';
-import { addIcons } from 'ionicons';
-import { mailOutline, mailSharp, paperPlaneOutline, paperPlaneSharp, heartOutline, heartSharp, archiveOutline, archiveSharp, trashOutline, trashSharp, warningOutline, warningSharp, bookmarkOutline, bookmarkSharp } from 'ionicons/icons';
+import { CommonModule } from '@angular/common';
+import { RouterModule } from '@angular/router';
+import { IonicModule } from '@ionic/angular';
+import { Platform } from '@ionic/angular/standalone';
+import { App } from '@capacitor/app';
+import { fromEvent } from 'rxjs';
+import { Globals } from './globals';
 
 @Component({
+  standalone: true,
   selector: 'app-root',
   templateUrl: 'app.component.html',
   styleUrls: ['app.component.scss'],
-  imports: [RouterLink, RouterLinkActive, IonApp, IonSplitPane, IonMenu, IonContent, IonList, IonListHeader, IonNote, IonMenuToggle, IonItem, IonIcon, IonLabel, IonRouterLink, IonRouterOutlet],
+  imports: [
+    CommonModule,
+    RouterModule,
+    IonicModule,
+  ],
 })
 export class AppComponent {
-  public appPages = [
-    { title: 'Inbox', url: '/folder/inbox', icon: 'mail' },
-    { title: 'Outbox', url: '/folder/outbox', icon: 'paper-plane' },
-    { title: 'Favorites', url: '/folder/favorites', icon: 'heart' },
-    { title: 'Archived', url: '/folder/archived', icon: 'archive' },
-    { title: 'Trash', url: '/folder/trash', icon: 'trash' },
-    { title: 'Spam', url: '/folder/spam', icon: 'warning' },
+  public appPages: Array<{ title: string; url: string; icon: string }> = [
+    { title: 'Home', url: '/home', icon: 'home' },
+    { title: 'Locations', url: '/locations', icon: 'compass' },
+    { title: 'Events', url: '/events', icon: 'calendar' },
+    { title: 'News', url: '/news', icon: 'megaphone' },
+    { title: 'Featured', url: '/featured', icon: 'star' },
+    { title: 'About', url: '/about', icon: 'information-circle' },
   ];
-  public labels = ['Family', 'Friends', 'Notes', 'Work', 'Travel', 'Reminders'];
-  constructor() {
-    addIcons({ mailOutline, mailSharp, paperPlaneOutline, paperPlaneSharp, heartOutline, heartSharp, archiveOutline, archiveSharp, trashOutline, trashSharp, warningOutline, warningSharp, bookmarkOutline, bookmarkSharp });
+
+  constructor(
+    public globals: Globals,
+    private platform: Platform,
+  ) {
+    this.platform.ready().then(async () => {
+      await this.globals.getDeviceInfo();
+
+      App.addListener('backButton', ({ canGoBack }) => {
+        if (canGoBack) this.globals.go_back();
+        else this.globals.confirm_exit();
+      });
+
+      fromEvent(document, 'didDismiss').subscribe(() => {
+        this.globals.modal_open = false;
+      });
+    });
   }
 }

@@ -1,0 +1,21 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>News</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="close()">
+        <ion-icon name="close" slot="icon-only"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <h2>{{ news?.title }}</h2>
+  <p *ngIf="news?.date">{{ news.date }}</p>
+
+  <div *ngIf="news?.content" [innerHTML]="news.content"></div>
+
+  <ion-button expand="block" *ngIf="news?.url" (click)="openLink(news.url)">
+    View on web
+  </ion-button>
+</ion-content>

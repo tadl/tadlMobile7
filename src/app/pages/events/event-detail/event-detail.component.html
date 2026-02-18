@@ -1,0 +1,23 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Event</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="close()">
+        <ion-icon name="close" slot="icon-only"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <h2>{{ event?.title }}</h2>
+
+  <p *ngIf="event?.start"><b>When:</b> {{ event.start }}</p>
+  <p *ngIf="event?.venue_name"><b>Where:</b> {{ event.venue_name }}</p>
+
+  <div *ngIf="event?.description" [innerHTML]="event.description"></div>
+
+  <ion-button expand="block" *ngIf="event?.url" (click)="openLink(event.url)">
+    View on web
+  </ion-button>
+</ion-content>

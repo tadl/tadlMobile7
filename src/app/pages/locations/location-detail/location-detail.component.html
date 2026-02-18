@@ -1,0 +1,23 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Location</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="close()">
+        <ion-icon name="close" slot="icon-only"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <h2>{{ location?.name }}</h2>
+
+  <p *ngIf="location?.address"><b>Address:</b> {{ location.address }}</p>
+  <p *ngIf="location?.phone"><b>Phone:</b> {{ location.phone }}</p>
+
+  <div *ngIf="location?.hours" [innerHTML]="location.hours"></div>
+
+  <ion-button expand="block" *ngIf="location?.url" (click)="openLink(location.url)">
+    View on web
+  </ion-button>
+</ion-content>

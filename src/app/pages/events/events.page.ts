@@ -1,10 +1,15 @@
-import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { IonicModule, ModalController } from '@ionic/angular';
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { Component, OnDestroy, OnInit } from '@angular/core';
+import { IonicModule } from '@ionic/angular';
+import { ModalController } from '@ionic/angular/standalone';
+import { Subject, takeUntil } from 'rxjs';
+
 import { Globals } from '../../globals';
-import { ToastService } from '../../services/toast.service';
+import { EventsService, MobileEvent, VenueOption } from '../../services/events.service';
 import { EventDetailComponent } from './event-detail/event-detail.component';
+
+type VenueSelection = 'all' | number; // what EventsService expects
+type VenueCode = 'all' | string;      // what ion-select uses (string codes)
 
 @Component({
   standalone: true,
@@ -13,47 +18,121 @@ import { EventDetailComponent } from './event-detail/event-detail.component';
   styleUrls: ['./events.page.scss'],
   imports: [CommonModule, IonicModule],
 })
-export class EventsPage {
-  url: string;
-  web_events: any[] = [];
-  location: string = '';
+export class EventsPage implements OnInit, OnDestroy {
+  loading = true;
+  error: string | null = null;
+
+  venues: VenueOption[] = [];
+
+  // Keep the ion-select bound value as a string code
+  // (because ion-select works best with strings)
+  selectedVenueCode: VenueCode = 'all';
+
+  events: MobileEvent[] = [];
+
+  private destroyed$ = new Subject<void>();
+
+  readonly placeholderImage = 'assets/placeholder.png';
 
   constructor(
     public globals: Globals,
-    public toast: ToastService,
-    private http: HttpClient,
+    private eventsService: EventsService,
     private modalController: ModalController,
-  ) {
-    this.url = this.globals.events_api_url;
+  ) {}
+
+  ngOnInit(): void {
+    this.load('all');
   }
 
-  ionViewDidEnter() {
-    this.get_events(this.location);
+  ngOnDestroy(): void {
+    this.destroyed$.next();
+    this.destroyed$.complete();
   }
 
-  get_events(loc?: string) {
-    let params = new HttpParams();
-    if (loc) params = params.set('venue', loc);
-
-    this.globals.loading_show();
-    this.http.get(this.url, { params }).subscribe({
-      next: (data: any) => {
-        this.globals.api_loading = false;
-        this.web_events = data?.events ?? [];
-      },
-      error: () => {
-        this.globals.api_loading = false;
-        this.toast.presentToast(this.globals.server_error_msg);
-      },
-    });
+  onVenueChange(value: any): void {
+    const code = (value ?? 'all').toString();
+    this.selectedVenueCode = (code === 'all' ? 'all' : code);
+    this.load(this.toVenueSelection(this.selectedVenueCode));
   }
 
-  async view_details(event: any) {
+  trackByUrl(_: number, ev: MobileEvent): string {
+    return ev.url;
+  }
+
+  imageFor(ev: MobileEvent): string {
+    return ev.image || this.placeholderImage;
+  }
+
+  titleFor(ev: MobileEvent): string {
+    return (ev.title || 'Event').toString();
+  }
+
+  venueLabel(v: VenueOption): string {
+    const code = (v as any)?.code?.toString?.() ?? '';
+    if (code === 'all') return 'All Locations';
+    return (v as any)?.name ?? '';
+  }
+
+  venueValue(v: VenueOption): string {
+    const code = (v as any)?.code?.toString?.();
+    return code || '';
+  }
+
+  async openEvent(ev: MobileEvent): Promise<void> {
     const modal = await this.modalController.create({
       component: EventDetailComponent,
-      componentProps: { event },
+      componentProps: {
+        event: ev,
+        dismissStyle: 'close',
+      },
     });
     this.globals.modal_open = true;
-    return await modal.present();
+    modal.onDidDismiss().then(() => (this.globals.modal_open = false));
+    await modal.present();
+  }
+
+  private toVenueSelection(code: VenueCode): VenueSelection {
+    if (code === 'all') return 'all';
+    const n = Number(code);
+    return Number.isFinite(n) ? n : 'all';
+  }
+
+  private load(venue: VenueSelection): void {
+    this.loading = true;
+    this.error = null;
+
+    this.eventsService
+      .getEvents(venue)
+      .pipe(takeUntil(this.destroyed$))
+      .subscribe({
+        next: (res) => {
+          const apiVenues = (res.all_venues || []) as VenueOption[];
+
+          // Ensure only ONE "all" option in the UI.
+          const hasAll = apiVenues.some((v: any) => (v?.code ?? '').toString() === 'all');
+          this.venues = hasAll
+            ? apiVenues
+            : ([{ code: 'all', name: 'All Locations' } as any] as VenueOption[]).concat(apiVenues);
+
+          // If our selected code is no longer present, reset to 'all'
+          const selectedExists =
+            this.selectedVenueCode === 'all' ||
+            this.venues.some((v: any) => (v?.code ?? '').toString() === this.selectedVenueCode);
+          if (!selectedExists) this.selectedVenueCode = 'all';
+
+          this.events = (res.events || []).slice().sort((a, b) => {
+            const da = new Date((a.start_date || '').replace(' ', 'T')).getTime();
+            const db = new Date((b.start_date || '').replace(' ', 'T')).getTime();
+            return da - db;
+          });
+
+          this.loading = false;
+        },
+        error: (err) => {
+          console.error(err);
+          this.error = 'Could not load events. Please try again.';
+          this.loading = false;
+        },
+      });
   }
 }

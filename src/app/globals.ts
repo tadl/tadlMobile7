@@ -28,17 +28,34 @@ export class Globals {
 
   public system_short_name: string = 'TADL';
 
-  // ---- hosts (non-ILS) ----
-  public website_host: string = 'www.tadl.org';
-  public tools_host: string = 'tools.tadl.org';
-
+  // ---- hosts / endpoints (non-ILS) ----
   public website_schema: string = 'https://';
+
+  // Existing tools host (events/news)
+  public tools_host: string = 'tools.tadl.org';
   public tools_base: string = this.website_schema + this.tools_host;
 
-  // Non-ILS APIs (same as tadlMobile6)
+  // New locations host
+  public locations_base: string = 'https://locations.tools.tadl.org';
+
+  // Non-ILS APIs
   public events_api_url: string = this.tools_base + '/v2/mobile_events.json';
   public news_api_url: string = this.tools_base + '/v2/posts';
-  public hours_locations_url: string = this.tools_base + '/v2/locations.json?group=tadl';
+
+  // Locations APIs
+  public locations_group: string = 'tadl';
+  public locations_list_url: string = `${this.locations_base}/locations.json?group=${encodeURIComponent(
+    this.locations_group,
+  )}`;
+
+  locations_detail_url(shortname: string): string {
+    return `${this.locations_base}/locations.json?shortname=${encodeURIComponent(
+      (shortname || '').trim(),
+    )}`;
+  }
+
+  // Back-compat alias (so older code doesn’t explode if referenced anywhere)
+  public hours_locations_url: string = this.locations_list_url;
 
   // ---- UI state ----
   public api_loading: boolean = false;
@@ -55,7 +72,7 @@ export class Globals {
   }
 
   day_today() {
-    return format(new Date(), 'EEEE');
+    return format(new Date(), 'EEEE'); // e.g. "Monday"
   }
 
   async open_account_menu() {

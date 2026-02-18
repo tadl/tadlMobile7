@@ -23,6 +23,9 @@ import {
   star,
   informationCircle,
   personCircle,
+  openOutline,
+  locationOutline,
+  calendarOutline,
   close,
 } from 'ionicons/icons';
 
@@ -36,6 +39,9 @@ addIcons({
   calendar,
   megaphone,
   star,
+  'calendar-outline': calendarOutline,
+  'open-outline': openOutline,
+  'location-outline': locationOutline,
   'information-circle': informationCircle,
   'person-circle': personCircle,
   close,

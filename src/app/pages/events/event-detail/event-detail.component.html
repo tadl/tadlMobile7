@@ -1,23 +1,104 @@
 <ion-header>
   <ion-toolbar>
-    <ion-title>Event</ion-title>
-    <ion-buttons slot="end">
-      <ion-button (click)="close()">
-        <ion-icon name="close" slot="icon-only"></ion-icon>
+    <ion-title>Event Detail</ion-title>
+
+    <ion-buttons slot="start" *ngIf="dismissStyle === 'back'">
+      <ion-button (click)="dismiss()">
+        <ion-icon name="chevron-back-outline" slot="start"></ion-icon>
+        Back
       </ion-button>
+    </ion-buttons>
+
+    <ion-buttons slot="end" *ngIf="dismissStyle === 'close'">
+      <ion-button (click)="dismiss()">Close</ion-button>
     </ion-buttons>
   </ion-toolbar>
 </ion-header>
 
-<ion-content class="ion-padding">
-  <h2>{{ event?.title }}</h2>
+<ion-content>
+  <ng-container *ngIf="loading">
+    <ion-card>
+      <ion-card-header>
+        <ion-skeleton-text animated style="width: 60%"></ion-skeleton-text>
+        <ion-skeleton-text animated style="width: 35%"></ion-skeleton-text>
+      </ion-card-header>
+      <ion-card-content>
+        <ion-skeleton-text animated style="width: 100%"></ion-skeleton-text>
+        <ion-skeleton-text animated style="width: 92%"></ion-skeleton-text>
+        <ion-skeleton-text animated style="width: 85%"></ion-skeleton-text>
+      </ion-card-content>
+    </ion-card>
+  </ng-container>
 
-  <p *ngIf="event?.start"><b>When:</b> {{ event.start }}</p>
-  <p *ngIf="event?.venue_name"><b>Where:</b> {{ event.venue_name }}</p>
+  <ng-container *ngIf="!loading && error">
+    <ion-card class="error-card">
+      <ion-card-header>
+        <ion-card-title>Couldn’t load event</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <p class="muted">{{ error }}</p>
+      </ion-card-content>
+    </ion-card>
+  </ng-container>
 
-  <div *ngIf="event?.description" [innerHTML]="event.description"></div>
+  <ng-container *ngIf="!loading && !error && event">
+    <ion-card class="event-card">
+      <img *ngIf="imageUrl" class="hero" [src]="imageUrl" [alt]="title" />
 
-  <ion-button expand="block" *ngIf="event?.url" (click)="openLink(event.url)">
-    View on web
-  </ion-button>
+      <ion-card-header>
+        <ion-card-title class="title">{{ title }}</ion-card-title>
+      </ion-card-header>
+
+      <ion-card-content>
+        <div class="details">
+          <div class="when" *ngIf="startsAtDate; else noWhen">
+            <ion-icon name="calendar-outline" aria-hidden="true"></ion-icon>
+            <span class="when-text">
+              {{ startsAtDate | date : 'EEE, MMM d, y' }}
+              <span class="time" *ngIf="!event?.allDay">
+                • {{ startsAtDate | date : 'h:mm a' }}
+              </span>
+            </span>
+          </div>
+
+          <ng-template #noWhen>
+            <div class="when muted">—</div>
+          </ng-template>
+
+          <div class="where" *ngIf="location; else noWhere">
+            {{ location }}
+          </div>
+
+          <ng-template #noWhere>
+            <div class="where muted">—</div>
+          </ng-template>
+        </div>
+
+        <div class="desc" *ngIf="descriptionText; else noDesc">
+          <p [innerText]="descriptionText"></p>
+        </div>
+
+        <ng-template #noDesc>
+          <p class="muted">No description provided.</p>
+        </ng-template>
+
+        <div class="tags" *ngIf="event?.tags?.length">
+          <ion-chip *ngFor="let t of event?.tags" outline="true">
+            <ion-label>{{ t }}</ion-label>
+          </ion-chip>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
+    <ion-button
+      *ngIf="externalUrl"
+      class="open-button"
+      expand="block"
+      [href]="externalUrl"
+      target="_blank"
+      rel="noopener"
+    >
+      View full details
+    </ion-button>
+  </ng-container>
 </ion-content>

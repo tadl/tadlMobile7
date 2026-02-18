@@ -1,0 +1,112 @@
+.hero-wrap {
+  padding: 12px 12px 0 12px;
+}
+
+.hero {
+  width: 100%;
+  display: block;
+  border-radius: 14px;
+  max-height: 260px;
+  object-fit: cover;
+}
+
+.content {
+  padding: 14px 16px 24px 16px;
+}
+
+.title {
+  margin: 8px 0 8px 0;
+  font-size: 26px;
+  line-height: 1.1;
+}
+
+.today {
+  font-size: 16px;
+  opacity: 0.85;
+}
+
+.contact {
+  margin-bottom: 14px;
+
+  .line {
+    font-size: 16px;
+    line-height: 1.35;
+    margin: 0 0 6px 0;
+    opacity: 0.95;
+  }
+
+  .links {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0; // separator handles spacing
+  }
+
+  .link {
+    text-decoration: none;
+  }
+
+  .sep {
+    opacity: 0.65;
+    padding: 0 8px;
+  }
+}
+
+.hours-card {
+  margin: 0;
+}
+
+.hours-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.hours-row {
+  // Fixed sizing to prevent “today” row from visually jumping
+  min-height: 44px;
+  padding: 10px 12px;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+
+  .day {
+    font-size: 15px;
+    opacity: 0.85;
+    line-height: 1;
+    padding-right: 12px;
+    white-space: nowrap;
+  }
+
+  .hours {
+    font-size: 15px;
+    opacity: 0.95;
+    line-height: 1;
+
+    text-align: right;
+    margin-left: auto;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &.today {
+    background: rgba(56, 128, 255, 0.14);
+
+    .day,
+    .hours {
+      opacity: 1;
+    }
+  }
+}
+
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  background: rgba(0, 0, 0, 0.18);
+}

@@ -4,7 +4,7 @@
       <ion-menu-button menu="main"></ion-menu-button>
     </ion-buttons>
 
-    <ion-title>Locations</ion-title>
+    <ion-title>TADL Locations</ion-title>
 
     <ion-buttons slot="end">
       <ion-button (click)="globals.open_account_menu()">
@@ -20,12 +20,20 @@
   </ion-refresher>
 
   <ion-list>
-    <ion-item button *ngFor="let loc of locations" (click)="view_details(loc)">
+    <ion-item button *ngFor="let loc of locations" (click)="view_details(loc)" detail="true">
+      <ion-thumbnail slot="start">
+        <ion-img
+          [src]="imageFor(loc)"
+          [alt]="loc.fullname"
+          (ionError)="markLocationImageBroken(loc)"
+        ></ion-img>
+      </ion-thumbnail>
+
       <ion-label>
-        <h2>{{ loc.name }}</h2>
-        <p *ngIf="loc.today_hours">{{ loc.today_hours }}</p>
+        <h2>{{ loc.fullname }}</h2>
+        <p *ngIf="today_hours(loc)">{{ today_hours(loc) }}</p>
+        <p *ngIf="addressLine(loc)">{{ addressLine(loc) }}</p>
       </ion-label>
-      <ion-icon name="chevron-forward" slot="end"></ion-icon>
     </ion-item>
   </ion-list>
 

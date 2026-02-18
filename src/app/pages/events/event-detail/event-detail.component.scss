@@ -1,0 +1,77 @@
+.event-card {
+  .hero {
+    width: 100%;
+    display: block;
+    max-height: 260px;
+    object-fit: cover;
+  }
+
+  .title {
+    font-size: 28px;
+    line-height: 1.1;
+    text-align: center;
+    margin: 0;
+  }
+}
+
+.details {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+
+  gap: 8px;
+  margin: 14px 0 18px 0;
+
+  .when {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+
+    font-size: 20px; // slightly larger
+    line-height: 1.25;
+
+    ion-icon {
+      font-size: 20px;
+      opacity: 0.9;
+    }
+
+    .when-text {
+      display: inline;
+    }
+
+    .time {
+      opacity: 0.95;
+    }
+  }
+
+  .where {
+    font-size: 17px; // slightly smaller
+    line-height: 1.25;
+    opacity: 0.9;
+  }
+}
+
+.desc {
+  p {
+    white-space: pre-wrap;
+    margin: 0;
+    font-size: 18px;
+    line-height: 1.4;
+  }
+}
+
+.tags {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.muted {
+  opacity: 0.8;
+}
+
+.open-button {
+  margin: 16px;
+}

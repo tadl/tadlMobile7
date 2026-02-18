@@ -4,7 +4,7 @@
       <ion-menu-button menu="main"></ion-menu-button>
     </ion-buttons>
 
-    <ion-title>Events</ion-title>
+    <ion-title>TADL Events</ion-title>
 
     <ion-buttons slot="end">
       <ion-button (click)="globals.open_account_menu()">
@@ -12,27 +12,64 @@
       </ion-button>
     </ion-buttons>
   </ion-toolbar>
+
+  <!-- Filter dropdown at top of list -->
+  <ion-toolbar>
+    <ion-item lines="none">
+      <ion-label>Location</ion-label>
+      <ion-select
+        interface="popover"
+        [value]="selectedVenueCode"
+        (ionChange)="onVenueChange($event.detail.value)"
+      >
+        <ion-select-option *ngFor="let v of venues" [value]="venueValue(v)">
+          {{ venueLabel(v) }}
+        </ion-select-option>
+      </ion-select>
+    </ion-item>
+  </ion-toolbar>
 </ion-header>
 
 <ion-content>
-  <ion-refresher slot="fixed" (ionRefresh)="get_events(location); $event.target.complete()">
+  <ion-refresher
+    slot="fixed"
+    (ionRefresh)="onVenueChange(selectedVenueCode); $event.target.complete()"
+  >
     <ion-refresher-content></ion-refresher-content>
   </ion-refresher>
 
-  <ion-list>
-    <ion-item button *ngFor="let e of web_events" (click)="view_details(e)">
+  <ion-list *ngIf="!loading && !error">
+    <ion-item
+      button
+      *ngFor="let ev of events; trackBy: trackByUrl"
+      (click)="openEvent(ev)"
+      detail="true"
+    >
+      <ion-thumbnail slot="start">
+        <ion-img [src]="imageFor(ev)" [alt]="titleFor(ev)"></ion-img>
+      </ion-thumbnail>
+
       <ion-label>
-        <h2>{{ e.title }}</h2>
-        <p *ngIf="e.start">{{ e.start }}</p>
-        <p *ngIf="e.venue_name">{{ e.venue_name }}</p>
+        <h2>{{ ev.title }}</h2>
+        <p>{{ ev.start_date | date: 'EEE, MMM d, y · h:mm a' }}</p>
+        <p>{{ ev.location }}</p>
       </ion-label>
-      <ion-icon name="chevron-forward" slot="end"></ion-icon>
     </ion-item>
   </ion-list>
 
-  <ion-item *ngIf="!globals.api_loading && web_events.length === 0">
-    <ion-label>No events found.</ion-label>
-  </ion-item>
+  <div class="state" *ngIf="loading">
+    <ion-spinner></ion-spinner>
+    <p>Loading events…</p>
+  </div>
 
-  <ion-spinner *ngIf="globals.api_loading" class="ion-padding"></ion-spinner>
+  <div class="state" *ngIf="!loading && error">
+    <p>{{ error }}</p>
+    <ion-button expand="block" (click)="onVenueChange(selectedVenueCode)">
+      Retry
+    </ion-button>
+  </div>
+
+  <div class="state" *ngIf="!loading && !error && events.length === 0">
+    <p>No events found for this location.</p>
+  </div>
 </ion-content>

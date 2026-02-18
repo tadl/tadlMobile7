@@ -1,23 +1,62 @@
 <ion-header>
   <ion-toolbar>
-    <ion-title>Location</ion-title>
+    <ion-title>{{ location?.fullname || 'Location' }}</ion-title>
     <ion-buttons slot="end">
-      <ion-button (click)="close()">
-        <ion-icon name="close" slot="icon-only"></ion-icon>
-      </ion-button>
+      <ion-button (click)="close()">CLOSE</ion-button>
     </ion-buttons>
   </ion-toolbar>
 </ion-header>
 
-<ion-content class="ion-padding">
-  <h2>{{ location?.name }}</h2>
+<ion-content>
+  <div class="loading-overlay" *ngIf="loading">
+    <ion-spinner></ion-spinner>
+  </div>
 
-  <p *ngIf="location?.address"><b>Address:</b> {{ location.address }}</p>
-  <p *ngIf="location?.phone"><b>Phone:</b> {{ location.phone }}</p>
+  <ng-container *ngIf="location">
+    <div class="hero-wrap" *ngIf="location.image">
+      <img class="hero" [src]="location.image" [alt]="location.fullname" />
+    </div>
 
-  <div *ngIf="location?.hours" [innerHTML]="location.hours"></div>
+    <div class="content">
+      <h2 class="title">{{ location.fullname }}</h2>
 
-  <ion-button expand="block" *ngIf="location?.url" (click)="openLink(location.url)">
-    View on web
-  </ion-button>
+      <p class="today" *ngIf="openTodayLine(location)">{{ openTodayLine(location) }}</p>
+
+      <div class="contact">
+        <div class="line" *ngIf="location.address">{{ location.address }}</div>
+        <div class="line" *ngIf="location.citystatezip">{{ location.citystatezip }}</div>
+
+        <div class="line links" *ngIf="location.phone || location.email">
+          <a class="link" *ngIf="location.phone" [href]="telHref(location.phone)">
+            {{ location.phone }}
+          </a>
+
+          <span class="sep" *ngIf="location.phone && location.email">•</span>
+
+          <a class="link" *ngIf="location.email" [href]="mailtoHref(location.email)">
+            {{ location.email }}
+          </a>
+        </div>
+      </div>
+
+      <ion-card class="hours-card">
+        <ion-card-header>
+          <ion-card-title>Hours</ion-card-title>
+        </ion-card-header>
+
+        <ion-card-content>
+          <div class="hours-grid">
+            <div
+              class="hours-row"
+              *ngFor="let row of hoursRows(location)"
+              [class.today]="row.isToday"
+            >
+              <div class="day">{{ row.day }}</div>
+              <div class="hours">{{ row.hours }}</div>
+            </div>
+          </div>
+        </ion-card-content>
+      </ion-card>
+    </div>
+  </ng-container>
 </ion-content>

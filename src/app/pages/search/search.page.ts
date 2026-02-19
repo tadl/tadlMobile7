@@ -186,7 +186,6 @@ export class SearchPage {
   }
 
   trackById(_idx: number, h: AspenSearchHit) {
-    // prefer stable identifiers for list rendering
-    return (h as any).key ?? h.title ?? _idx;
+    return h.key;
   }
 }

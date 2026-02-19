@@ -1,0 +1,36 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Item</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="close()">
+        <ion-icon name="close" slot="icon-only"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <div class="hero" *ngIf="hit?.coverUrl">
+    <img [src]="hit.coverUrl" alt="" />
+  </div>
+
+  <h2>{{ hit.title || 'Untitled' }}</h2>
+  <p *ngIf="hit?.author"><strong>Author:</strong> {{ hit.author }}</p>
+
+  <!-- format is often blank in getAppSearchResults; consider showing itemList-derived formats later -->
+  <p *ngIf="hit?.format"><strong>Format:</strong> {{ hit.format }}</p>
+
+  <div *ngIf="hit?.summary" class="desc">
+    {{ hit.summary }}
+  </div>
+
+  <ion-button expand="block" *ngIf="hit?.catalogUrl" (click)="openCatalog()">
+    View in Catalog
+  </ion-button>
+
+  <!-- temporary: helps us see what Aspen is returning while we wire facets/details -->
+  <details class="raw">
+    <summary>Raw (debug)</summary>
+    <pre>{{ hit.raw | json }}</pre>
+  </details>
+</ion-content>

@@ -28,19 +28,12 @@ export class Globals {
 
   public system_short_name: string = 'TADL';
 
-  // ---- hosts / endpoints (non-ILS) ----
-  public website_schema: string = 'https://';
-
-  // Existing tools host (events/news)
-  public tools_host: string = 'tools.tadl.org';
-  public tools_base: string = this.website_schema + this.tools_host;
+  // Aspen API proxy (LIDA-compatible paths)
+  public aspen_base: string = 'https://aspen.tools.tadl.org';
+  public aspen_api_base: string = this.aspen_base + '/API';
 
   // New locations host
   public locations_base: string = 'https://locations.tools.tadl.org';
-
-  // Non-ILS APIs
-  public events_api_url: string = this.tools_base + '/v2/mobile_events.json';
-  public news_api_url: string = this.tools_base + '/v2/posts';
 
   // Locations APIs
   public locations_group: string = 'tadl';

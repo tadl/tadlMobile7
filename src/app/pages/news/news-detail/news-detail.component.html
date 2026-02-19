@@ -2,20 +2,25 @@
   <ion-toolbar>
     <ion-title>News</ion-title>
     <ion-buttons slot="end">
-      <ion-button (click)="close()">
-        <ion-icon name="close" slot="icon-only"></ion-icon>
-      </ion-button>
+      <ion-button (click)="close()">CLOSE</ion-button>
     </ion-buttons>
   </ion-toolbar>
 </ion-header>
 
 <ion-content class="ion-padding">
-  <h2>{{ news?.title }}</h2>
-  <p *ngIf="news?.date">{{ news.date }}</p>
+  <img
+    *ngIf="heroImage()"
+    [src]="heroImage()!"
+    [alt]="titleFor()"
+    class="hero"
+  />
 
-  <div *ngIf="news?.content" [innerHTML]="news.content"></div>
+  <h2 [innerText]="titleFor()"></h2>
+  <p class="muted" *ngIf="dateFor()">{{ dateFor() }}</p>
 
-  <ion-button expand="block" *ngIf="news?.url" (click)="openLink(news.url)">
+  <div *ngIf="htmlContent()" [innerHTML]="htmlContent()"></div>
+
+  <ion-button expand="block" *ngIf="postUrl()" (click)="openLink(postUrl()!)">
     View on web
   </ion-button>
 </ion-content>

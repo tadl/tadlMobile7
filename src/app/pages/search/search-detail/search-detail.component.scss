@@ -1,0 +1,24 @@
+.hero {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 16px;
+
+  img {
+    max-width: 220px;
+    border-radius: 12px;
+  }
+}
+
+.desc {
+  margin-top: 12px;
+  opacity: 0.9;
+}
+
+.raw {
+  margin-top: 16px;
+  opacity: 0.8;
+
+  pre {
+    white-space: pre-wrap;
+  }
+}

@@ -1,0 +1,100 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-menu-button menu="main"></ion-menu-button>
+    </ion-buttons>
+
+    <ion-title>Search</ion-title>
+
+    <ion-buttons slot="end">
+      <ion-button (click)="globals.open_account_menu()">
+        <ion-icon name="person-circle" slot="icon-only"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <div class="ion-padding">
+    <ion-searchbar
+      [(ngModel)]="lookfor"
+      placeholder="Search the catalog"
+      (ionClear)="hits = []; page = 1; totalPages = 1; infiniteDisabled = true"
+      (keyup.enter)="onSubmit()"
+    ></ion-searchbar>
+
+    <div class="actions">
+      <ion-button size="small" (click)="onSubmit()">
+        Search
+      </ion-button>
+
+      <ion-button size="small" fill="clear" (click)="toggleAdvanced()">
+        Advanced
+      </ion-button>
+    </div>
+
+    <div *ngIf="showAdvanced" class="advanced">
+      <ion-item>
+        <ion-label>Search index</ion-label>
+        <ion-select [(ngModel)]="searchIndex" interface="popover">
+          <ion-select-option value="Keyword">Keyword</ion-select-option>
+          <ion-select-option value="Title">Title</ion-select-option>
+          <ion-select-option value="Author">Author</ion-select-option>
+          <ion-select-option value="Subject">Subject</ion-select-option>
+          <ion-select-option value="ISBN">ISBN</ion-select-option>
+        </ion-select>
+      </ion-item>
+
+      <ion-item>
+        <ion-label>Sort</ion-label>
+        <ion-select [(ngModel)]="sort" interface="popover">
+          <ion-select-option value="relevance">Relevance</ion-select-option>
+          <ion-select-option value="newest_to_oldest">Newest</ion-select-option>
+          <ion-select-option value="oldest_to_newest">Oldest</ion-select-option>
+          <ion-select-option value="title">Title</ion-select-option>
+          <ion-select-option value="author">Author</ion-select-option>
+        </ion-select>
+      </ion-item>
+
+      <ion-note class="ion-padding-top">
+        Filters/facets coming next (we’ll pull them from getAvailableFacets / getAppliedFilters).
+      </ion-note>
+    </div>
+
+    <ion-note *ngIf="hits.length" class="ion-padding-top">
+      Page {{ page }} of {{ totalPages }}
+    </ion-note>
+  </div>
+
+  <ion-refresher slot="fixed" (ionRefresh)="runSearch(true); $event.target.complete()">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  <ion-list *ngIf="hits.length > 0">
+    <ion-item button *ngFor="let h of hits; trackBy: trackById" (click)="openDetail(h)">
+      <ion-thumbnail slot="start" *ngIf="h.coverUrl">
+        <img [src]="h.coverUrl" alt="" />
+      </ion-thumbnail>
+
+      <ion-label>
+        <h2>{{ h.title || 'Untitled' }}</h2>
+        <p *ngIf="h.author">{{ h.author }}</p>
+        <p *ngIf="h.format">{{ h.format }}</p>
+      </ion-label>
+    </ion-item>
+  </ion-list>
+
+  <ion-item *ngIf="!globals.api_loading && lookfor.trim() && hits.length === 0">
+    <ion-label>No results.</ion-label>
+  </ion-item>
+
+  <ion-spinner *ngIf="globals.api_loading && hits.length === 0" class="ion-padding"></ion-spinner>
+
+  <ion-infinite-scroll
+    threshold="150px"
+    (ionInfinite)="loadMore($event)"
+    [disabled]="infiniteDisabled"
+  >
+    <ion-infinite-scroll-content loadingSpinner="bubbles"></ion-infinite-scroll-content>
+  </ion-infinite-scroll>
+</ion-content>

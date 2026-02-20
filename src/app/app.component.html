@@ -19,26 +19,16 @@
     </ion-content>
   </ion-menu>
 
-  <!-- RIGHT MENU (Account / ILS shell for later) -->
-  <ion-menu contentId="main-content" menuId="account" side="end">
+  <!-- RIGHT MENU (Account) -->
+  <ion-menu contentId="main-content" menuId="account" side="end" (ionDidOpen)="accountMenuDidOpen()">
     <ion-header>
       <ion-toolbar>
-        <ion-title>Account Menu</ion-title>
+        <ion-title>Account</ion-title>
       </ion-toolbar>
     </ion-header>
 
-    <ion-content class="ion-padding">
-      <p>
-        Account features (login, holds, checkouts, barcode, etc.) will live here once the
-        Aspen proxy service is wired up.
-      </p>
-
-      <ion-list>
-        <ion-item button (click)="globals.toggleMenu('account')">
-          <ion-icon name="close" slot="start"></ion-icon>
-          <ion-label>Close</ion-label>
-        </ion-item>
-      </ion-list>
+    <ion-content>
+      <app-account-menu></app-account-menu>
     </ion-content>
   </ion-menu>
 

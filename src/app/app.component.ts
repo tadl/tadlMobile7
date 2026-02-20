@@ -1,11 +1,14 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { IonicModule } from '@ionic/angular';
 import { Platform } from '@ionic/angular/standalone';
 import { App } from '@capacitor/app';
 import { fromEvent } from 'rxjs';
+
 import { Globals } from './globals';
+import { AuthService } from './services/auth.service';
+import { AccountMenuComponent } from './components/account-menu/account-menu.component';
 
 @Component({
   standalone: true,
@@ -16,9 +19,10 @@ import { Globals } from './globals';
     CommonModule,
     RouterModule,
     IonicModule,
+    AccountMenuComponent,
   ],
 })
-export class AppComponent {
+export class AppComponent implements OnInit {
   public appPages: Array<{ title: string; url: string; icon: string }> = [
     { title: 'Home', url: '/home', icon: 'home' },
     { title: 'Locations', url: '/locations', icon: 'compass' },
@@ -31,6 +35,7 @@ export class AppComponent {
   constructor(
     public globals: Globals,
     private platform: Platform,
+    private auth: AuthService,
   ) {
     this.platform.ready().then(async () => {
       await this.globals.getDeviceInfo();
@@ -43,6 +48,21 @@ export class AppComponent {
       fromEvent(document, 'didDismiss').subscribe(() => {
         this.globals.modal_open = false;
       });
+    });
+  }
+
+  ngOnInit() {
+    this.auth.restore().subscribe({
+      error: (err) => console.warn('[Auth] restore failed', err),
+    });
+  }
+
+  // Called by (ionDidOpen) on the account menu in app.component.html
+  accountMenuDidOpen() {
+    // Update counts/badges whenever the user opens the account menu.
+    this.auth.refreshActiveProfile().subscribe({
+      next: () => {},
+      error: (err) => console.warn('[Auth] refreshActiveProfile failed', err),
     });
   }
 }

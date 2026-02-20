@@ -32,6 +32,9 @@ export class Globals {
   public aspen_base: string = 'https://aspen.tools.tadl.org';
   public aspen_api_base: string = this.aspen_base + '/API';
 
+  // Centralized Aspen ILS API selector (your proxy requires this)
+  public aspen_api_param_api: string = 'tadl-prod';
+
   // New locations host
   public locations_base: string = 'https://locations.tools.tadl.org';
 

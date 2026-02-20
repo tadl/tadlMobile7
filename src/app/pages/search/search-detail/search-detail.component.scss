@@ -1,24 +1,134 @@
-.hero {
+.header-row {
   display: flex;
-  justify-content: center;
-  margin-bottom: 16px;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
 
-  img {
-    max-width: 220px;
-    border-radius: 12px;
-  }
+.cover {
+  width: 90px;
+  height: 130px;
+  flex: 0 0 auto;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.header-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.title {
+  margin: 0 0 6px 0;
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.meta {
+  margin: 0;
+  opacity: 0.85;
+  font-size: 13px;
+  line-height: 1.25;
 }
 
 .desc {
-  margin-top: 12px;
-  opacity: 0.9;
+  margin-top: 10px;
+  margin-bottom: 14px;
+  opacity: 0.95;
+  line-height: 1.35;
+}
+
+.format-row {
+  --padding-start: 14px;
+  --inner-padding-end: 14px;
+  align-items: flex-start;
+}
+
+.format-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 10px 0;
+  white-space: normal;
+}
+
+.format-title {
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 1.2;
+  overflow-wrap: break-word;
+}
+
+.format-meta {
+  margin-top: 4px;
+  font-size: 13px;
+  opacity: 0.8;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  align-items: baseline;
+}
+
+.format-sub {
+  display: block;
+  font-size: 13px;
+  opacity: 0.75;
+  margin-top: 4px;
+  line-height: 1.2;
+}
+
+.dot {
+  margin: 0 6px;
+}
+
+.format-actions {
+  flex: 0 0 auto;
+  max-width: 56%;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin: 10px 0;
+}
+
+.format-actions ion-button {
+  margin: 0;
+  height: 32px;
+  --padding-start: 10px;
+  --padding-end: 10px;
+}
+
+/* On narrow screens, stack buttons instead of crushing the label */
+@media (max-width: 420px) {
+  .cover {
+    width: 76px;
+    height: 110px;
+  }
+
+  .format-actions {
+    max-width: 52%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .format-actions ion-button {
+    width: 100%;
+  }
 }
 
 .raw {
-  margin-top: 16px;
-  opacity: 0.8;
+  margin-top: 18px;
+  opacity: 0.85;
+}
 
-  pre {
-    white-space: pre-wrap;
-  }
+.raw pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 12px;
 }

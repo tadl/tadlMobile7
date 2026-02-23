@@ -218,8 +218,12 @@ export class AccountMenuComponent implements OnInit {
     this.router.navigateByUrl('/holds?tab=ready');
   }
 
+  goCheckouts() {
+    this.globals.toggleMenu('account');
+    this.router.navigateByUrl('/checkouts');
+  }
+
   // placeholders until we build pages
-  goCheckouts() { this.toast.presentToast('Checkouts page coming next.'); }
   goFines() { this.toast.presentToast('Fines page coming next.'); }
   goHistory() { this.toast.presentToast('Checkout history page coming next.'); }
   goPrefs() { this.toast.presentToast('Account preferences page coming next.'); }

@@ -35,6 +35,10 @@ export const routes: Routes = [
     path: 'holds',
     loadComponent: () => import('./pages/holds/holds.page').then(m => m.HoldsPage),
   },
+  {
+    path: 'checkouts',
+    loadComponent: () => import('./pages/checkouts/checkouts.page').then(m => m.CheckoutsPage),
+  },
 
   { path: '**', redirectTo: 'home' },
 ];

@@ -28,6 +28,27 @@
     {{ work?.description || hit.summary }}
   </div>
 
+  <!-- CHECKED OUT TO YOU -->
+  <ion-card *ngIf="checkout" class="checkout-card">
+    <ion-card-header>
+      <ion-card-title>Checked out to you</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <div class="checkout-line" *ngIf="checkoutDueText()">Due: {{ checkoutDueText() }}</div>
+      <div class="checkout-line" *ngIf="checkoutRenewInfoText()">{{ checkoutRenewInfoText() }}</div>
+
+      <div class="checkout-actions">
+        <ion-button
+          expand="block"
+          (click)="renewCheckout()"
+          [disabled]="checkoutActionBusy || !checkoutCanRenew()"
+        >
+          Renew
+        </ion-button>
+      </div>
+    </ion-card-content>
+  </ion-card>
+
   <!-- YOU HAVE THIS ON HOLD (only when provided by component.ts) -->
   <ion-card *ngIf="hold" class="hold-card">
     <ion-card-header>

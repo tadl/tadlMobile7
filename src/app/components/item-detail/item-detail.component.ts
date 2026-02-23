@@ -15,6 +15,8 @@ import { ItemService, AspenGroupedWork } from '../../services/item.service';
 import { AspenSearchHit } from '../../services/search.service';
 import { HoldsService } from '../../services/holds.service';
 import type { AspenHold } from '../../services/holds.service';
+import { CheckoutsService } from '../../services/checkouts.service';
+import type { AspenCheckout } from '../../services/checkouts.service';
 
 @Component({
   standalone: true,
@@ -31,29 +33,41 @@ export class ItemDetailComponent implements OnInit {
   /** if we got here from HoldsPage, it passes the hold as hit.raw */
   hold: AspenHold | null = null;
 
+  /** if we got here from CheckoutsPage, it passes the checkout as hit.raw */
+  checkout: AspenCheckout | null = null;
+
   /** format label -> holdings count */
   private holdingsCountByFormat: Record<string, number> = {};
 
   holdActionBusy = false;
+  checkoutActionBusy = false;
 
   /** set to true when we mutate holds so HoldsPage can refresh on dismiss */
   private needsHoldsRefresh = false;
 
+  /** set to true when we mutate checkouts so CheckoutsPage can refresh on dismiss */
+  private needsCheckoutsRefresh = false;
+
   /** prevents overlapping hold-refresh calls */
   private holdRefreshBusy = false;
+
+  /** prevents overlapping checkout-refresh calls */
+  private checkoutRefreshBusy = false;
 
   constructor(
     public globals: Globals,
     private toast: ToastService,
     private items: ItemService,
     private holds: HoldsService,
+    private checkouts: CheckoutsService,
     private modalCtrl: ModalController, // ✅ renamed from "modal"
     private actionSheet: ActionSheetController,
   ) {}
 
   ngOnInit() {
-    // If opened from Holds, we already have the hold object in hit.raw
+    // If opened from Holds/Checkouts pages, we already have the object in hit.raw
     this.hold = this.extractHoldFromHit(this.hit);
+    this.checkout = this.extractCheckoutFromHit(this.hit);
 
     const key = (this.hit?.key ?? '').toString().trim();
     if (!key) return;
@@ -63,22 +77,90 @@ export class ItemDetailComponent implements OnInit {
         this.work = w ?? null;
         this.loadHoldingsCountsForWork(this.work);
 
-        // IMPORTANT:
-        // If we did NOT come from HoldsPage, or if we placed a hold from this view earlier,
-        // fetch holds and attach the hold for this grouped work so the "you have this on hold" card can show.
+        // Attach hold/checkout for this grouped work so cards appear even when opened from Search
         this.refreshHoldForThisItem();
+        this.refreshCheckoutForThisItem();
       },
       error: () => this.toast.presentToast('Could not load item details.'),
     });
   }
 
   close() {
-    this.modalCtrl.dismiss(this.needsHoldsRefresh ? { refreshHolds: true } : undefined);
+    const payload: any = {};
+    if (this.needsHoldsRefresh) payload.refreshHolds = true;
+    if (this.needsCheckoutsRefresh) payload.refreshCheckouts = true;
+
+    this.modalCtrl.dismiss(Object.keys(payload).length ? payload : undefined);
     this.globals.modal_open = false;
   }
 
   openCatalog() {
     if (this.hit?.catalogUrl) this.globals.open_page(this.hit.catalogUrl);
+  }
+
+  // ----------------------------
+  // Checkout card helpers/actions
+  // ----------------------------
+
+  checkoutDueText(): string {
+    const c: any = this.checkout;
+    if (!c) return '';
+    const due = Number(c?.dueDate ?? 0);
+    if (!Number.isFinite(due) || due <= 0) return '';
+    const dt = new Date(due * 1000); // Aspen dueDate is epoch seconds
+    return dt.toLocaleDateString(undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  }
+
+  checkoutRenewInfoText(): string {
+    const c: any = this.checkout;
+    if (!c) return '';
+    const used = c?.renewCount;
+    const max = c?.maxRenewals;
+    if (used == null && max == null) return '';
+    if (used == null) return `Max renewals: ${max}`;
+    if (max == null) return `Renewals: ${used}`;
+    return `Renewals: ${used} / ${max}`;
+  }
+
+  checkoutCanRenew(): boolean {
+    const c: any = this.checkout;
+    if (!c) return false;
+    return c?.canRenew === true || c?.canrenew === true;
+  }
+
+  renewCheckout() {
+    if (!this.checkout || this.checkoutActionBusy) return;
+
+    if (!this.checkoutCanRenew()) {
+      this.toast.presentToast('This item cannot be renewed.');
+      return;
+    }
+
+    this.checkoutActionBusy = true;
+
+    this.checkouts
+      .renewCheckout(this.checkout)
+      .pipe(finalize(() => (this.checkoutActionBusy = false)))
+      .subscribe({
+        next: (res) => {
+          if (!res?.success) {
+            this.toast.presentToast(res?.message || 'Could not renew.');
+            return;
+          }
+
+          this.needsCheckoutsRefresh = true;
+          this.toast.presentToast(res?.message || 'Renewed.');
+
+          // Authoritative refresh so due date / canRenew updates
+          this.refreshCheckoutForThisItem(true);
+        },
+        error: () => this.toast.presentToast('Could not renew.'),
+      });
   }
 
   // ----------------------------
@@ -397,7 +479,7 @@ export class ItemDetailComponent implements OnInit {
           this.needsHoldsRefresh = true;
           this.toast.presentToast(res?.message || 'Hold placed.');
 
-          // NEW: fetch holds and attach the hold for this grouped work so the card appears
+          // fetch holds and attach the hold for this grouped work so the card appears
           this.refreshHoldForThisItem();
         },
         error: () => this.toast.presentToast('Could not place hold.'),
@@ -478,6 +560,29 @@ export class ItemDetailComponent implements OnInit {
       });
   }
 
+  private refreshCheckoutForThisItem(force = false) {
+    const key = (this.hit?.key ?? '').toString().trim();
+    if (!key) return;
+
+    if (!force && this.checkout && String((this.checkout as any)?.groupedWorkId ?? '').trim() === key) return;
+
+    if (this.checkoutRefreshBusy) return;
+    this.checkoutRefreshBusy = true;
+
+    this.checkouts.fetchActiveCheckouts()
+      .pipe(finalize(() => (this.checkoutRefreshBusy = false)))
+      .subscribe({
+        next: (list) => {
+          const found =
+            (list ?? []).find(c => String((c as any)?.groupedWorkId ?? '').trim() === key) ?? null;
+
+          if (found) this.checkout = found;
+          else if (force) this.checkout = null;
+        },
+        error: () => {},
+      });
+  }
+
   private extractHoldFromHit(hit: AspenSearchHit | null | undefined): AspenHold | null {
     const raw: any = hit?.raw;
     if (!raw || typeof raw !== 'object') return null;
@@ -487,6 +592,19 @@ export class ItemDetailComponent implements OnInit {
     const hasCancel = raw?.cancelable === true || raw?.cancelId;
 
     if (hasIds && isIls && hasCancel) return raw as AspenHold;
+    return null;
+  }
+
+  private extractCheckoutFromHit(hit: AspenSearchHit | null | undefined): AspenCheckout | null {
+    const raw: any = hit?.raw;
+    if (!raw || typeof raw !== 'object') return null;
+
+    const isIls = raw?.type === 'ils' || raw?.source === 'ils';
+    const hasBarcode = !!(raw?.barcode);
+    const hasDue = raw?.dueDate != null;
+    const hasRecord = raw?.recordId != null;
+
+    if (isIls && hasBarcode && hasDue && hasRecord) return raw as AspenCheckout;
     return null;
   }
 }

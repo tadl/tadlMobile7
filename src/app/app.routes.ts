@@ -39,6 +39,14 @@ export const routes: Routes = [
     path: 'checkouts',
     loadComponent: () => import('./pages/checkouts/checkouts.page').then(m => m.CheckoutsPage),
   },
+  {
+    path: 'my-lists',
+    loadComponent: () => import('./pages/my-lists/my-lists.page').then(m => m.MyListsPage),
+  },
+  {
+    path: 'my-lists/:id',
+    loadComponent: () => import('./pages/my-list-detail/my-list-detail.page').then(m => m.MyListDetailPage),
+  },
 
   { path: '**', redirectTo: 'home' },
 ];

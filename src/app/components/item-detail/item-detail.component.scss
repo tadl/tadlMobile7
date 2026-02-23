@@ -39,6 +39,22 @@
   overflow-wrap: break-word;
 }
 
+.list-card ion-card-title {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  opacity: 0.85;
+}
+
+.list-line {
+  margin: 6px 0;
+  opacity: 0.95;
+}
+
+.list-actions {
+  margin-top: 12px;
+}
+
 /* Hold card */
 .hold-card ion-card-title {
   font-size: 14px;

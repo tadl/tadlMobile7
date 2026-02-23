@@ -17,6 +17,13 @@ import { HoldsService } from '../../services/holds.service';
 import type { AspenHold } from '../../services/holds.service';
 import { CheckoutsService } from '../../services/checkouts.service';
 import type { AspenCheckout } from '../../services/checkouts.service';
+import { ListsService } from '../../services/lists.service';
+
+interface ItemDetailListContext {
+  listId: string;
+  listTitle?: string;
+  recordId?: string;
+}
 
 @Component({
   standalone: true,
@@ -27,6 +34,7 @@ import type { AspenCheckout } from '../../services/checkouts.service';
 })
 export class ItemDetailComponent implements OnInit {
   @Input() hit!: AspenSearchHit;
+  @Input() listContext: ItemDetailListContext | null = null;
 
   work: AspenGroupedWork | null = null;
 
@@ -41,12 +49,15 @@ export class ItemDetailComponent implements OnInit {
 
   holdActionBusy = false;
   checkoutActionBusy = false;
+  listActionBusy = false;
 
   /** set to true when we mutate holds so HoldsPage can refresh on dismiss */
   private needsHoldsRefresh = false;
 
   /** set to true when we mutate checkouts so CheckoutsPage can refresh on dismiss */
   private needsCheckoutsRefresh = false;
+  /** set to true when we mutate list membership so MyListDetail can refresh on dismiss */
+  private needsListRefresh = false;
 
   /** prevents overlapping hold-refresh calls */
   private holdRefreshBusy = false;
@@ -60,6 +71,7 @@ export class ItemDetailComponent implements OnInit {
     private items: ItemService,
     private holds: HoldsService,
     private checkouts: CheckoutsService,
+    private lists: ListsService,
     private modalCtrl: ModalController, // ✅ renamed from "modal"
     private actionSheet: ActionSheetController,
   ) {}
@@ -89,6 +101,7 @@ export class ItemDetailComponent implements OnInit {
     const payload: any = {};
     if (this.needsHoldsRefresh) payload.refreshHolds = true;
     if (this.needsCheckoutsRefresh) payload.refreshCheckouts = true;
+    if (this.needsListRefresh) payload.refreshList = true;
 
     this.modalCtrl.dismiss(Object.keys(payload).length ? payload : undefined);
     this.globals.modal_open = false;
@@ -96,6 +109,73 @@ export class ItemDetailComponent implements OnInit {
 
   openCatalog() {
     if (this.hit?.catalogUrl) this.globals.open_page(this.hit.catalogUrl);
+  }
+
+  // ----------------------------
+  // List context helpers/actions
+  // ----------------------------
+
+  inListTitle(): string {
+    return (this.listContext?.listTitle ?? '').toString().trim() || 'This list';
+  }
+
+  canRemoveFromList(): boolean {
+    const listId = (this.listContext?.listId ?? '').toString().trim();
+    const recordId = this.listRecordId();
+    return !!listId && !!recordId;
+  }
+
+  async confirmRemoveFromList() {
+    if (this.listActionBusy || !this.canRemoveFromList()) return;
+
+    const sheet = await this.actionSheet.create({
+      header: 'Remove from list?',
+      subHeader: this.inListTitle(),
+      buttons: [
+        {
+          text: 'Remove',
+          role: 'destructive',
+          handler: () => this.removeFromListNow(),
+        },
+        {
+          text: 'Cancel',
+          role: 'cancel',
+        },
+      ],
+    });
+
+    await sheet.present();
+  }
+
+  private removeFromListNow() {
+    if (this.listActionBusy || !this.canRemoveFromList()) return;
+
+    const listId = (this.listContext?.listId ?? '').toString().trim();
+    const recordId = this.listRecordId();
+    if (!listId || !recordId) return;
+
+    this.listActionBusy = true;
+    this.lists.removeTitlesFromList(listId, [recordId])
+      .pipe(finalize(() => (this.listActionBusy = false)))
+      .subscribe({
+        next: (res) => {
+          if (!res?.success) {
+            this.toast.presentToast(res?.message || 'Could not remove from list.');
+            return;
+          }
+
+          this.needsListRefresh = true;
+          this.toast.presentToast(res?.message || 'Removed from list.');
+          this.close();
+        },
+        error: () => this.toast.presentToast('Could not remove from list.'),
+      });
+  }
+
+  private listRecordId(): string {
+    const fromCtx = (this.listContext?.recordId ?? '').toString().trim();
+    if (fromCtx) return fromCtx;
+    return (this.hit?.key ?? '').toString().trim();
   }
 
   // ----------------------------

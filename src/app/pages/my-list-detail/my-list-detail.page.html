@@ -1,0 +1,55 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/my-lists"></ion-back-button>
+    </ion-buttons>
+
+    <ion-title>{{ listTitle }}</ion-title>
+
+    <ion-buttons slot="end">
+      <ion-button (click)="globals.open_account_menu()">
+        <ion-icon name="person-circle" slot="icon-only"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <ion-refresher slot="fixed" (ionRefresh)="refresh($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  <ion-item lines="none" *ngIf="listDescription">
+    <ion-label class="ion-text-wrap desc">{{ listDescription }}</ion-label>
+  </ion-item>
+
+  <ion-list *ngIf="titles.length > 0" lines="full" class="full-list">
+    <ion-item button *ngFor="let t of titles; trackBy: trackByTitle" (click)="openTitle(t)">
+      <ion-thumbnail slot="start" *ngIf="coverUrl(t)">
+        <img [src]="coverUrl(t)" alt="" (error)="$event.target.style.display='none'" />
+      </ion-thumbnail>
+
+      <ion-label class="ion-text-wrap">
+        <div class="title">{{ titleText(t) }}</div>
+        <div class="sub" *ngIf="authorText(t)">{{ authorText(t) }}</div>
+      </ion-label>
+
+      <ion-button
+        slot="end"
+        fill="clear"
+        size="small"
+        class="row-action"
+        [disabled]="removeBusyFor(t)"
+        (click)="openTitleActions(t, $event)"
+      >
+        <ion-icon name="ellipsis-vertical" slot="icon-only"></ion-icon>
+      </ion-button>
+    </ion-item>
+  </ion-list>
+
+  <ion-item *ngIf="!loading && titles.length === 0">
+    <ion-label class="ion-text-wrap">
+      No titles in this list.
+    </ion-label>
+  </ion-item>
+</ion-content>

@@ -35,6 +35,10 @@ import {
   calendarOutline,
   close,
   chevronForward,
+  add,
+  createOutline,
+  trashOutline,
+  ellipsisVertical,
 } from 'ionicons/icons';
 
 import { routes } from './app/app.routes';
@@ -57,6 +61,10 @@ addIcons({
   'information-circle': informationCircle,
   'person-circle': personCircle,
   close,
+  add,
+  'create-outline': createOutline,
+  'trash-outline': trashOutline,
+  'ellipsis-vertical': ellipsisVertical,
 });
 
 bootstrapApplication(AppComponent, {

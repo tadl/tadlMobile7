@@ -223,6 +223,11 @@ export class AccountMenuComponent implements OnInit {
     this.router.navigateByUrl('/checkouts');
   }
 
+  goMyLists() {
+    this.globals.toggleMenu('account');
+    this.router.navigateByUrl('/my-lists');
+  }
+
   // placeholders until we build pages
   goFines() { this.toast.presentToast('Fines page coming next.'); }
   goHistory() { this.toast.presentToast('Checkout history page coming next.'); }

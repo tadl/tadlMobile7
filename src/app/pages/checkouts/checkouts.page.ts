@@ -108,7 +108,7 @@ export class CheckoutsPage {
       language: undefined,
       format: c?.format,
       itemList: [],
-      catalogUrl: key ? `${this.globals.aspen_base}/GroupedWork/${encodeURIComponent(key)}` : undefined,
+      catalogUrl: key ? `${this.globals.aspen_discovery_base}/GroupedWork/${encodeURIComponent(key)}` : undefined,
       raw: c,
     };
 

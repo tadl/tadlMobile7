@@ -171,7 +171,7 @@ export class SearchService {
 
       const itemList = this.extractItemList(r?.itemList);
 
-      const catalogUrl = `${this.globals.aspen_base}/GroupedWork/${encodeURIComponent(key)}`;
+      const catalogUrl = `${this.globals.aspen_discovery_base}/GroupedWork/${encodeURIComponent(key)}`;
 
       hits.push({
         key,

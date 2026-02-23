@@ -28,6 +28,26 @@
     {{ work?.description || hit.summary }}
   </div>
 
+  <ion-card *ngIf="listContext" class="list-card">
+    <ion-card-header>
+      <ion-card-title>In this list</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <div class="list-line">{{ inListTitle() }}</div>
+      <div class="list-actions">
+        <ion-button
+          expand="block"
+          color="danger"
+          fill="outline"
+          (click)="confirmRemoveFromList()"
+          [disabled]="listActionBusy || !canRemoveFromList()"
+        >
+          Remove from list
+        </ion-button>
+      </div>
+    </ion-card-content>
+  </ion-card>
+
   <!-- CHECKED OUT TO YOU -->
   <ion-card *ngIf="checkout" class="checkout-card">
     <ion-card-header>

@@ -33,9 +33,15 @@ export class Globals {
 
   public system_short_name: string = 'TADL';
 
-  // Aspen API proxy (LIDA-compatible paths)
-  public aspen_base: string = 'https://aspen.tools.tadl.org';
-  public aspen_api_base: string = this.aspen_base + '/API';
+  // Aspen hosts:
+  // - discovery host serves catalog pages and covers
+  // - api host serves proxied API endpoints
+  public aspen_discovery_base: string = 'https://discover.tadl.org';
+  public aspen_api_host: string = 'https://aspen.tools.tadl.org';
+  public aspen_api_base: string = this.aspen_api_host + '/API';
+
+  // Back-compat alias: existing code may still reference this for discovery links.
+  public aspen_base: string = this.aspen_discovery_base;
 
   // Centralized Aspen ILS API selector (your proxy requires this)
   public aspen_api_param_api: string = 'tadl-prod';

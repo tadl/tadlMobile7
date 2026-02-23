@@ -149,7 +149,7 @@ export class HoldsPage {
       language: undefined,
       format: h?.['format'], // TS4111-safe
       itemList: [],
-      catalogUrl: `${this.globals.aspen_base}/GroupedWork/${encodeURIComponent(key)}`,
+      catalogUrl: `${this.globals.aspen_discovery_base}/GroupedWork/${encodeURIComponent(key)}`,
       raw: h,
     };
 

@@ -1,0 +1,28 @@
+.title {
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.sub {
+  opacity: 0.8;
+  margin-top: 2px;
+}
+
+.manage-card {
+  margin-top: 0;
+  margin-bottom: 10px;
+}
+
+.manage-toggle {
+  --padding-start: 0;
+  --inner-padding-end: 0;
+  margin-top: 8px;
+}
+
+.count-badge {
+  margin-inline-end: 6px;
+}
+
+.row-action {
+  margin-inline-start: 8px;
+}

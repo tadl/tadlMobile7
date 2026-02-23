@@ -1,0 +1,41 @@
+.welcome-card {
+  margin-top: 0;
+}
+
+.welcome-auth {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.welcome-logo-auth {
+  width: 76px;
+  height: auto;
+  flex: 0 0 auto;
+}
+
+.welcome-copy {
+  min-width: 0;
+}
+
+.welcome-headline {
+  font-size: 1.65rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.welcome-text {
+  margin-top: 6px;
+  opacity: 0.92;
+  line-height: 1.35;
+}
+
+.welcome-noauth {
+  display: flex;
+  justify-content: center;
+}
+
+.welcome-logo-noauth {
+  width: min(520px, 100%);
+  height: auto;
+}

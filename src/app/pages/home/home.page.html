@@ -15,15 +15,31 @@
 </ion-header>
 
 <ion-content class="ion-padding">
-  <ion-card>
-    <ion-card-header>
-      <ion-card-title>Welcome</ion-card-title>
-      <ion-card-subtitle>Home screen (non-ILS)</ion-card-subtitle>
-    </ion-card-header>
-
+  <ion-card class="welcome-card">
     <ion-card-content>
-      Use the left menu to browse <b>Events</b>, <b>News</b>, <b>Locations</b>, and <b>Featured</b>.
-      Account features will reappear on the right menu once the Aspen proxy is ready.
+      <ng-container *ngIf="auth.authState() | async as s">
+        <div *ngIf="s.isLoggedIn; else loggedOutWelcome" class="welcome-auth">
+          <img
+            [src]="isDarkMode() ? 'assets/logo-clock-only-dark.png' : 'assets/logo-clock-only.png'"
+            alt="TADL logo"
+            class="welcome-logo-auth"
+          />
+          <div class="welcome-copy">
+            <div class="welcome-headline">Logged in as {{ loggedInUsername(s) }}</div>
+            <div class="welcome-text">{{ holdsCheckoutsSummary(s.profile) }}</div>
+          </div>
+        </div>
+
+        <ng-template #loggedOutWelcome>
+          <div class="welcome-noauth">
+            <img
+              [src]="isDarkMode() ? 'assets/logo-dark.png' : 'assets/logo.png'"
+              alt="Traverse Area District Library"
+              class="welcome-logo-noauth"
+            />
+          </div>
+        </ng-template>
+      </ng-container>
     </ion-card-content>
   </ion-card>
 

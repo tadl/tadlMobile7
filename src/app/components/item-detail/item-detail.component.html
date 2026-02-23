@@ -1,0 +1,108 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Item Detail</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="close()">
+        <ion-icon name="close" slot="icon-only"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <!-- Header block (small cover, not hero) -->
+  <div class="header">
+    <div class="cover" *ngIf="(work?.cover || hit?.coverUrl) as c">
+      <img [src]="c" alt="" />
+    </div>
+
+    <div class="header-text">
+      <h2 class="title">{{ (work?.title || hit.title || 'Untitled') }}</h2>
+      <div class="meta" *ngIf="work?.author || hit.author">
+        {{ work?.author || hit.author }}
+      </div>
+    </div>
+  </div>
+
+  <div class="desc" *ngIf="work?.description || hit.summary">
+    {{ work?.description || hit.summary }}
+  </div>
+
+  <!-- YOU HAVE THIS ON HOLD (only when provided by component.ts) -->
+  <ion-card *ngIf="hold" class="hold-card">
+    <ion-card-header>
+      <ion-card-title>You have this item on hold</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <div class="hold-line" *ngIf="holdPositionText()">{{ holdPositionText() }}</div>
+      <div class="hold-line" *ngIf="holdPickupText()">{{ holdPickupText() }}</div>
+      <div class="hold-line" *ngIf="holdStatusText()">
+        Status:
+        <span class="hold-status" [class.frozen]="holdIsFrozen()" [class.active]="!holdIsFrozen()">
+          {{ holdStatusText() }}
+        </span>
+      </div>
+
+      <div class="hold-actions">
+        <ion-button expand="block" *ngIf="holdIsFrozen()" (click)="thawHold()">Activate</ion-button>
+        <ion-button expand="block" *ngIf="!holdIsFrozen()" (click)="freezeHold()">Suspend</ion-button>
+        <ion-button expand="block" fill="outline" (click)="changePickupLocation()">Change pickup location</ion-button>
+        <ion-button expand="block" color="danger" (click)="confirmCancelHold()">Cancel</ion-button>
+      </div>
+    </ion-card-content>
+  </ion-card>
+
+  <!-- Formats -->
+  <ion-card *ngIf="work?.formats as fmts">
+    <ion-card-header>
+      <ion-card-title>Formats</ion-card-title>
+    </ion-card-header>
+
+    <ion-card-content class="ion-no-padding formats-list">
+      <ion-list lines="full">
+        <ion-item class="format-row" *ngFor="let kv of ($any(fmts) | keyvalue)">
+          <ion-label class="format-label ion-text-wrap">
+            <div class="format-title">
+              {{ $any(kv.value).label || ('' + kv.key) }}
+            </div>
+
+            <div class="format-meta">
+              <span *ngIf="$any(kv.value).category">{{ $any(kv.value).category }}</span>
+              <span *ngIf="$any(kv.value).category" class="dot">•</span>
+              <span>{{ $any(kv.value).isAvailable ? 'Available' : 'Not available' }}</span>
+            </div>
+
+            <ion-note *ngIf="(formatHoldingsCount(('' + kv.key)) || 0) > 0" class="format-sub">
+              {{ formatHoldingsCount(('' + kv.key)) }} holding(s) listed
+            </ion-note>
+
+            <ion-note *ngIf="hasHoldForFormat(('' + kv.key))" class="format-sub you-hold-it">
+              You have a hold on this format
+            </ion-note>
+          </ion-label>
+
+          <div class="format-actions" slot="end">
+            <ion-button
+              size="small"
+              fill="solid"
+              *ngFor="let a of ($any(kv.value).actions || [])"
+              [disabled]="holdActionBusy || (hasHoldForFormat(('' + kv.key)) && isIlsHoldAction(a))"
+              (click)="handleFormatAction(a, ('' + kv.key))"
+            >
+              {{ a.title || 'Action' }}
+            </ion-button>
+          </div>
+        </ion-item>
+      </ion-list>
+    </ion-card-content>
+  </ion-card>
+
+  <ion-button expand="block" *ngIf="hit?.catalogUrl" (click)="openCatalog()">
+    View in Catalog
+  </ion-button>
+
+  <details class="raw" *ngIf="work">
+    <summary>Raw (WorkAPI)</summary>
+    <pre>{{ work | json }}</pre>
+  </details>
+</ion-content>

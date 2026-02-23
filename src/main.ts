@@ -1,5 +1,10 @@
 import { bootstrapApplication } from '@angular/platform-browser';
-import { PreloadAllModules, provideRouter, RouteReuseStrategy, withPreloading } from '@angular/router';
+import {
+  PreloadAllModules,
+  provideRouter,
+  RouteReuseStrategy,
+  withPreloading,
+} from '@angular/router';
 import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
 import { HTTP_INTERCEPTORS } from '@angular/common/http';
 
@@ -22,6 +27,7 @@ import {
   calendar,
   megaphone,
   star,
+  search,
   informationCircle,
   personCircle,
   openOutline,
@@ -34,6 +40,7 @@ import {
 import { routes } from './app/app.routes';
 import { AppComponent } from './app/app.component';
 import { AspenApiParamsInterceptor } from './app/services/aspen-api-params.interceptor';
+import { LoadingInterceptor } from './app/services/loading.interceptor';
 
 // Register only what you use (fixes ionicon asset-path / base URL issues)
 addIcons({
@@ -42,6 +49,7 @@ addIcons({
   calendar,
   megaphone,
   star,
+  search,
   'chevron-forward': chevronForward,
   'calendar-outline': calendarOutline,
   'open-outline': openOutline,
@@ -67,8 +75,9 @@ bootstrapApplication(AppComponent, {
     PopoverController,
     Platform,
 
-    // ✅ Add interceptor provider anywhere in this providers array (order doesn't matter here)
+    // Interceptors
     { provide: HTTP_INTERCEPTORS, useClass: AspenApiParamsInterceptor, multi: true },
+    { provide: HTTP_INTERCEPTORS, useClass: LoadingInterceptor, multi: true },
 
     provideRouter(routes, withPreloading(PreloadAllModules)),
     provideHttpClient(withInterceptorsFromDi()),

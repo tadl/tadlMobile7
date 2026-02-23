@@ -1,4 +1,9 @@
 <ion-app>
+  <!-- GLOBAL TOP LOADING BAR (visible during normal navigation + modals + XHR) -->
+  <div class="global-loading" *ngIf="isLoading">
+    <ion-progress-bar type="indeterminate"></ion-progress-bar>
+  </div>
+
   <!-- LEFT MENU (main navigation) -->
   <ion-menu contentId="main-content" menuId="main" side="start">
     <ion-header>
@@ -20,7 +25,12 @@
   </ion-menu>
 
   <!-- RIGHT MENU (Account) -->
-  <ion-menu contentId="main-content" menuId="account" side="end" (ionDidOpen)="accountMenuDidOpen()">
+  <ion-menu
+    contentId="main-content"
+    menuId="account"
+    side="end"
+    (ionDidOpen)="accountMenuDidOpen()"
+  >
     <ion-header>
       <ion-toolbar>
         <ion-title>Account</ion-title>

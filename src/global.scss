@@ -35,3 +35,33 @@
 /* @import "@ionic/angular/css/palettes/dark.always.css"; */
 /* @import "@ionic/angular/css/palettes/dark.class.css"; */
 @import '@ionic/angular/css/palettes/dark.system.css';
+
+/* Centered “full page” spinner container */
+.page-spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  min-height: 45vh; /* keeps it from hugging top */
+  padding-top: 8vh;
+
+  width: 100%;
+}
+
+/* This makes the progress bar visible above menus/modals/backdrops */
+.global-loading {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+
+  z-index: 2147483647; /* be obnoxious; this is a global loading indicator */
+  pointer-events: none;
+}
+
+/* Optional: if you ever notice it tucked under iOS safe area */
+@supports (padding-top: env(safe-area-inset-top)) {
+  .global-loading {
+    top: env(safe-area-inset-top);
+  }
+}

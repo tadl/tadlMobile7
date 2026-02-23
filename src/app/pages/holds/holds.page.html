@@ -1,0 +1,83 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-menu-button menu="main"></ion-menu-button>
+    </ion-buttons>
+
+    <ion-title>Holds</ion-title>
+
+    <ion-buttons slot="end">
+      <ion-button (click)="globals.open_account_menu()">
+        <ion-icon name="person-circle" slot="icon-only"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <ion-refresher slot="fixed" (ionRefresh)="refresh($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  <!-- Centered spinner overlay while first load (no cache) -->
+  <div *ngIf="loading && !hasAnyData" class="page-spinner">
+    <ion-spinner></ion-spinner>
+  </div>
+
+  <!-- READY section only if > 0 -->
+  <ng-container *ngIf="ilsReady.length > 0">
+    <div class="section-title">
+      Ready for pickup
+      <ion-badge class="count-badge">{{ ilsReady.length }}</ion-badge>
+    </div>
+
+    <ion-list lines="full" class="full-list">
+      <ion-item button *ngFor="let h of ilsReady; trackBy: trackByHold" (click)="openHold(h)">
+        <ion-thumbnail slot="start" *ngIf="h.coverUrl">
+          <img [src]="h.coverUrl" alt="" />
+        </ion-thumbnail>
+
+        <ion-label class="ion-text-wrap">
+          <div class="title">{{ holdTitle(h) }}</div>
+          <div class="sub" *ngIf="holdAuthor(h)">{{ holdAuthor(h) }}</div>
+          <ion-note class="status">{{ holdStatus(h) }}</ion-note>
+          <ion-note *ngIf="h.pickupLocationName" class="pickup">Pickup: {{ h.pickupLocationName }}</ion-note>
+        </ion-label>
+      </ion-item>
+    </ion-list>
+  </ng-container>
+
+  <!-- PENDING section only if > 0 -->
+  <ng-container *ngIf="ilsPending.length > 0">
+    <div class="section-title">
+      Pending
+      <ion-badge class="count-badge">{{ ilsPending.length }}</ion-badge>
+    </div>
+
+    <ion-list lines="full" class="full-list">
+      <ion-item button *ngFor="let h of ilsPending; trackBy: trackByHold" (click)="openHold(h)">
+        <ion-thumbnail slot="start" *ngIf="h.coverUrl">
+          <img [src]="h.coverUrl" alt="" />
+        </ion-thumbnail>
+
+        <ion-label class="ion-text-wrap">
+          <div class="title">{{ holdTitle(h) }}</div>
+          <div class="sub" *ngIf="holdAuthor(h)">{{ holdAuthor(h) }}</div>
+          <ion-note class="status">{{ holdStatus(h) }}</ion-note>
+          <ion-note *ngIf="h.pickupLocationName" class="pickup">Pickup: {{ h.pickupLocationName }}</ion-note>
+        </ion-label>
+
+        <ion-note slot="end" *ngIf="h.position && h.holdQueueLength">
+          {{ h.position }} / {{ h.holdQueueLength }}
+        </ion-note>
+      </ion-item>
+    </ion-list>
+  </ng-container>
+
+  <!-- If we have data and both sections empty, show nothing; but if fully empty after load, show a friendly note -->
+  <ion-item *ngIf="!loading && !hasAnyData">
+    <ion-label class="ion-text-wrap">
+      No holds right now.
+    </ion-label>
+  </ion-item>
+</ion-content>

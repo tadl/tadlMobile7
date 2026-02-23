@@ -10,6 +10,11 @@ import { Device } from '@capacitor/device';
 import { App } from '@capacitor/app';
 import { format } from 'date-fns';
 
+export interface PickupLocationOption {
+  code: string; // e.g. "TADL-WOOD"
+  name: string; // e.g. "Woodmere (Main) Branch Library"
+}
+
 @Injectable({ providedIn: 'root' })
 export class Globals {
   constructor(
@@ -34,6 +39,27 @@ export class Globals {
 
   // Centralized Aspen ILS API selector (your proxy requires this)
   public aspen_api_param_api: string = 'tadl-prod';
+
+  // Pickup locations (Aspen LocationID + PickupBranch code)
+  // NOTE: Aspen expects newLocation formatted as "<locationId>_<pickupBranchCode>"
+  public pickupLocations: Array<{ id: number; code: string; name: string }> = [
+    { id: 7, code: 'TADL-WOOD', name: 'Woodmere (Main) Branch Library' },
+    { id: 2, code: 'TADL-EBB', name: 'East Bay Branch Library' },
+    { id: 3, code: 'TADL-FLPL', name: 'Fife Lake Public Library' },
+    { id: 4, code: 'TADL-IPL', name: 'Interlochen Public Library' },
+    { id: 5, code: 'TADL-KBL', name: 'Kingsley Branch Library' },
+    { id: 6, code: 'TADL-PCL', name: 'Peninsula Community Library' },
+  ];
+
+  pickupNameForCode(code: string): string | null {
+    const c = (code ?? '').trim();
+    const loc = this.pickupLocations.find(x => x.code === c);
+    return loc ? loc.name : null;
+  }
+
+  pickupAspenNewLocation(loc: { id: number; code: string }): string {
+    return `${loc.id}_${loc.code}`;
+  }
 
   // New locations host
   public locations_base: string = 'https://locations.tools.tadl.org';

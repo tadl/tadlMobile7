@@ -8,7 +8,7 @@ import { finalize } from 'rxjs';
 import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
 import { SearchService, AspenSearchHit, AspenSearchIndex, AspenSearchSort } from '../../services/search.service';
-import { SearchDetailComponent } from './search-detail/search-detail.component';
+import { ItemDetailComponent } from '../../components/item-detail/item-detail.component';
 
 @Component({
   standalone: true,
@@ -178,7 +178,7 @@ export class SearchPage {
 
   async openDetail(hit: AspenSearchHit) {
     const modal = await this.modalController.create({
-      component: SearchDetailComponent,
+      component: ItemDetailComponent,
       componentProps: { hit },
     });
     this.globals.modal_open = true;

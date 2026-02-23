@@ -1,53 +1,83 @@
-.header-row {
+/* Header (small cover, not hero) */
+.header {
   display: flex;
-  gap: 12px;
+  gap: 14px;
   align-items: flex-start;
-  margin-bottom: 10px;
-}
-
-.cover {
-  width: 90px;
-  height: 130px;
-  flex: 0 0 auto;
-  border-radius: 10px;
-  overflow: hidden;
+  margin-bottom: 12px;
 }
 
 .cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+  width: 92px;
+  height: auto;
+  border-radius: 10px;
   display: block;
 }
 
 .header-text {
   flex: 1 1 auto;
-  min-width: 0;
+  min-width: 0; /* critical so text wraps normally */
 }
 
 .title {
-  margin: 0 0 6px 0;
-  font-size: 18px;
-  line-height: 1.2;
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.15;
+  overflow-wrap: break-word;
 }
 
 .meta {
-  margin: 0;
+  margin-top: 6px;
   opacity: 0.85;
-  font-size: 13px;
-  line-height: 1.25;
+  overflow-wrap: break-word;
 }
 
 .desc {
-  margin-top: 10px;
+  margin-top: 12px;
   margin-bottom: 14px;
   opacity: 0.95;
   line-height: 1.35;
+  overflow-wrap: break-word;
+}
+
+/* Hold card */
+.hold-card ion-card-title {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  opacity: 0.85;
+}
+
+.hold-line {
+  margin: 6px 0;
+  opacity: 0.95;
+}
+
+.hold-status {
+  font-weight: 600;
+}
+
+.hold-status.frozen {
+  color: var(--ion-color-danger);
+}
+
+.hold-status.active {
+  color: var(--ion-color-success);
+}
+
+.hold-actions {
+  margin-top: 12px;
+}
+
+/* Formats list layout (the important part) */
+.formats-list {
+  padding-top: 6px;
+  padding-bottom: 6px;
 }
 
 .format-row {
   --padding-start: 14px;
   --inner-padding-end: 14px;
+  --min-height: 68px;
   align-items: flex-start;
 }
 
@@ -62,25 +92,29 @@
   font-weight: 600;
   font-size: 15px;
   line-height: 1.2;
+
+  /* This is the key to prevent letter-by-letter stacking */
   overflow-wrap: break-word;
+  word-break: normal;
 }
 
 .format-meta {
   margin-top: 4px;
   font-size: 13px;
   opacity: 0.8;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0;
-  align-items: baseline;
+  line-height: 1.2;
 }
 
 .format-sub {
-  display: block;
   font-size: 13px;
   opacity: 0.75;
   margin-top: 4px;
   line-height: 1.2;
+}
+
+.you-hold-it {
+  opacity: 0.85;
+  font-weight: 600;
 }
 
 .dot {
@@ -106,11 +140,6 @@
 
 /* On narrow screens, stack buttons instead of crushing the label */
 @media (max-width: 420px) {
-  .cover {
-    width: 76px;
-    height: 110px;
-  }
-
   .format-actions {
     max-width: 52%;
     flex-direction: column;

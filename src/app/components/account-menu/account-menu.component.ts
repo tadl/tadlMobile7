@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { IonicModule, ActionSheetController, ModalController } from '@ionic/angular';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 
 import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
@@ -31,6 +32,7 @@ export class AccountMenuComponent implements OnInit {
     public globals: Globals,
     public auth: AuthService,
     public patron: PatronService,
+    private router: Router,
     private accounts: AccountStoreService,
     private toast: ToastService,
     private actionSheet: ActionSheetController,
@@ -206,10 +208,18 @@ export class AccountMenuComponent implements OnInit {
     await m.present();
   }
 
+  goHolds() {
+    this.globals.toggleMenu('account'); // close menu
+    this.router.navigateByUrl('/holds');
+  }
+
+  goReady() {
+    this.globals.toggleMenu('account');
+    this.router.navigateByUrl('/holds?tab=ready');
+  }
+
   // placeholders until we build pages
   goCheckouts() { this.toast.presentToast('Checkouts page coming next.'); }
-  goHolds() { this.toast.presentToast('Holds page coming next.'); }
-  goReady() { this.toast.presentToast('Ready for pickup page coming next.'); }
   goFines() { this.toast.presentToast('Fines page coming next.'); }
   goHistory() { this.toast.presentToast('Checkout history page coming next.'); }
   goPrefs() { this.toast.presentToast('Account preferences page coming next.'); }

@@ -62,24 +62,60 @@
 
     <ng-container *ngIf="patron.badgesFromProfile(s.profile) as b">
       <ion-list lines="full" class="full-list">
-        <ion-item button (click)="goCheckouts()">
+        <ion-item
+          button
+          [disabled]="b.checkouts === 0"
+          (click)="goCheckouts()"
+        >
           <ion-label>Checkouts</ion-label>
-          <ion-badge slot="end">{{ b.checkouts }}</ion-badge>
+          <ion-badge
+            slot="end"
+            [color]="b.checkouts === 0 ? 'medium' : undefined"
+          >
+            {{ b.checkouts }}
+          </ion-badge>
         </ion-item>
 
-        <ion-item button (click)="goHolds()">
+        <ion-item
+          button
+          [disabled]="b.holds === 0"
+          (click)="goHolds()"
+        >
           <ion-label>Holds</ion-label>
-          <ion-badge slot="end">{{ b.holds }}</ion-badge>
+          <ion-badge
+            slot="end"
+            [color]="b.holds === 0 ? 'medium' : undefined"
+          >
+            {{ b.holds }}
+          </ion-badge>
         </ion-item>
 
-        <ion-item button (click)="goReady()">
+        <ion-item
+          button
+          [disabled]="b.ready === 0"
+          (click)="goReady()"
+        >
           <ion-label>Holds Ready for Pickup</ion-label>
-          <ion-badge slot="end">{{ b.ready }}</ion-badge>
+          <ion-badge
+            slot="end"
+            [color]="b.ready === 0 ? 'medium' : undefined"
+          >
+            {{ b.ready }}
+          </ion-badge>
         </ion-item>
 
-        <ion-item button (click)="goFines()">
+        <ion-item
+          button
+          [disabled]="b.finesVal === 0"
+          (click)="goFines()"
+        >
           <ion-label>Fines</ion-label>
-          <ion-note slot="end">{{ b.finesText || ('$' + (b.finesVal | number:'1.2-2')) }}</ion-note>
+          <ion-note
+            slot="end"
+            [style.opacity]="b.finesVal === 0 ? '0.55' : '1'"
+          >
+            {{ b.finesText || ('$' + (b.finesVal | number:'1.2-2')) }}
+          </ion-note>
         </ion-item>
 
         <ion-item button (click)="goHistory()">

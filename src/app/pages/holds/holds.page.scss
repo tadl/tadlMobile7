@@ -1,0 +1,36 @@
+.section-title {
+  padding: 14px 16px 8px 16px;
+  font-weight: 700;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.count-badge {
+  opacity: 0.9;
+}
+
+.title {
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.sub {
+  opacity: 0.8;
+  margin-top: 2px;
+}
+
+.status {
+  display: block;
+  margin-top: 6px;
+  opacity: 0.85;
+}
+
+.pickup {
+  display: block;
+  margin-top: 2px;
+  opacity: 0.75;
+}
+
+/* Spinner handled globally via .page-spinner */

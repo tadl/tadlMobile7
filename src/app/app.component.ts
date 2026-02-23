@@ -5,11 +5,13 @@ import { IonicModule } from '@ionic/angular';
 import { Platform } from '@ionic/angular/standalone';
 import { App } from '@capacitor/app';
 import { fromEvent, Observable } from 'rxjs';
+import { distinctUntilChanged } from 'rxjs/operators';
 
 import { Globals } from './globals';
 import { AuthService } from './services/auth.service';
 import { AccountMenuComponent } from './components/account-menu/account-menu.component';
 import { LoadingService } from './services/loading.service';
+import { CacheWarmService } from './services/cache-warm.service';
 
 @Component({
   standalone: true,
@@ -36,12 +38,14 @@ export class AppComponent implements OnInit {
 
   // Bind in templates: *ngIf="isLoading$ | async"
   isLoading$: Observable<boolean>;
+  private lastWarmedAccountId: string | null = null;
 
   constructor(
     public globals: Globals,
     private platform: Platform,
     private auth: AuthService,
     private loading: LoadingService,
+    private cacheWarm: CacheWarmService,
   ) {
     this.isLoading$ = this.loading.isLoading$();
 
@@ -64,6 +68,23 @@ export class AppComponent implements OnInit {
     this.auth.restore().subscribe({
       error: (err) => console.warn('[Auth] restore failed', err),
     });
+
+    this.auth.authState()
+      .pipe(
+        distinctUntilChanged((a, b) =>
+          a.isLoggedIn === b.isLoggedIn && a.activeAccountId === b.activeAccountId,
+        ),
+      )
+      .subscribe((s) => {
+        if (!s.isLoggedIn || !s.activeAccountId) {
+          this.lastWarmedAccountId = null;
+          return;
+        }
+
+        if (this.lastWarmedAccountId === s.activeAccountId) return;
+        this.lastWarmedAccountId = s.activeAccountId;
+        this.cacheWarm.warmForActiveAccount();
+      });
   }
 
   // Called by (ionDidOpen) on the account menu in app.component.html

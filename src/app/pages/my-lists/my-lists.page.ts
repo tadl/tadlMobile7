@@ -18,7 +18,6 @@ import { ListsService, type AspenUserList } from '../../services/lists.service';
 export class MyListsPage {
   loading = false;
   mutating = false;
-  manageMode = false;
   lists: AspenUserList[] = [];
 
   constructor(
@@ -195,7 +194,7 @@ export class MyListsPage {
     const alert = await this.alertCtrl.create({
       header: 'Delete list?',
       subHeader: title,
-      message: `${warning}<br><br>This cannot be undone.`,
+      message: `${warning}\n\nThis cannot be undone.`,
       buttons: [
         { text: 'Cancel', role: 'cancel' },
         {

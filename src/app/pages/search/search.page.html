@@ -80,6 +80,12 @@
         <h2>{{ h.title || 'Untitled' }}</h2>
         <p *ngIf="h.author">{{ h.author }}</p>
         <p *ngIf="h.format">{{ h.format }}</p>
+        <p *ngIf="h.lastCheckOut">
+          Last checked out: {{ formatLastCheckOut(h.lastCheckOut) }}
+        </p>
+        <p *ngIf="h.appearsOnLists?.length">
+          {{ listCountLabel(h) }}: {{ listTitles(h) }}
+        </p>
       </ion-label>
     </ion-item>
   </ion-list>

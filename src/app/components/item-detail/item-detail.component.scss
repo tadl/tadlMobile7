@@ -39,6 +39,19 @@
   overflow-wrap: break-word;
 }
 
+.desc-toggle {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--ion-color-primary);
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  line-height: 1.35;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .list-card ion-card-title {
   font-size: 14px;
   text-transform: uppercase;

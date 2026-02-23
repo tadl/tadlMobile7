@@ -1,8 +1,10 @@
 // src/app/services/search.service.ts
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, map } from 'rxjs';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
+import { Observable, map, from, switchMap } from 'rxjs';
 import { Globals } from '../globals';
+import { AuthService } from './auth.service';
+import { AccountStoreService } from './account-store.service';
 
 export type AspenSearchIndex = 'Keyword' | 'Title' | 'Author' | 'Subject' | 'ISBN';
 export type AspenSearchSource = 'local' | 'combined';
@@ -47,6 +49,8 @@ export interface AspenSearchHit {
   itemList: AspenItemRef[];
 
   catalogUrl?: string;
+  lastCheckOut?: string | number | null;
+  appearsOnLists?: Array<{ id: string | number; title: string }>;
 
   raw: any;
 }
@@ -98,18 +102,23 @@ export interface AspenSearchResult {
 
 @Injectable({ providedIn: 'root' })
 export class SearchService {
-  constructor(private http: HttpClient, private globals: Globals) {}
+  constructor(
+    private http: HttpClient,
+    private globals: Globals,
+    private auth: AuthService,
+    private accounts: AccountStoreService,
+  ) {}
 
   getAppSearchResults(opts: AspenSearchOptions): Observable<AspenSearchResult> {
     const page = opts.page ?? 1;
     const pageSize = opts.pageSize ?? 25;
 
     let params = new HttpParams()
-      .set('method', 'getAppSearchResults')
+      .set('method', 'searchLite')
       .set('type', 'catalog')
       .set('lookfor', opts.lookfor ?? '')
       .set('page', String(page))
-      .set('count', String(pageSize))
+      .set('pageSize', String(pageSize))
       .set('searchIndex', opts.searchIndex ?? 'Keyword')
       .set('source', opts.source ?? 'local');
 
@@ -120,9 +129,27 @@ export class SearchService {
       params = params.append('filter[]', f);
     }
 
-    return this.http
-      .post<any>(`${this.globals.aspen_api_base}/SearchAPI`, {}, { params })
-      .pipe(
+    const snap = this.auth.snapshot();
+    const shouldSendCreds = !!(snap.isLoggedIn && snap.activeAccountId && snap.activeAccountMeta);
+
+    const searchRequest$ = shouldSendCreds
+      ? from(this.accounts.getPassword(snap.activeAccountId!)).pipe(
+        switchMap((password) => {
+          if (!password) {
+            return this.http.post<any>(`${this.globals.aspen_api_base}/SearchAPI`, {}, { params });
+          }
+
+          const body = new URLSearchParams();
+          body.set('username', snap.activeAccountMeta!.username);
+          body.set('password', password);
+          const headers = new HttpHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' });
+
+          return this.http.post<any>(`${this.globals.aspen_api_base}/SearchAPI`, body.toString(), { params, headers });
+        }),
+      )
+      : this.http.post<any>(`${this.globals.aspen_api_base}/SearchAPI`, {}, { params });
+
+    return searchRequest$.pipe(
         map(raw => {
           const result = raw?.result ?? raw;
           const success = !!result?.success;
@@ -183,6 +210,8 @@ export class SearchService {
         format: r?.format ?? undefined,
         itemList,
         catalogUrl,
+        lastCheckOut: this.normalizeLastCheckOut(r?.lastCheckOut),
+        appearsOnLists: this.extractAppearsOnLists(r?.appearsOnLists),
         raw: r,
       });
     }
@@ -191,17 +220,44 @@ export class SearchService {
   }
 
   private extractItemList(input: any): AspenItemRef[] {
-    if (!Array.isArray(input)) return [];
+    if (!input) return [];
+    const sourceItems = Array.isArray(input) ? input : (typeof input === 'object' ? Object.values(input) : []);
+    if (!Array.isArray(sourceItems)) return [];
     const out: AspenItemRef[] = [];
 
-    for (const x of input) {
-      const id = typeof x?.id === 'string' ? x.id : '';
+    for (const x of sourceItems as any[]) {
+      const id = (x?.id ?? '').toString().trim();
       const name = typeof x?.name === 'string' ? x.name : '';
-      const source = typeof x?.source === 'string' ? x.source : '';
-      if (id && name && source) out.push({ id, name, source });
+      const source = typeof x?.source === 'string' ? x.source : 'ils';
+      if (name) out.push({ id: id || `fmt:${name.toLowerCase()}`, name, source });
     }
 
     return out;
+  }
+
+  private extractAppearsOnLists(input: any): Array<{ id: string | number; title: string }> {
+    if (!input) return [];
+    const values = Array.isArray(input) ? input : (typeof input === 'object' ? Object.values(input) : []);
+    const out: Array<{ id: string | number; title: string }> = [];
+    for (const x of values as any[]) {
+      const id = (x?.id ?? '').toString().trim();
+      const title = (x?.title ?? '').toString().trim();
+      if (id && title) out.push({ id, title });
+    }
+    return out;
+  }
+
+  private normalizeLastCheckOut(input: any): string | number | null {
+    if (input === null || input === undefined) return null;
+    if (typeof input === 'number' && Number.isFinite(input)) return input;
+    if (typeof input === 'string') {
+      const v = input.trim();
+      if (!v) return null;
+      const maybeNum = Number(v);
+      if (Number.isFinite(maybeNum)) return maybeNum;
+      return v;
+    }
+    return null;
   }
 
   private extractPaging(p: any, fallbackPage: number, fallbackPageSize: number, totalResults: number): AspenPaging {

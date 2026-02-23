@@ -230,6 +230,9 @@ export class AccountMenuComponent implements OnInit {
 
   // placeholders until we build pages
   goFines() { this.toast.presentToast('Fines page coming next.'); }
-  goHistory() { this.toast.presentToast('Checkout history page coming next.'); }
+  goHistory() {
+    this.globals.toggleMenu('account');
+    this.router.navigateByUrl('/checkout-history');
+  }
   goPrefs() { this.toast.presentToast('Account preferences page coming next.'); }
 }

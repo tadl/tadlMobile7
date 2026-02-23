@@ -54,6 +54,8 @@ export class ItemDetailComponent implements OnInit {
 
   /** format label -> holdings count */
   private holdingsCountByFormat: Record<string, number> = {};
+  private readonly descriptionPreviewChars = 320;
+  descriptionExpanded = false;
 
   holdActionBusy = false;
   checkoutActionBusy = false;
@@ -98,6 +100,7 @@ export class ItemDetailComponent implements OnInit {
     this.items.getGroupedWork(key).subscribe({
       next: (w) => {
         this.work = w ?? null;
+        this.descriptionExpanded = false;
         this.loadHoldingsCountsForWork(this.work);
 
         // Attach hold/checkout for this grouped work so cards appear even when opened from Search
@@ -120,6 +123,36 @@ export class ItemDetailComponent implements OnInit {
 
   openCatalog() {
     if (this.hit?.catalogUrl) this.globals.open_page(this.hit.catalogUrl);
+  }
+
+  itemDescriptionText(): string {
+    const raw =
+      this.work?.description ??
+      (this.work as any)?.abstract ??
+      (this.work as any)?.contents ??
+      this.hit?.summary ??
+      '';
+
+    return this.normalizeDescriptionText(raw);
+  }
+
+  descriptionCanExpand(text: string): boolean {
+    return text.length > this.descriptionPreviewChars;
+  }
+
+  itemDescriptionPreview(text: string): string {
+    if (!this.descriptionCanExpand(text)) return text;
+
+    const cut = text.slice(0, this.descriptionPreviewChars);
+    const lastSpace = cut.lastIndexOf(' ');
+    if (lastSpace >= this.descriptionPreviewChars * 0.65) {
+      return cut.slice(0, lastSpace).trim();
+    }
+    return cut.trim();
+  }
+
+  toggleDescription() {
+    this.descriptionExpanded = !this.descriptionExpanded;
   }
 
   // ----------------------------
@@ -644,6 +677,12 @@ export class ItemDetailComponent implements OnInit {
     return this.holdingsCountByFormat[k] ?? 0;
   }
 
+  formatHoldingsText(formatLabel: string): string {
+    const count = this.formatHoldingsCount(formatLabel);
+    if (count <= 0) return '';
+    return `${count} ${count === 1 ? 'holding' : 'holdings'}`;
+  }
+
   hasHoldForFormat(formatKey: string): boolean {
     const h: any = this.hold;
     if (!h) return false;
@@ -861,5 +900,27 @@ export class ItemDetailComponent implements OnInit {
 
     if (isIls && hasBarcode && hasDue && hasRecord) return raw as AspenCheckout;
     return null;
+  }
+
+  lastBorrowedText(): string {
+    const value = this.hit?.lastCheckOut;
+    if (value === null || value === undefined || value === '') return '';
+    let dateValue: number | string = value;
+    if (typeof value === 'number') {
+      dateValue = value < 1e12 ? value * 1000 : value;
+    } else {
+      const numeric = Number(value);
+      if (Number.isFinite(numeric)) {
+        dateValue = numeric < 1e12 ? numeric * 1000 : numeric;
+      }
+    }
+    const parsed = new Date(dateValue);
+    if (Number.isNaN(parsed.getTime())) return String(value);
+    return parsed.toLocaleDateString();
+  }
+
+  private normalizeDescriptionText(value: any): string {
+    if (value === null || value === undefined) return '';
+    return String(value).replace(/\s+/g, ' ').trim();
   }
 }

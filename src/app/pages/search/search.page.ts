@@ -188,4 +188,32 @@ export class SearchPage {
   trackById(_idx: number, h: AspenSearchHit) {
     return h.key;
   }
+
+  listCountLabel(hit: AspenSearchHit): string {
+    const count = hit.appearsOnLists?.length ?? 0;
+    return count === 1 ? 'In list' : 'In lists';
+  }
+
+  listTitles(hit: AspenSearchHit): string {
+    return (hit.appearsOnLists ?? [])
+      .map(x => x.title)
+      .filter(Boolean)
+      .join(', ');
+  }
+
+  formatLastCheckOut(value?: string | number | null): string {
+    if (value === null || value === undefined || value === '') return '';
+    let dateValue: number | string = value;
+    if (typeof value === 'number') {
+      dateValue = value < 1e12 ? value * 1000 : value;
+    } else {
+      const numeric = Number(value);
+      if (Number.isFinite(numeric)) {
+        dateValue = numeric < 1e12 ? numeric * 1000 : numeric;
+      }
+    }
+    const parsed = new Date(dateValue);
+    if (Number.isNaN(parsed.getTime())) return String(value);
+    return parsed.toLocaleDateString();
+  }
 }

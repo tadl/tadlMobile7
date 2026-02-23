@@ -40,6 +40,10 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/checkouts/checkouts.page').then(m => m.CheckoutsPage),
   },
   {
+    path: 'checkout-history',
+    loadComponent: () => import('./pages/checkout-history/checkout-history.page').then(m => m.CheckoutHistoryPage),
+  },
+  {
     path: 'my-lists',
     loadComponent: () => import('./pages/my-lists/my-lists.page').then(m => m.MyListsPage),
   },

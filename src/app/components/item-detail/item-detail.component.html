@@ -24,8 +24,17 @@
     </div>
   </div>
 
-  <div class="desc" *ngIf="work?.description || hit.summary">
-    {{ work?.description || hit.summary }}
+  <div class="desc" *ngIf="itemDescriptionText() as desc">
+    <span>{{ descriptionExpanded ? desc : itemDescriptionPreview(desc) }}</span>
+    <span *ngIf="!descriptionExpanded && descriptionCanExpand(desc)">... </span>
+    <button
+      *ngIf="descriptionCanExpand(desc)"
+      type="button"
+      class="desc-toggle"
+      (click)="toggleDescription()"
+    >
+      {{ descriptionExpanded ? 'less' : 'more' }}
+    </button>
   </div>
 
   <!-- CHECKED OUT TO YOU -->
@@ -93,8 +102,15 @@
               <span>{{ $any(kv.value).isAvailable ? 'Available' : 'Not available' }}</span>
             </div>
 
-            <ion-note *ngIf="(formatHoldingsCount(('' + kv.key)) || 0) > 0" class="format-sub">
-              {{ formatHoldingsCount(('' + kv.key)) }} holding(s) listed
+            <ion-note
+              *ngIf="hit?.lastCheckOut || (formatHoldingsCount(('' + kv.key)) || 0) > 0"
+              class="format-sub"
+            >
+              <span *ngIf="hit?.lastCheckOut">Last borrowed: {{ lastBorrowedText() }}</span>
+              <span *ngIf="hit?.lastCheckOut && (formatHoldingsCount(('' + kv.key)) || 0) > 0" class="dot">•</span>
+              <span *ngIf="(formatHoldingsCount(('' + kv.key)) || 0) > 0">
+                {{ formatHoldingsText(('' + kv.key)) }}
+              </span>
             </ion-note>
 
             <ion-note *ngIf="hasHoldForFormat(('' + kv.key))" class="format-sub you-hold-it">

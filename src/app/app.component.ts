@@ -1,10 +1,10 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { IonicModule } from '@ionic/angular';
 import { Platform } from '@ionic/angular/standalone';
 import { App } from '@capacitor/app';
-import { fromEvent, Subscription } from 'rxjs';
+import { fromEvent, Observable } from 'rxjs';
 
 import { Globals } from './globals';
 import { AuthService } from './services/auth.service';
@@ -23,7 +23,7 @@ import { LoadingService } from './services/loading.service';
     AccountMenuComponent,
   ],
 })
-export class AppComponent implements OnInit, OnDestroy {
+export class AppComponent implements OnInit {
   public appPages: Array<{ title: string; url: string; icon: string }> = [
     { title: 'Home', url: '/home', icon: 'home' },
     { title: 'Search', url: '/search', icon: 'search' },
@@ -34,10 +34,8 @@ export class AppComponent implements OnInit, OnDestroy {
     { title: 'About', url: '/about', icon: 'information-circle' },
   ];
 
-  // Bind this in templates: *ngIf="isLoading"
-  isLoading = false;
-
-  private loadingSub?: Subscription;
+  // Bind in templates: *ngIf="isLoading$ | async"
+  isLoading$: Observable<boolean>;
 
   constructor(
     public globals: Globals,
@@ -45,6 +43,8 @@ export class AppComponent implements OnInit, OnDestroy {
     private auth: AuthService,
     private loading: LoadingService,
   ) {
+    this.isLoading$ = this.loading.isLoading$();
+
     this.platform.ready().then(async () => {
       await this.globals.getDeviceInfo();
 
@@ -63,15 +63,6 @@ export class AppComponent implements OnInit, OnDestroy {
     this.auth.restore().subscribe({
       error: (err) => console.warn('[Auth] restore failed', err),
     });
-
-    // Global XHR loading indicator
-    this.loadingSub = this.loading.isLoading$().subscribe(v => {
-      this.isLoading = v;
-    });
-  }
-
-  ngOnDestroy() {
-    this.loadingSub?.unsubscribe();
   }
 
   // Called by (ionDidOpen) on the account menu in app.component.html

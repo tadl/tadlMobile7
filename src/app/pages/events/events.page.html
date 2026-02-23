@@ -57,11 +57,6 @@
     </ion-item>
   </ion-list>
 
-  <div class="state" *ngIf="loading">
-    <ion-spinner></ion-spinner>
-    <p>Loading events…</p>
-  </div>
-
   <div class="state" *ngIf="!loading && error">
     <p>{{ error }}</p>
     <ion-button expand="block" (click)="onVenueChange(selectedVenueCode)">

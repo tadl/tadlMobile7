@@ -45,7 +45,6 @@ export class HoldsPage {
       return;
     }
 
-    // 1) Load cache immediately (no spinner-jank)
     try {
       const cached = await this.holds.getCachedHolds(snap.activeAccountId);
       if (cached?.holds?.length) {
@@ -74,8 +73,7 @@ export class HoldsPage {
       return;
     }
 
-    // show spinner only if we had nothing cached
-    this.loading = !this.hydratedFromCache;
+    this.loading = true;
 
     this.holds
       .fetchActiveHolds()

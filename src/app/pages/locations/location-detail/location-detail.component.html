@@ -8,10 +8,6 @@
 </ion-header>
 
 <ion-content>
-  <div class="loading-overlay" *ngIf="loading">
-    <ion-spinner></ion-spinner>
-  </div>
-
   <ng-container *ngIf="location">
     <div class="hero-wrap" *ngIf="location.image">
       <img class="hero" [src]="location.image" [alt]="location.fullname" />

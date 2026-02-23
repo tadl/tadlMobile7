@@ -1,6 +1,6 @@
 <ion-app>
   <!-- GLOBAL TOP LOADING BAR (visible during normal navigation + modals + XHR) -->
-  <div class="global-loading" *ngIf="isLoading">
+  <div class="global-loading" *ngIf="isLoading$ | async">
     <ion-progress-bar type="indeterminate"></ion-progress-bar>
   </div>
 

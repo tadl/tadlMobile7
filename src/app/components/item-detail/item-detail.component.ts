@@ -47,7 +47,7 @@ export class ItemDetailComponent implements OnInit {
     private toast: ToastService,
     private items: ItemService,
     private holds: HoldsService,
-    private modal: ModalController,
+    private modalCtrl: ModalController, // ✅ renamed from "modal"
     private actionSheet: ActionSheetController,
   ) {}
 
@@ -73,7 +73,7 @@ export class ItemDetailComponent implements OnInit {
   }
 
   close() {
-    this.modal.dismiss(this.needsHoldsRefresh ? { refreshHolds: true } : undefined);
+    this.modalCtrl.dismiss(this.needsHoldsRefresh ? { refreshHolds: true } : undefined);
     this.globals.modal_open = false;
   }
 
@@ -216,7 +216,7 @@ export class ItemDetailComponent implements OnInit {
 
           this.toast.presentToast(res?.message || 'Hold cancelled.');
           const canceledId = Number(this.hold?.cancelId ?? this.hold?.id ?? 0) || null;
-          this.modal.dismiss({ refreshHolds: true, canceledHoldId: canceledId });
+          this.modalCtrl.dismiss({ refreshHolds: true, canceledHoldId: canceledId });
           this.globals.modal_open = false;
         },
         error: () => this.toast.presentToast('Could not cancel hold.'),
@@ -280,7 +280,7 @@ export class ItemDetailComponent implements OnInit {
 
           this.toast.presentToast(res?.message || 'Pickup location updated.');
 
-          // authoritative refresh so the detail block updates correctly
+          // authoritative refresh so the UI reflects server truth
           this.refreshHoldForThisItem();
         },
         error: () => this.toast.presentToast('Could not change pickup location.'),
@@ -397,7 +397,7 @@ export class ItemDetailComponent implements OnInit {
           this.needsHoldsRefresh = true;
           this.toast.presentToast(res?.message || 'Hold placed.');
 
-          // NEW: immediately fetch holds and attach it to this item so the "on hold" card appears
+          // NEW: fetch holds and attach the hold for this grouped work so the card appears
           this.refreshHoldForThisItem();
         },
         error: () => this.toast.presentToast('Could not place hold.'),
@@ -457,18 +457,11 @@ export class ItemDetailComponent implements OnInit {
     });
   }
 
-  /**
-   * NEW: Find and attach the hold for this groupedWorkId while staying inside item detail.
-   * This is what makes the "You have this item on hold" card appear immediately after placing a hold.
-   */
   private refreshHoldForThisItem() {
     const key = (this.hit?.key ?? '').toString().trim();
     if (!key) return;
 
-    // If we're already holding from HoldsPage and it matches, no need to re-fetch
-    if (this.hold && String((this.hold as any)?.groupedWorkId ?? '').trim() === key) {
-      return;
-    }
+    if (this.hold && String((this.hold as any)?.groupedWorkId ?? '').trim() === key) return;
 
     if (this.holdRefreshBusy) return;
     this.holdRefreshBusy = true;
@@ -479,14 +472,9 @@ export class ItemDetailComponent implements OnInit {
         next: (list) => {
           const found =
             (list ?? []).find(h => String((h as any)?.groupedWorkId ?? '').trim() === key) ?? null;
-
-          if (found) {
-            this.hold = found;
-          }
+          if (found) this.hold = found;
         },
-        error: () => {
-          // non-fatal; card just won't appear until next navigation
-        },
+        error: () => {},
       });
   }
 

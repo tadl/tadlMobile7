@@ -97,10 +97,6 @@
     </ion-card-content>
   </ion-card>
 
-  <ion-button expand="block" *ngIf="hit?.catalogUrl" (click)="openCatalog()">
-    View in Catalog
-  </ion-button>
-
   <details class="raw" *ngIf="work">
     <summary>Raw (WorkAPI)</summary>
     <pre>{{ work | json }}</pre>

@@ -88,8 +88,6 @@
     <ion-label>No results.</ion-label>
   </ion-item>
 
-  <ion-spinner *ngIf="globals.api_loading && hits.length === 0" class="ion-padding"></ion-spinner>
-
   <ion-infinite-scroll
     threshold="150px"
     (ionInfinite)="loadMore($event)"

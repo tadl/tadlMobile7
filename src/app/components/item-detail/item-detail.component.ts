@@ -6,8 +6,10 @@ import {
   ModalController,
   type ActionSheetButton,
 } from '@ionic/angular';
+import { Router } from '@angular/router';
 import { forkJoin, of } from 'rxjs';
 import { catchError, finalize } from 'rxjs/operators';
+import { firstValueFrom } from 'rxjs';
 
 import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
@@ -17,12 +19,17 @@ import { HoldsService } from '../../services/holds.service';
 import type { AspenHold } from '../../services/holds.service';
 import { CheckoutsService } from '../../services/checkouts.service';
 import type { AspenCheckout } from '../../services/checkouts.service';
-import { ListsService } from '../../services/lists.service';
+import { ListsService, type AspenUserList } from '../../services/lists.service';
 
 interface ItemDetailListContext {
   listId: string;
   listTitle?: string;
   recordId?: string;
+}
+
+interface KnownListMembership {
+  listId: string;
+  listTitle: string;
 }
 
 @Component({
@@ -43,6 +50,7 @@ export class ItemDetailComponent implements OnInit {
 
   /** if we got here from CheckoutsPage, it passes the checkout as hit.raw */
   checkout: AspenCheckout | null = null;
+  knownListMemberships: KnownListMembership[] = [];
 
   /** format label -> holdings count */
   private holdingsCountByFormat: Record<string, number> = {};
@@ -72,6 +80,7 @@ export class ItemDetailComponent implements OnInit {
     private holds: HoldsService,
     private checkouts: CheckoutsService,
     private lists: ListsService,
+    private router: Router,
     private modalCtrl: ModalController, // ✅ renamed from "modal"
     private actionSheet: ActionSheetController,
   ) {}
@@ -80,6 +89,8 @@ export class ItemDetailComponent implements OnInit {
     // If opened from Holds/Checkouts pages, we already have the object in hit.raw
     this.hold = this.extractHoldFromHit(this.hit);
     this.checkout = this.extractCheckoutFromHit(this.hit);
+    this.seedKnownListMemberships();
+    this.refreshKnownListMembershipsFromServer();
 
     const key = (this.hit?.key ?? '').toString().trim();
     if (!key) return;
@@ -115,44 +126,145 @@ export class ItemDetailComponent implements OnInit {
   // List context helpers/actions
   // ----------------------------
 
-  inListTitle(): string {
-    return (this.listContext?.listTitle ?? '').toString().trim() || 'This list';
+  canManageLists(): boolean {
+    return !!this.listRecordId();
   }
 
-  canRemoveFromList(): boolean {
-    const listId = (this.listContext?.listId ?? '').toString().trim();
+  hasKnownListMembership(): boolean {
+    return this.knownListMemberships.length > 0;
+  }
+
+  listMembershipLabel(): string {
+    return this.knownListMemberships.length > 1 ? 'In lists:' : 'In list:';
+  }
+
+  async openKnownList(listId: string, listTitle: string) {
+    if (!listId) return;
+
+    await this.modalCtrl.dismiss();
+    this.globals.modal_open = false;
+    this.router.navigate(['/my-lists', listId], {
+      queryParams: { title: listTitle },
+    });
+  }
+
+  async addToAnyList() {
+    if (this.listActionBusy || !this.canManageLists()) return;
     const recordId = this.listRecordId();
-    return !!listId && !!recordId;
-  }
+    if (!recordId) return;
 
-  async confirmRemoveFromList() {
-    if (this.listActionBusy || !this.canRemoveFromList()) return;
+    const lists = await this.getListsForAction();
+    if (!lists.length) return;
 
     const sheet = await this.actionSheet.create({
-      header: 'Remove from list?',
-      subHeader: this.inListTitle(),
+      header: 'Add to which list?',
       buttons: [
-        {
-          text: 'Remove',
-          role: 'destructive',
-          handler: () => this.removeFromListNow(),
-        },
-        {
-          text: 'Cancel',
-          role: 'cancel',
-        },
+        ...lists.map((list): ActionSheetButton => ({
+          text: this.actionListLabel(list),
+          handler: () => this.addRecordToList(list, recordId),
+        })),
+        { text: 'Cancel', role: 'cancel' },
       ],
     });
 
     await sheet.present();
   }
 
-  private removeFromListNow() {
-    if (this.listActionBusy || !this.canRemoveFromList()) return;
-
-    const listId = (this.listContext?.listId ?? '').toString().trim();
+  async removeFromAnyList() {
+    if (this.listActionBusy || !this.canManageLists()) return;
     const recordId = this.listRecordId();
+    if (!recordId) return;
+
+    const lists = await this.getListsForAction();
+    if (!lists.length) return;
+
+    const pickSheet = await this.actionSheet.create({
+      header: 'Remove from which list?',
+      buttons: [
+        ...lists.map((list): ActionSheetButton => ({
+          text: this.actionListLabel(list),
+          role: 'destructive',
+          handler: () => this.confirmRemoveFromNamedList(list, recordId),
+        })),
+        { text: 'Cancel', role: 'cancel' },
+      ],
+    });
+
+    await pickSheet.present();
+  }
+
+  private listRecordId(): string {
+    const fromCtx = (this.listContext?.recordId ?? '').toString().trim();
+    if (fromCtx) return fromCtx;
+    return (this.hit?.key ?? '').toString().trim();
+  }
+
+  private async getListsForAction(): Promise<AspenUserList[]> {
+    try {
+      const lists = await firstValueFrom(this.lists.fetchUserLists());
+      if (!lists?.length) {
+        this.toast.presentToast('You do not have any lists yet.');
+        return [];
+      }
+      return lists;
+    } catch {
+      this.toast.presentToast('Could not load your lists.');
+      return [];
+    }
+  }
+
+  private actionListLabel(list: AspenUserList): string {
+    const title = (list?.title ?? '').toString().trim() || 'Untitled list';
+    const n = Number((list as any)?.numTitles ?? 0);
+    if (Number.isFinite(n) && n > 0) return `${title} (${n})`;
+    return title;
+  }
+
+  private addRecordToList(list: AspenUserList, recordId: string) {
+    const listId = (list?.id ?? '').toString().trim();
     if (!listId || !recordId) return;
+    if (this.listActionBusy) return;
+
+    this.listActionBusy = true;
+    this.lists.addTitlesToList(listId, [recordId])
+      .pipe(finalize(() => (this.listActionBusy = false)))
+      .subscribe({
+        next: (res) => {
+          if (!res?.success) {
+            this.toast.presentToast(res?.message || 'Could not add to list.');
+            return;
+          }
+          this.upsertKnownListMembership(listId, (list?.title ?? '').toString().trim() || 'Untitled list');
+          this.needsListRefresh = true;
+          this.toast.presentToast(res?.message || 'Added to list.');
+        },
+        error: () => this.toast.presentToast('Could not add to list.'),
+      });
+  }
+
+  private async confirmRemoveFromNamedList(list: AspenUserList, recordId: string) {
+    const listId = (list?.id ?? '').toString().trim();
+    const title = (list?.title ?? '').toString().trim() || 'This list';
+    if (!listId || !recordId) return;
+
+    const confirmSheet = await this.actionSheet.create({
+      header: 'Remove from list?',
+      subHeader: title,
+      buttons: [
+        {
+          text: 'Remove',
+          role: 'destructive',
+          handler: () => this.removeRecordFromList(listId, recordId),
+        },
+        { text: 'Cancel', role: 'cancel' },
+      ],
+    });
+
+    await confirmSheet.present();
+  }
+
+  private removeRecordFromList(listId: string, recordId: string) {
+    if (this.listActionBusy) return;
 
     this.listActionBusy = true;
     this.lists.removeTitlesFromList(listId, [recordId])
@@ -165,17 +277,80 @@ export class ItemDetailComponent implements OnInit {
           }
 
           this.needsListRefresh = true;
+          this.removeKnownListMembership(listId);
           this.toast.presentToast(res?.message || 'Removed from list.');
-          this.close();
         },
         error: () => this.toast.presentToast('Could not remove from list.'),
       });
   }
 
-  private listRecordId(): string {
-    const fromCtx = (this.listContext?.recordId ?? '').toString().trim();
-    if (fromCtx) return fromCtx;
-    return (this.hit?.key ?? '').toString().trim();
+  private seedKnownListMemberships() {
+    const listId = (this.listContext?.listId ?? '').toString().trim();
+    if (!listId) return;
+
+    const listTitle = (this.listContext?.listTitle ?? '').toString().trim() || 'This list';
+    this.knownListMemberships = [{ listId, listTitle }];
+  }
+
+  private async refreshKnownListMembershipsFromServer() {
+    const recordId = this.listRecordId();
+    if (!recordId) return;
+
+    try {
+      const lists = await firstValueFrom(this.lists.fetchUserLists());
+      if (!lists?.length) return;
+
+      const candidates = lists.filter((l) => Number((l as any)?.numTitles ?? 0) > 0);
+      if (!candidates.length) {
+        if (!this.knownListMemberships.length) this.knownListMemberships = [];
+        return;
+      }
+
+      const checks = await Promise.all(
+        candidates.map(async (list) => {
+          const listId = (list?.id ?? '').toString().trim();
+          if (!listId) return null;
+          try {
+            const res = await firstValueFrom(this.lists.fetchListTitles(listId, 1, 500));
+            if (!res?.success || !Array.isArray(res?.titles)) return null;
+            const found = res.titles.some((t) => ((t?.id ?? t?.shortId ?? '') as any).toString().trim() === recordId);
+            if (!found) return null;
+            return {
+              listId,
+              listTitle: (list?.title ?? '').toString().trim() || 'List',
+            } as KnownListMembership;
+          } catch {
+            return null;
+          }
+        }),
+      );
+
+      const found = checks.filter((x): x is KnownListMembership => !!x);
+      if (found.length) {
+        this.knownListMemberships = found;
+      }
+    } catch {
+      // Keep local optimistic memberships if API probing fails.
+    }
+  }
+
+  private upsertKnownListMembership(listId: string, listTitle: string) {
+    const id = (listId ?? '').toString().trim();
+    if (!id) return;
+
+    const existing = this.knownListMemberships.find(x => x.listId === id);
+    if (existing) {
+      existing.listTitle = listTitle || existing.listTitle;
+      return;
+    }
+
+    this.knownListMemberships = [...this.knownListMemberships, { listId: id, listTitle: listTitle || 'List' }];
+  }
+
+  private removeKnownListMembership(listId: string) {
+    const id = (listId ?? '').toString().trim();
+    if (!id) return;
+    this.knownListMemberships = this.knownListMemberships.filter(x => x.listId !== id);
   }
 
   // ----------------------------

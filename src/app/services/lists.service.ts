@@ -119,6 +119,24 @@ export class ListsService {
     );
   }
 
+  addTitlesToList(listId: string | number, recordIds: Array<string | number>): Observable<AspenListMutationResult> {
+    const id = (listId ?? '').toString().trim();
+    const records = (recordIds ?? [])
+      .map(r => (r ?? '').toString().trim())
+      .filter(r => !!r);
+
+    if (!id) return throwError(() => new Error('missing_list_id'));
+    if (!records.length) return throwError(() => new Error('missing_record_ids'));
+
+    return this.callListApi('addTitlesToList', {
+      listId: id,
+      recordIds: records.join(','),
+      source: 'GroupedWork',
+    }).pipe(
+      map((r: any) => this.mapMutationResult(r)),
+    );
+  }
+
   createList(title: string, description = '', isPublic = false): Observable<AspenListMutationResult> {
     const t = (title ?? '').toString().trim();
     if (!t) return throwError(() => new Error('missing_title'));

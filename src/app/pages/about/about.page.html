@@ -4,7 +4,7 @@
       <ion-menu-button menu="main"></ion-menu-button>
     </ion-buttons>
 
-    <ion-title>About</ion-title>
+    <ion-title>About TADL Mobile</ion-title>
 
     <ion-buttons slot="end">
       <ion-button (click)="globals.open_account_menu()">
@@ -14,17 +14,98 @@
   </ion-toolbar>
 </ion-header>
 
-<ion-content class="ion-padding">
-  <ion-card>
-    <ion-card-header>
-      <ion-card-title>Traverse Area District Library</ion-card-title>
-      <ion-card-subtitle>App v{{ globals.app_version }}</ion-card-subtitle>
-    </ion-card-header>
+<ion-content [fullscreen]="true">
+  <ion-list>
+    <ion-item-divider>
+      <ion-label>Information</ion-label>
+    </ion-item-divider>
 
-    <ion-card-content>
-      <ion-button expand="block" (click)="globals.open_page('https://www.tadl.org')">
-        Visit tadl.org
-      </ion-button>
-    </ion-card-content>
-  </ion-card>
+    <ion-item>
+      <ion-label>App Version</ion-label>
+      <ion-note slot="end" color="dark">{{ globals.app_version }}</ion-note>
+    </ion-item>
+
+    <ion-item>
+      <ion-label>Update Version</ion-label>
+      <ion-note slot="end" color="dark">{{ globals.update_version }}</ion-note>
+    </ion-item>
+
+    <ion-item>
+      <ion-label>Screen</ion-label>
+      <ion-note slot="end" color="dark">{{ screenSize }}</ion-note>
+    </ion-item>
+
+    <ion-item>
+      <ion-label>Storage Driver</ion-label>
+      <ion-note slot="end" color="dark">{{ storageDriver }}</ion-note>
+    </ion-item>
+
+    <ion-item>
+      <ion-label>Creds Migrated</ion-label>
+      <ion-note slot="end" color="dark">{{ credsMigrated }}</ion-note>
+    </ion-item>
+
+    <ion-item>
+      <ion-label>Platforms</ion-label>
+      <ion-note slot="end" color="dark">{{ platforms }}</ion-note>
+    </ion-item>
+
+    <ion-item>
+      <ion-label>Network Status</ion-label>
+      <ion-note slot="end" color="dark">{{ globals.net_status }}</ion-note>
+    </ion-item>
+
+    <ion-item>
+      <ion-label>Network Type</ion-label>
+      <ion-note slot="end" color="dark">{{ globals.net_type }}</ion-note>
+    </ion-item>
+  </ion-list>
+
+  <ion-list>
+    <ion-item-divider>
+      <ion-label>Device Information</ion-label>
+    </ion-item-divider>
+
+    <ion-item *ngIf="globals.device_info?.name">
+      <ion-label>Device Name</ion-label>
+      <ion-note slot="end" color="dark">{{ globals.device_info?.name }}</ion-note>
+    </ion-item>
+
+    <ion-item>
+      <ion-label>Virtual</ion-label>
+      <ion-note slot="end" color="dark">{{ globals.device_info?.isVirtual }}</ion-note>
+    </ion-item>
+
+    <ion-item>
+      <ion-label>Manufacturer</ion-label>
+      <ion-note slot="end" color="dark">{{ globals.device_info?.manufacturer }}</ion-note>
+    </ion-item>
+
+    <ion-item>
+      <ion-label>Model</ion-label>
+      <ion-note slot="end" color="dark">{{ globals.device_info?.model }}</ion-note>
+    </ion-item>
+
+    <ion-item>
+      <ion-label>OS</ion-label>
+      <ion-note slot="end" color="dark">
+        {{ globals.device_info?.operatingSystem }} {{ globals.device_info?.osVersion }}
+      </ion-note>
+    </ion-item>
+
+    <ion-item>
+      <ion-label>Webview Version</ion-label>
+      <ion-note slot="end" color="dark">{{ globals.device_info?.webViewVersion }}</ion-note>
+    </ion-item>
+  </ion-list>
+
+  <ion-grid>
+    <ion-row>
+      <ion-col>
+        <div class="ion-text-center">
+          <a (click)="globals.open_page('https://www.tadl.org/mobileapppolicy')">Privacy Policy</a>
+        </div>
+      </ion-col>
+    </ion-row>
+  </ion-grid>
 </ion-content>

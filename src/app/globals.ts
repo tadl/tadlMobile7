@@ -26,7 +26,7 @@ export class Globals {
 
   // ---- app identity / toggles ----
   public app_version: string = '7.0.0';
-  public update_version: string = '2026021800';
+  public update_version: string = '2026022300';
 
   public device_info: any;
   public system_color: any = window.matchMedia('(prefers-color-scheme: dark)');
@@ -88,6 +88,10 @@ export class Globals {
   public server_error_msg: string =
     'Whoops. Something went wrong. Please check your internet connection and try again in a minute.';
 
+  private connectionChangeHandler = () => this.updateNetworkFromEnvironment();
+  private browserOnlineHandler = () => this.updateNetworkFromEnvironment();
+  private browserOfflineHandler = () => this.updateNetworkFromEnvironment();
+
   // ---- helpers ----
   async open_page(url: string) {
     await Browser.open({ url });
@@ -140,6 +144,61 @@ export class Globals {
 
   async getDeviceInfo() {
     this.device_info = await Device.getInfo();
+  }
+
+  initNetworkStatusTracking() {
+    this.updateNetworkFromEnvironment();
+
+    window.addEventListener('online', this.browserOnlineHandler);
+    window.addEventListener('offline', this.browserOfflineHandler);
+
+    const conn = this.getBrowserConnection();
+    if (conn?.addEventListener) {
+      conn.addEventListener('change', this.connectionChangeHandler);
+    }
+  }
+
+  private updateNetworkFromEnvironment() {
+    const online = typeof navigator?.onLine === 'boolean' ? navigator.onLine : true;
+    this.net_status = online ? 'online' : 'offline';
+    this.net_type = this.pickNetworkType(online);
+  }
+
+  private pickNetworkType(online: boolean): string {
+    if (!online) return 'none';
+
+    const conn = this.getBrowserConnection();
+    const rawTransport = ((conn?.type ?? '') as string).toLowerCase().trim();
+    const rawEffective = ((conn?.effectiveType ?? '') as string).toLowerCase().trim();
+    const isDesktop = this.platform.is('desktop');
+
+    if (rawTransport) {
+      if (rawTransport.includes('wifi')) return 'wifi';
+      if (rawTransport.includes('ethernet') || rawTransport.includes('wired')) return 'ethernet';
+      if (rawTransport.includes('cell')) return 'cellular';
+      if (rawTransport === 'none') return 'none';
+      return rawTransport;
+    }
+
+    // effectiveType (2g/3g/4g) is link quality, not transport; on desktop it often
+    // reports "4g" even when wired, so do not classify desktop as cellular from it.
+    if (rawEffective) {
+      if (isDesktop) return 'ethernet';
+      if (rawEffective === '4g' || rawEffective === '3g' || rawEffective === '2g' || rawEffective === 'slow-2g') {
+        return 'cellular';
+      }
+      return rawEffective;
+    }
+
+    // Fallback for desktop browsers that expose neither field.
+    if (isDesktop) return 'ethernet';
+
+    return 'unknown';
+  }
+
+  private getBrowserConnection(): any {
+    const n = navigator as any;
+    return n?.connection ?? n?.mozConnection ?? n?.webkitConnection ?? null;
   }
 
   async confirm_exit() {

@@ -47,6 +47,7 @@ export class AppComponent implements OnInit {
 
     this.platform.ready().then(async () => {
       await this.globals.getDeviceInfo();
+      this.globals.initNetworkStatusTracking();
 
       App.addListener('backButton', ({ canGoBack }) => {
         if (canGoBack) this.globals.go_back();

@@ -70,7 +70,17 @@ export class CheckoutsPage {
   }
 
   checkoutTitle(c: AspenCheckout): string {
-    return (c?.title ?? '').toString().trim() || 'Untitled';
+    const raw = (c?.title ?? '').toString().trim();
+    if (!raw) return 'Untitled';
+
+    // Aspen checkout titles are often full MARC-style strings:
+    // "Main title : subtitle / statement of responsibility".
+    // For list display, keep the concise main title only.
+    const withoutResponsibility = raw.split(/\s+\/\s+/)[0]?.trim() ?? raw;
+    const withoutSubtitle = withoutResponsibility.split(/\s+:\s+/)[0]?.trim() ?? withoutResponsibility;
+    const cleaned = withoutSubtitle.replace(/[\s:\/]+$/, '').trim();
+
+    return cleaned || raw || 'Untitled';
   }
 
   checkoutAuthor(c: AspenCheckout): string {

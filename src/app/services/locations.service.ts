@@ -1,0 +1,76 @@
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable, concat, filter, from, map, tap } from 'rxjs';
+
+import { Globals } from '../globals';
+import { AppCacheService } from './app-cache.service';
+
+export interface AppLocation {
+  id: number;
+  shortname: string;
+  fullname: string;
+  group: string;
+  address: string;
+  citystatezip: string;
+  phone: string;
+  fax?: string;
+  email?: string;
+  image?: string;
+  sunday?: string;
+  monday?: string;
+  tuesday?: string;
+  wednesday?: string;
+  thursday?: string;
+  friday?: string;
+  saturday?: string;
+  exceptions?: any[];
+}
+
+@Injectable({ providedIn: 'root' })
+export class LocationsService {
+  constructor(
+    private http: HttpClient,
+    private globals: Globals,
+    private cache: AppCacheService,
+  ) {}
+
+  getLocations(): Observable<AppLocation[]> {
+    const cacheKey = `locations:list:${this.globals.locations_group}`;
+
+    const cached$ = from(this.cache.read<AppLocation[]>(cacheKey)).pipe(
+      filter((v): v is AppLocation[] => Array.isArray(v)),
+    );
+
+    const network$ = this.http
+      .get<{ locations: AppLocation[] }>(this.globals.locations_list_url)
+      .pipe(
+        map((res) => Array.isArray(res?.locations) ? res.locations : []),
+        tap((locations) => {
+          this.cache.write(cacheKey, locations).catch(() => {});
+        }),
+      );
+
+    return concat(cached$, network$);
+  }
+
+  getLocationByShortname(shortname: string): Observable<AppLocation | null> {
+    const s = (shortname ?? '').toString().trim();
+    const cacheKey = `locations:detail:${s}`;
+
+    const cached$ = from(this.cache.read<AppLocation>(cacheKey)).pipe(
+      filter((v): v is AppLocation => !!v && typeof v === 'object'),
+    );
+
+    const network$ = this.http
+      .get<{ locations: AppLocation[] }>(this.globals.locations_detail_url(s))
+      .pipe(
+        map((res) => (Array.isArray(res?.locations) ? res.locations[0] ?? null : null)),
+        tap((location) => {
+          if (location) this.cache.write(cacheKey, location).catch(() => {});
+        }),
+      );
+
+    return concat(cached$, network$);
+  }
+}
+

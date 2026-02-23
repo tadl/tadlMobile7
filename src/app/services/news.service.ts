@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, concat, from, filter, tap } from 'rxjs';
+import { AppCacheService } from './app-cache.service';
 
 export interface WordpressRenderedField {
   rendered: string;
@@ -28,9 +29,23 @@ export class NewsService {
   // matches the URL you pasted
   private readonly baseUrl = 'https://feeds.tools.tadl.org/posts.json';
 
-  constructor(private http: HttpClient) {}
+  constructor(
+    private http: HttpClient,
+    private cache: AppCacheService,
+  ) {}
 
   getPosts(): Observable<MobilePost[]> {
-    return this.http.get<MobilePost[]>(this.baseUrl);
+    const cacheKey = 'news:posts';
+    const cached$ = from(this.cache.read<MobilePost[]>(cacheKey)).pipe(
+      filter((posts): posts is MobilePost[] => Array.isArray(posts)),
+    );
+
+    const network$ = this.http.get<MobilePost[]>(this.baseUrl).pipe(
+      tap((posts) => {
+        this.cache.write(cacheKey, Array.isArray(posts) ? posts : []).catch(() => {});
+      }),
+    );
+
+    return concat(cached$, network$);
   }
 }

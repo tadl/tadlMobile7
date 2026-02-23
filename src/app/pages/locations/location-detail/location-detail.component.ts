@@ -1,32 +1,11 @@
 import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { IonicModule } from '@ionic/angular';
-import { HttpClient } from '@angular/common/http';
 import { Globals } from '../../../globals';
 import { ModalController } from '@ionic/angular/standalone';
+import { LocationsService, type AppLocation } from '../../../services/locations.service';
 
-type Location = {
-  id: number;
-  shortname: string;
-  fullname: string;
-  group: string;
-  address: string;
-  citystatezip: string;
-  phone: string;
-  fax?: string;
-  email?: string;
-  image?: string;
-
-  sunday?: string;
-  monday?: string;
-  tuesday?: string;
-  wednesday?: string;
-  thursday?: string;
-  friday?: string;
-  saturday?: string;
-
-  exceptions?: any[];
-};
+type Location = AppLocation;
 
 type HoursRow = {
   key: string;
@@ -51,7 +30,7 @@ export class LocationDetailComponent {
   constructor(
     public globals: Globals,
     private modalController: ModalController,
-    private http: HttpClient,
+    private locationsService: LocationsService,
   ) {}
 
   ionViewDidEnter() {
@@ -64,10 +43,9 @@ export class LocationDetailComponent {
   load_detail(shortname: string) {
     this.loading = true;
 
-    const url = this.globals.locations_detail_url(shortname);
-    this.http.get<{ locations: Location[] }>(url).subscribe({
-      next: (data) => {
-        this.location = data?.locations?.[0] ?? this.location;
+    this.locationsService.getLocationByShortname(shortname).subscribe({
+      next: (detail) => {
+        this.location = detail ?? this.location;
         this.loading = false;
       },
       error: () => {

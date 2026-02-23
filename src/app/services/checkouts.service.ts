@@ -1,12 +1,13 @@
 // src/app/services/checkouts.service.ts
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
-import { Observable, map, switchMap, from, throwError } from 'rxjs';
+import { Observable, map, switchMap, from, throwError, concat, filter, tap } from 'rxjs';
 import { Preferences } from '@capacitor/preferences';
 
 import { Globals } from '../globals';
 import { AuthService } from './auth.service';
 import { AccountStoreService } from './account-store.service';
+import { AppCacheService } from './app-cache.service';
 
 export interface AspenCheckout {
   id: number;
@@ -66,6 +67,7 @@ export class CheckoutsService {
     private globals: Globals,
     private auth: AuthService,
     private accounts: AccountStoreService,
+    private cache: AppCacheService,
   ) {}
 
   /**
@@ -78,7 +80,12 @@ export class CheckoutsService {
       return from([[]]);
     }
 
-    return from(this.accounts.getPassword(snap.activeAccountId)).pipe(
+    const cacheKey = `checkouts:${snap.activeAccountId}`;
+    const cached$ = from(this.cache.read<AspenCheckout[]>(cacheKey)).pipe(
+      filter((v): v is AspenCheckout[] => Array.isArray(v)),
+    );
+
+    const network$ = from(this.accounts.getPassword(snap.activeAccountId)).pipe(
       switchMap(password => {
         if (!password) return throwError(() => new Error('missing_password'));
 
@@ -99,9 +106,14 @@ export class CheckoutsService {
               const list = Array.isArray(r?.checkedOutItems) ? (r.checkedOutItems as AspenCheckout[]) : [];
               return list.filter((c) => c?.type === 'ils' || c?.source === 'ils');
             }),
+            tap((list) => {
+              this.cache.write(cacheKey, list).catch(() => {});
+            }),
           );
       }),
     );
+
+    return concat(cached$, network$);
   }
 
   /**

@@ -1,35 +1,13 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { IonicModule } from '@ionic/angular';
-import { HttpClient } from '@angular/common/http';
 import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
 import { LocationDetailComponent } from './location-detail/location-detail.component';
 import { ModalController } from '@ionic/angular/standalone';
+import { LocationsService, type AppLocation } from '../../services/locations.service';
 
-type Location = {
-  id: number;
-  shortname: string;
-  fullname: string;
-  group: string;
-  address: string;
-  citystatezip: string;
-  phone: string;
-  fax?: string;
-  email?: string;
-
-  image?: string;
-
-  sunday?: string;
-  monday?: string;
-  tuesday?: string;
-  wednesday?: string;
-  thursday?: string;
-  friday?: string;
-  saturday?: string;
-
-  exceptions?: any[];
-};
+type Location = AppLocation;
 
 @Component({
   standalone: true,
@@ -48,7 +26,7 @@ export class LocationsPage {
   constructor(
     public globals: Globals,
     public toast: ToastService,
-    private http: HttpClient,
+    private locationsService: LocationsService,
     private modalController: ModalController,
   ) {
     this.url = this.globals.locations_list_url;
@@ -61,10 +39,10 @@ export class LocationsPage {
   get_locations() {
     this.globals.loading_show();
 
-    this.http.get<{ locations: Location[] }>(this.url).subscribe({
-      next: (data) => {
+    this.locationsService.getLocations().subscribe({
+      next: (locations) => {
         this.globals.api_loading = false;
-        this.locations = (data?.locations ?? []).slice().sort((a, b) =>
+        this.locations = (locations ?? []).slice().sort((a, b) =>
           (a.fullname || '').localeCompare(b.fullname || ''),
         );
       },

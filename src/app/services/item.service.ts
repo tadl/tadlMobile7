@@ -1,8 +1,9 @@
 // src/app/services/item.service.ts
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, map } from 'rxjs';
+import { Observable, map, concat, from, filter, tap } from 'rxjs';
 import { Globals } from '../globals';
+import { AppCacheService } from './app-cache.service';
 
 export type AspenWorkAction =
   | {
@@ -70,20 +71,37 @@ export interface AspenItemAvailabilityResult {
 
 @Injectable({ providedIn: 'root' })
 export class ItemService {
-  constructor(private http: HttpClient, private globals: Globals) {}
+  constructor(
+    private http: HttpClient,
+    private globals: Globals,
+    private cache: AppCacheService,
+  ) {}
 
   /**
    * Work-level details (grouped work):
    * GET /API/WorkAPI?method=getGroupedWork&id=<groupedWorkKey>&api=tadl-prod
    */
   getGroupedWork(groupedWorkKey: string): Observable<AspenGroupedWork> {
+    const key = (groupedWorkKey || '').trim();
     const params = new HttpParams()
       .set('method', 'getGroupedWork')
-      .set('id', (groupedWorkKey || '').trim());
+      .set('id', key);
 
-    return this.http
+    const cacheKey = `item:groupedWork:${key}`;
+    const cached$ = from(this.cache.read<AspenGroupedWork>(cacheKey)).pipe(
+      filter((v): v is AspenGroupedWork => !!v && typeof v === 'object'),
+    );
+
+    const network$ = this.http
       .get<any>(`${this.globals.aspen_api_base}/WorkAPI`, { params })
-      .pipe(map(raw => (raw?.result ?? raw) as AspenGroupedWork));
+      .pipe(
+        map(raw => (raw?.result ?? raw) as AspenGroupedWork),
+        tap((work) => {
+          this.cache.write(cacheKey, work).catch(() => {});
+        }),
+      );
+
+    return concat(cached$, network$);
   }
 
   /**
@@ -101,9 +119,21 @@ export class ItemService {
       .set('method', 'getItemAvailability')
       .set('id', numeric);
 
-    return this.http
+    const cacheKey = `item:availability:${numeric}`;
+    const cached$ = from(this.cache.read<AspenItemAvailabilityResult>(cacheKey)).pipe(
+      filter((v): v is AspenItemAvailabilityResult => !!v && typeof v === 'object'),
+    );
+
+    const network$ = this.http
       .get<any>(`${this.globals.aspen_api_base}/ItemAPI`, { params })
-      .pipe(map(raw => (raw?.result ?? raw) as AspenItemAvailabilityResult));
+      .pipe(
+        map(raw => (raw?.result ?? raw) as AspenItemAvailabilityResult),
+        tap((availability) => {
+          this.cache.write(cacheKey, availability).catch(() => {});
+        }),
+      );
+
+    return concat(cached$, network$);
   }
 
   stripIlsPrefix(id: string): string {

@@ -1,12 +1,13 @@
 // src/app/services/holds.service.ts
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
-import { Observable, map, switchMap, from, throwError } from 'rxjs';
+import { Observable, map, switchMap, from, throwError, concat, filter, tap } from 'rxjs';
 import { Preferences } from '@capacitor/preferences';
 
 import { Globals } from '../globals';
 import { AuthService } from './auth.service';
 import { AccountStoreService } from './account-store.service';
+import { AppCacheService } from './app-cache.service';
 
 export interface AspenHold {
   id: number; // transactionId-ish
@@ -69,27 +70,19 @@ export class HoldsService {
     private globals: Globals,
     private auth: AuthService,
     private accounts: AccountStoreService,
+    private cache: AppCacheService,
   ) {}
 
   // ---------- Cache ----------
 
   async getCachedHolds(accountId: string): Promise<{ holds: AspenHold[] } | null> {
-    const { value } = await Preferences.get({ key: PREF_HOLDS_CACHE_PREFIX + accountId });
-    if (!value) return null;
-    try {
-      const parsed = JSON.parse(value);
-      if (parsed && Array.isArray(parsed.holds)) return parsed as { holds: AspenHold[] };
-    } catch {
-      // ignore
-    }
-    return null;
+    const holds = await this.cache.read<AspenHold[]>(PREF_HOLDS_CACHE_PREFIX + accountId);
+    if (!Array.isArray(holds)) return null;
+    return { holds };
   }
 
   async setCachedHolds(accountId: string, holds: AspenHold[]): Promise<void> {
-    await Preferences.set({
-      key: PREF_HOLDS_CACHE_PREFIX + accountId,
-      value: JSON.stringify({ holds: holds ?? [] }),
-    });
+    await this.cache.write(PREF_HOLDS_CACHE_PREFIX + accountId, holds ?? []);
   }
 
   // ---------- Fetch holds ----------
@@ -104,7 +97,12 @@ export class HoldsService {
       return from([[]]);
     }
 
-    return from(this.accounts.getPassword(snap.activeAccountId)).pipe(
+    const cacheKey = PREF_HOLDS_CACHE_PREFIX + snap.activeAccountId;
+    const cached$ = from(this.cache.read<AspenHold[]>(cacheKey)).pipe(
+      filter((v): v is AspenHold[] => Array.isArray(v)),
+    );
+
+    const network$ = from(this.accounts.getPassword(snap.activeAccountId)).pipe(
       switchMap(password => {
         if (!password) return throwError(() => new Error('missing_password'));
 
@@ -128,9 +126,14 @@ export class HoldsService {
               ];
               return all.filter(h => (h?.type === 'ils' || h?.source === 'ils'));
             }),
+            tap((holds) => {
+              this.cache.write(cacheKey, holds).catch(() => {});
+            }),
           );
       }),
     );
+
+    return concat(cached$, network$);
   }
 
   private normalizeHoldCollection(input: any): AspenHold[] {

@@ -1,10 +1,11 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
-import { Observable, from, map, switchMap, throwError } from 'rxjs';
+import { Observable, from, map, switchMap, throwError, concat, filter, tap } from 'rxjs';
 
 import { Globals } from '../globals';
 import { AuthService } from './auth.service';
 import { AccountStoreService } from './account-store.service';
+import { AppCacheService } from './app-cache.service';
 
 export interface AspenUserList {
   id: string | number;
@@ -59,10 +60,19 @@ export class ListsService {
     private globals: Globals,
     private auth: AuthService,
     private accounts: AccountStoreService,
+    private cache: AppCacheService,
   ) {}
 
   fetchUserLists(): Observable<AspenUserList[]> {
-    return this.callListApi('getUserLists').pipe(
+    const snap = this.auth.snapshot();
+    const accountId = (snap?.activeAccountId ?? '').toString().trim();
+    const cacheKey = `lists:user:${accountId || 'none'}`;
+
+    const cached$ = from(this.cache.read<AspenUserList[]>(cacheKey)).pipe(
+      filter((v): v is AspenUserList[] => Array.isArray(v)),
+    );
+
+    const network$ = this.callListApi('getUserLists').pipe(
       map((r: any) => {
         if (!r?.success) return [];
         const lists = Array.isArray(r?.lists) ? r.lists : [];
@@ -71,14 +81,27 @@ export class ListsService {
           cover: this.normalizeDiscoveryUrl(list?.cover),
         })) as AspenUserList[];
       }),
+      tap((lists) => {
+        if (accountId) this.cache.write(cacheKey, lists).catch(() => {});
+      }),
     );
+
+    return concat(cached$, network$);
   }
 
   fetchListTitles(listId: string | number, page = 1, numTitles = 50): Observable<AspenListTitlesResult> {
     const id = (listId ?? '').toString().trim();
     if (!id) return throwError(() => new Error('missing_list_id'));
 
-    return this.callListApi('getListTitles', {
+    const snap = this.auth.snapshot();
+    const accountId = (snap?.activeAccountId ?? '').toString().trim();
+    const cacheKey = `lists:titles:${accountId || 'none'}:${id}:${Math.max(1, Number(page) || 1)}:${Math.max(1, Number(numTitles) || 50)}`;
+
+    const cached$ = from(this.cache.read<AspenListTitlesResult>(cacheKey)).pipe(
+      filter((v): v is AspenListTitlesResult => !!v && Array.isArray(v.titles)),
+    );
+
+    const network$ = this.callListApi('getListTitles', {
       id,
       page: String(Math.max(1, Number(page) || 1)),
       numTitles: String(Math.max(1, Number(numTitles) || 50)),
@@ -99,7 +122,12 @@ export class ListsService {
         page_total: Number.isFinite(Number(r?.page_total)) ? Number(r.page_total) : undefined,
         message: typeof r?.message === 'string' ? r.message : undefined,
       })),
+      tap((result) => {
+        if (accountId && result?.success) this.cache.write(cacheKey, result).catch(() => {});
+      }),
     );
+
+    return concat(cached$, network$);
   }
 
   removeTitlesFromList(listId: string | number, recordIds: Array<string | number>): Observable<AspenListMutationResult> {

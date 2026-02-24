@@ -40,12 +40,25 @@
     <ion-list lines="full" class="full-list">
       <ion-item>
         <ion-label position="stacked">Library card / username</ion-label>
-        <ion-input [(ngModel)]="username" autocomplete="username"></ion-input>
+        <ion-input
+          [(ngModel)]="username"
+          autocomplete="off"
+          autocapitalize="off"
+          autocorrect="off"
+          spellcheck="false"
+        ></ion-input>
       </ion-item>
 
       <ion-item>
         <ion-label position="stacked">PIN / password</ion-label>
-        <ion-input [(ngModel)]="password" type="password" autocomplete="current-password"></ion-input>
+        <ion-input
+          [(ngModel)]="password"
+          type="password"
+          autocomplete="off"
+          autocapitalize="off"
+          autocorrect="off"
+          spellcheck="false"
+        ></ion-input>
       </ion-item>
     </ion-list>
 

@@ -1004,11 +1004,23 @@ export class ItemDetailComponent implements OnInit {
           type: 'text',
           value: (snap?.activeAccountMeta?.username ?? '').toString(),
           placeholder: 'Library card / username',
+          attributes: {
+            autocapitalize: 'off',
+            autocorrect: 'off',
+            autocomplete: 'off',
+            spellcheck: 'false',
+          },
         },
         {
           name: 'password',
           type: 'password',
           placeholder: 'PIN / password',
+          attributes: {
+            autocapitalize: 'off',
+            autocorrect: 'off',
+            autocomplete: 'off',
+            spellcheck: 'false',
+          },
         },
       ],
       buttons: [

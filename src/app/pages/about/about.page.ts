@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { IonicModule } from '@ionic/angular';
 import { Platform } from '@ionic/angular/standalone';
-import { Preferences } from '@capacitor/preferences';
+import { SecureStoragePlugin } from 'capacitor-secure-storage-plugin';
 import { Globals } from '../../globals';
 
 @Component({
@@ -15,7 +15,7 @@ import { Globals } from '../../globals';
 export class AboutPage implements OnInit {
   platforms = '';
   storageDriver: string = '(pending)';
-  credsMigrated: 'yes' | 'no' | 'pending' = 'pending';
+  credentialStorage: string = '(pending)';
   screenSize = '';
 
   constructor(
@@ -45,14 +45,9 @@ export class AboutPage implements OnInit {
       }
     }
 
-    try {
-      const { value } = await Preferences.get({ key: 'creds_migrated_v1' });
-      this.credsMigrated = value === 'yes' ? 'yes' : 'no';
-    } catch {
-      this.credsMigrated = 'pending';
-    }
-
+    const secureAvailable = await this.hasSecureStorage();
     this.storageDriver = this.computeStorageDriver();
+    this.credentialStorage = secureAvailable ? 'secure-storage' : 'secure-storage (unavailable)';
   }
 
   private updateScreenSize() {
@@ -63,5 +58,18 @@ export class AboutPage implements OnInit {
     const isNative = this.platform.is('ios') || this.platform.is('android');
     if (isNative) return 'preferences';
     return 'preferences (web)';
+  }
+
+  private async hasSecureStorage(): Promise<boolean> {
+    const key = 'about_secure_storage_probe';
+    const value = 'ok';
+    try {
+      await SecureStoragePlugin.set({ key, value });
+      const read = await SecureStoragePlugin.get({ key });
+      await SecureStoragePlugin.remove({ key });
+      return read?.value === value;
+    } catch {
+      return false;
+    }
   }
 }

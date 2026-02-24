@@ -46,6 +46,12 @@
   overflow-wrap: break-word;
 }
 
+.add-to-list-button {
+  margin-top: 10px;
+  --padding-start: 10px;
+  --padding-end: 10px;
+}
+
 .desc {
   margin-top: 12px;
   margin-bottom: 14px;
@@ -67,13 +73,6 @@
   cursor: pointer;
 }
 
-.list-card ion-card-title {
-  font-size: 14px;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  opacity: 0.85;
-}
-
 .list-line {
   margin: 6px 0;
   opacity: 0.95;
@@ -81,10 +80,6 @@
 
 .list-memberships {
   margin: 8px 0;
-}
-
-.list-actions {
-  margin-top: 12px;
 }
 
 /* Hold card */

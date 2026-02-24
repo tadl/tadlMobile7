@@ -19,6 +19,16 @@
       <div class="meta" *ngIf="work?.author || hit.author">
         {{ work?.author || hit.author }}
       </div>
+      <ion-button
+        size="small"
+        fill="outline"
+        class="add-to-list-button"
+        *ngIf="canManageLists()"
+        (click)="addToAnyList()"
+        [disabled]="listActionBusy"
+      >
+        Add to list
+      </ion-button>
     </div>
   </div>
 
@@ -164,43 +174,32 @@
     </ion-card-content>
   </ion-card>
 
-  <ion-card *ngIf="canManageLists()" class="list-card">
+  <ion-card *ngIf="hasKnownListMembership()" class="list-card">
     <ion-card-header>
       <ion-card-title>Lists</ion-card-title>
     </ion-card-header>
     <ion-card-content>
-      <div class="list-line" *ngIf="hasKnownListMembership()">
+      <div class="list-line">
         {{ listMembershipLabel() }}
       </div>
-      <ion-list *ngIf="hasKnownListMembership()" lines="none" class="list-memberships">
+      <ion-list lines="none" class="list-memberships">
         <ion-item
           button
-          detail="true"
           *ngFor="let m of knownListMemberships"
           (click)="openKnownList(m.listId, m.listTitle)"
         >
           <ion-label>{{ m.listTitle }}</ion-label>
+          <ion-button
+            slot="end"
+            fill="clear"
+            size="small"
+            aria-label="List actions"
+            (click)="openListMembershipActions(m, $event)"
+          >
+            <ion-icon name="ellipsis-vertical" slot="icon-only"></ion-icon>
+          </ion-button>
         </ion-item>
       </ion-list>
-
-      <div class="list-actions">
-        <ion-button
-          expand="block"
-          (click)="addToAnyList()"
-          [disabled]="listActionBusy"
-        >
-          {{ hasKnownListMembership() ? 'Add to another list' : 'Add to list' }}
-        </ion-button>
-        <ion-button
-          expand="block"
-          fill="outline"
-          color="danger"
-          (click)="removeFromAnyList()"
-          [disabled]="listActionBusy"
-        >
-          Remove from list
-        </ion-button>
-      </div>
     </ion-card-content>
   </ion-card>
 

@@ -3,6 +3,7 @@ import { CommonModule, KeyValue } from '@angular/common';
 import {
   IonicModule,
   ActionSheetController,
+  AlertController,
   ModalController,
   type ActionSheetButton,
 } from '@ionic/angular';
@@ -20,6 +21,7 @@ import type { AspenHold } from '../../services/holds.service';
 import { CheckoutsService } from '../../services/checkouts.service';
 import type { AspenCheckout } from '../../services/checkouts.service';
 import { ListsService, type AspenUserList } from '../../services/lists.service';
+import { AuthService } from '../../services/auth.service';
 import { CopyDetailsPopoverComponent } from '../copy-details-popover/copy-details-popover.component';
 
 interface ItemDetailListContext {
@@ -107,6 +109,7 @@ export class ItemDetailComponent implements OnInit {
   constructor(
     public globals: Globals,
     private toast: ToastService,
+    private auth: AuthService,
     private items: ItemService,
     private holds: HoldsService,
     private checkouts: CheckoutsService,
@@ -114,6 +117,7 @@ export class ItemDetailComponent implements OnInit {
     private router: Router,
     private modalCtrl: ModalController, // ✅ renamed from "modal"
     private actionSheet: ActionSheetController,
+    private alertCtrl: AlertController,
   ) {}
 
   ngOnInit() {
@@ -265,6 +269,9 @@ export class ItemDetailComponent implements OnInit {
   }
 
   private async getListsForAction(): Promise<AspenUserList[]> {
+    const loggedIn = await this.ensureLoggedInForInteractiveAction('Log in to manage lists');
+    if (!loggedIn) return [];
+
     try {
       const lists = await lastValueFrom(this.lists.fetchUserLists());
       if (!lists?.length) {
@@ -416,6 +423,33 @@ export class ItemDetailComponent implements OnInit {
     const id = (listId ?? '').toString().trim();
     if (!id) return;
     this.knownListMemberships = this.knownListMemberships.filter(x => x.listId !== id);
+  }
+
+  async openListMembershipActions(m: KnownListMembership, ev?: Event) {
+    ev?.stopPropagation?.();
+    if (!m?.listId) return;
+
+    const sheet = await this.actionSheet.create({
+      header: m.listTitle || 'List actions',
+      buttons: [
+        {
+          text: 'View list',
+          handler: () => this.openKnownList(m.listId, m.listTitle),
+        },
+        {
+          text: 'Remove from this list',
+          role: 'destructive',
+          handler: () =>
+            this.confirmRemoveFromNamedList(
+              { id: m.listId, title: m.listTitle } as AspenUserList,
+              this.listRecordId(),
+            ),
+        },
+        { text: 'Cancel', role: 'cancel' },
+      ],
+    });
+
+    await sheet.present();
   }
 
   // ----------------------------
@@ -903,6 +937,8 @@ export class ItemDetailComponent implements OnInit {
 
   private async promptAndPlaceHold(recordId: string) {
     if (this.holdActionBusy) return;
+    const loggedIn = await this.ensureLoggedInForInteractiveAction('Log in to place hold');
+    if (!loggedIn) return;
 
     const buttons: ActionSheetButton[] = this.globals.pickupLocations.map((loc) => ({
       text: loc.name,
@@ -938,8 +974,82 @@ export class ItemDetailComponent implements OnInit {
           // fetch holds and attach the hold for this grouped work so the card appears
           this.refreshHoldForThisItem();
         },
-        error: () => this.toast.presentToast('Could not place hold.'),
+        error: (err) => {
+          const msg = (err?.message ?? '').toString().trim();
+          if (msg === 'not_logged_in' || msg === 'missing_password') {
+            void this.retryPlaceHoldAfterLogin(recordId, pickupBranch);
+            return;
+          }
+          this.toast.presentToast('Could not place hold.');
+        },
       });
+  }
+
+  private async retryPlaceHoldAfterLogin(recordId: string, pickupBranch: string): Promise<void> {
+    const ok = await this.ensureLoggedInForInteractiveAction('Log in to place hold');
+    if (!ok) return;
+    this.placeHoldNow(recordId, pickupBranch);
+  }
+
+  private async ensureLoggedInForInteractiveAction(header: string): Promise<boolean> {
+    const snap = this.auth.snapshot();
+    if (snap?.isLoggedIn && snap?.activeAccountId && snap?.activeAccountMeta) return true;
+
+    const alert = await this.alertCtrl.create({
+      header,
+      message: 'Enter your library card / username and password.',
+      inputs: [
+        {
+          name: 'username',
+          type: 'text',
+          value: (snap?.activeAccountMeta?.username ?? '').toString(),
+          placeholder: 'Library card / username',
+        },
+        {
+          name: 'password',
+          type: 'password',
+          placeholder: 'PIN / password',
+        },
+      ],
+      buttons: [
+        { text: 'Cancel', role: 'cancel' },
+        {
+          text: 'Log in',
+          role: 'confirm',
+          handler: (v) => ({
+            username: (v?.username ?? '').toString().trim(),
+            password: (v?.password ?? '').toString(),
+          }),
+        },
+      ],
+    });
+
+    await alert.present();
+    const { role, data } = await alert.onDidDismiss<{
+      username: string;
+      password: string;
+    }>();
+    if (role !== 'confirm') return false;
+
+    const username = (data?.username ?? '').toString().trim();
+    const password = (data?.password ?? '').toString();
+    if (!username || !password) {
+      this.toast.presentToast('Username and password are required.');
+      return false;
+    }
+
+    try {
+      await lastValueFrom(this.auth.login(username, password));
+      return true;
+    } catch (e: any) {
+      const msg = (e?.message ?? '').toString();
+      if (msg === 'invalid_login') {
+        this.toast.presentToast('Login failed. Check your username/password and try again.');
+      } else {
+        this.toast.presentToast('Login failed. Please try again.');
+      }
+      return false;
+    }
   }
 
   private loadHoldingsCountsForWork(work: AspenGroupedWork | null) {

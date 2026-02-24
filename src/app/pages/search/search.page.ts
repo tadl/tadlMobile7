@@ -21,9 +21,15 @@ interface SearchFacetOption {
 
 interface SearchFacetGroup {
   key: string;
+  field: string;
   label: string;
   multiSelect: boolean;
   options: SearchFacetOption[];
+}
+
+interface SearchSortOption {
+  value: AspenSearchSort;
+  label: string;
 }
 
 @Component({
@@ -40,11 +46,25 @@ export class SearchPage {
 
   // advanced controls (start simple)
   showAdvanced = false;
+  facetsEnabled = false;
   searchIndex: AspenSearchIndex = 'Keyword';
   sort: AspenSearchSort = 'relevance';
+  sortOptions: SearchSortOption[] = [
+    { value: 'relevance', label: 'Best Match' },
+    { value: 'year desc,title asc', label: 'Publication Year Desc' },
+    { value: 'year asc,title asc', label: 'Publication Year Asc' },
+    { value: 'author asc,title asc', label: 'Author' },
+    { value: 'title', label: 'Title' },
+    { value: 'days_since_added asc', label: 'Date Purchased Desc' },
+    { value: 'callnumber_sort', label: 'Call Number' },
+    { value: 'popularity desc', label: 'Total Checkouts' },
+    { value: 'rating desc', label: 'User Rating' },
+    { value: 'total_holds desc', label: 'Number of Holds' },
+  ];
 
   filters: string[] = [];
   facetGroups: SearchFacetGroup[] = [];
+  collapsedFacetGroups: Record<string, boolean> = {};
   private facetDisplayByFilter = new Map<string, string>();
 
   // paging / infinite scroll
@@ -84,6 +104,9 @@ export class SearchPage {
 
   runSearch(reset: boolean) {
     const q = (this.lookfor ?? '').trim();
+    this.filters = this.filters.filter(f => this.filterField(f) !== 'sort_by');
+    const sortValue = this.normalizedSortValue(this.sort);
+    if (sortValue !== this.sort) this.sort = sortValue;
 
     if (!q) {
       this.lastExecutedQuery = '';
@@ -92,6 +115,7 @@ export class SearchPage {
       this.totalPages = 1;
       this.infiniteDisabled = true;
       this.facetGroups = [];
+      this.collapsedFacetGroups = {};
       this.facetDisplayByFilter.clear();
       return;
     }
@@ -118,7 +142,8 @@ export class SearchPage {
         pageSize: this.pageSize,
         searchIndex: this.searchIndex,
         source: 'local',
-        sort: this.sort,
+        sort: sortValue,
+        includeSortList: true,
         filters: this.filters,
       })
       .pipe(finalize(() => (this.globals.api_loading = false)))
@@ -133,8 +158,17 @@ export class SearchPage {
 
           const newHits = res.hits ?? [];
           this.totalPages = res.totalPages ?? this.totalPages ?? 1;
-          this.facetGroups = this.buildFacetGroups(res.facets);
-          this.rebuildFacetDisplayMap();
+          const allGroups = this.buildFacetGroups(res.facets);
+          this.applySortOptionsFromGroups(allGroups);
+          if (this.facetsEnabled) {
+            this.facetGroups = allGroups.filter(g => g.field !== 'sort_by');
+            this.reconcileCollapsedFacetGroups();
+            this.rebuildFacetDisplayMap();
+          } else {
+            this.facetGroups = [];
+            this.collapsedFacetGroups = {};
+            this.facetDisplayByFilter.clear();
+          }
 
           if (reset) {
             this.hits = newHits;
@@ -167,6 +201,8 @@ export class SearchPage {
     }
 
     this.page += 1;
+    const sortValue = this.normalizedSortValue(this.sort);
+    if (sortValue !== this.sort) this.sort = sortValue;
 
     this.globals.api_loading = true;
     this.searchService
@@ -176,7 +212,8 @@ export class SearchPage {
         pageSize: this.pageSize,
         searchIndex: this.searchIndex,
         source: 'local',
-        sort: this.sort,
+        sort: sortValue,
+        includeSortList: true,
         filters: this.filters,
       })
       .pipe(
@@ -195,6 +232,8 @@ export class SearchPage {
           }
 
           this.totalPages = res.totalPages ?? this.totalPages ?? 1;
+          const allGroups = this.buildFacetGroups(res.facets);
+          this.applySortOptionsFromGroups(allGroups);
           this.hits = [...this.hits, ...(res.hits ?? [])];
           this.infiniteDisabled = !(this.page < this.totalPages);
         },
@@ -203,6 +242,22 @@ export class SearchPage {
           this.toast.presentToast(this.globals.server_error_msg);
         },
       });
+  }
+
+  onFacetsEnabledChanged(enabled: boolean) {
+    this.facetsEnabled = !!enabled;
+
+    if (!this.facetsEnabled) {
+      const hadFilters = this.filters.length > 0;
+      this.filters = [];
+      this.facetGroups = [];
+      this.collapsedFacetGroups = {};
+      this.facetDisplayByFilter.clear();
+      if (hadFilters && this.lookfor.trim()) this.runSearch(true);
+      return;
+    }
+
+    if (this.lookfor.trim()) this.runSearch(true);
   }
 
   toggleAdvanced() {
@@ -245,6 +300,22 @@ export class SearchPage {
 
   filterChipLabel(filter: string): string {
     return this.facetDisplayByFilter.get(filter) || filter;
+  }
+
+  toggleFacetGroup(groupKey: string) {
+    const current = !!this.collapsedFacetGroups[groupKey];
+    this.collapsedFacetGroups = {
+      ...this.collapsedFacetGroups,
+      [groupKey]: !current,
+    };
+  }
+
+  isFacetGroupCollapsed(groupKey: string): boolean {
+    return !!this.collapsedFacetGroups[groupKey];
+  }
+
+  selectedOptionsForGroup(group: SearchFacetGroup): SearchFacetOption[] {
+    return group.options.filter(opt => this.isFacetSelected(opt.filter));
   }
 
   async openDetail(hit: AspenSearchHit) {
@@ -304,7 +375,8 @@ export class SearchPage {
     for (const [facetKey, facetInfo] of Object.entries(rawFacets)) {
       const label = this.decodeLabel((facetInfo as any)?.label) || facetKey;
       const multiSelect = !!(facetInfo as any)?.multiSelect;
-      const list = (facetInfo as any)?.list;
+      const groupField = (facetInfo as any)?.field?.toString?.().trim?.() || '';
+      const list = (facetInfo as any)?.list ?? (facetInfo as any)?.facets;
       const listValues = Array.isArray(list) ? list : (list && typeof list === 'object' ? Object.values(list) : []);
       const options: SearchFacetOption[] = [];
 
@@ -312,7 +384,7 @@ export class SearchPage {
         const value = (rawOption?.value ?? '').toString().trim();
         if (!value) continue;
 
-        const field = this.inferFacetField(facetKey, rawOption);
+        const field = this.inferFacetField(facetKey, rawOption, groupField);
         const filter = `${field}:${value}`;
         options.push({
           filter,
@@ -325,13 +397,14 @@ export class SearchPage {
       }
 
       if (!options.length) continue;
-      groups.push({ key: facetKey, label, multiSelect, options });
+      groups.push({ key: facetKey, field: groupField || facetKey, label, multiSelect, options });
     }
 
     return groups;
   }
 
-  private inferFacetField(facetKey: string, rawOption: any): string {
+  private inferFacetField(facetKey: string, rawOption: any, groupField?: string): string {
+    if (groupField) return groupField;
     const explicitField = (rawOption?.field ?? '').toString().trim();
     if (explicitField) return explicitField;
     return (facetKey ?? '').toString().trim() || 'unknown';
@@ -352,6 +425,14 @@ export class SearchPage {
     }
   }
 
+  private reconcileCollapsedFacetGroups() {
+    const next: Record<string, boolean> = {};
+    for (const group of this.facetGroups) {
+      next[group.key] = this.collapsedFacetGroups[group.key] ?? true;
+    }
+    this.collapsedFacetGroups = next;
+  }
+
   private decodeLabel(input: any): string {
     if (typeof input !== 'string') return '';
     let s = input.replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
@@ -363,5 +444,44 @@ export class SearchPage {
       // ignore
     }
     return s;
+  }
+
+  private normalizedSortValue(input: AspenSearchSort): AspenSearchSort {
+    const raw = (input ?? '').toString().trim();
+    if (!raw) return 'relevance';
+
+    const legacyMap: Record<string, AspenSearchSort> = {
+      newest_to_oldest: 'year desc,title asc',
+      oldest_to_newest: 'year asc,title asc',
+      author: 'author asc,title asc',
+      datePurchased: 'days_since_added asc',
+      'datePurchased desc': 'days_since_added asc',
+      'total_checkouts desc': 'popularity desc',
+      'rating_summary desc': 'rating desc',
+      'num_holds desc': 'total_holds desc',
+    };
+
+    return legacyMap[raw] ?? raw;
+  }
+
+  private applySortOptionsFromGroups(groups: SearchFacetGroup[]) {
+    const sortGroup = groups.find(g => g.field === 'sort_by');
+    if (!sortGroup?.options?.length) return;
+
+    const options: SearchSortOption[] = sortGroup.options.map(o => ({
+      value: o.value,
+      label: o.display || o.value,
+    }));
+    this.sortOptions = options;
+
+    const applied = sortGroup.options.find(o => o.isApplied);
+    if (applied?.value) {
+      this.sort = applied.value;
+      return;
+    }
+
+    if (!options.some(o => o.value === this.sort)) {
+      this.sort = options[0].value;
+    }
   }
 }

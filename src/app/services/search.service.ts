@@ -25,6 +25,7 @@ export interface AspenSearchOptions {
   searchIndex?: AspenSearchIndex;
   source?: AspenSearchSource;
   sort?: AspenSearchSort;
+  includeSortList?: boolean;
 
   // Aspen uses repeated filter[] query params
   filters?: string[];
@@ -124,6 +125,9 @@ export class SearchService {
 
     if (opts.language) params = params.set('language', opts.language);
     if (opts.sort) params = params.set('sort', opts.sort);
+    if (opts.includeSortList !== undefined) {
+      params = params.set('includeSortList', opts.includeSortList ? 'true' : 'false');
+    }
 
     for (const f of opts.filters ?? []) {
       params = params.append('filter[]', f);
@@ -171,7 +175,7 @@ export class SearchService {
 
             hits,
 
-            facets: (result?.facetSet ?? undefined) as Record<string, AspenFacetBucket> | undefined,
+            facets: (result?.options ?? result?.facetSet ?? undefined) as Record<string, AspenFacetBucket> | undefined,
             sortList: result?.sortList,
             paging,
             raw: result,

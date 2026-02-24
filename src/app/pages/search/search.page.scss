@@ -22,6 +22,11 @@
   margin-top: 2px;
 }
 
+.facet-toggle-row {
+  --inner-padding-start: 0;
+  --inner-padding-end: 0;
+}
+
 .advanced {
   margin-top: 10px;
   border-radius: 12px;
@@ -38,4 +43,17 @@
 
 .facet-group {
   margin-top: 6px;
+}
+
+.facet-group-header {
+  --inner-padding-start: 10px;
+  --inner-padding-end: 10px;
+  font-weight: 600;
+}
+
+.facet-selected {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 10px 2px;
 }

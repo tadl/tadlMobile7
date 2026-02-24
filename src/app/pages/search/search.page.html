@@ -36,7 +36,7 @@
 
     <div *ngIf="showAdvanced" class="advanced">
       <ion-item>
-        <ion-label>Search index</ion-label>
+        <ion-label>Search by</ion-label>
         <ion-select [(ngModel)]="searchIndex" interface="popover">
           <ion-select-option value="Keyword">Keyword</ion-select-option>
           <ion-select-option value="Title">Title</ion-select-option>
@@ -49,15 +49,22 @@
       <ion-item>
         <ion-label>Sort</ion-label>
         <ion-select [(ngModel)]="sort" interface="popover">
-          <ion-select-option value="relevance">Relevance</ion-select-option>
-          <ion-select-option value="newest_to_oldest">Newest</ion-select-option>
-          <ion-select-option value="oldest_to_newest">Oldest</ion-select-option>
-          <ion-select-option value="title">Title</ion-select-option>
-          <ion-select-option value="author">Author</ion-select-option>
+          <ion-select-option *ngFor="let opt of sortOptions" [value]="opt.value">
+            {{ opt.label }}
+          </ion-select-option>
         </ion-select>
       </ion-item>
 
-      <div class="facet-controls" *ngIf="filters.length">
+      <ion-item lines="none" class="facet-toggle-row">
+        <ion-label>Show search filters</ion-label>
+        <ion-toggle
+          slot="end"
+          [(ngModel)]="facetsEnabled"
+          (ionChange)="onFacetsEnabledChanged($event.detail.checked)"
+        ></ion-toggle>
+      </ion-item>
+
+      <div class="facet-controls" *ngIf="facetsEnabled && filters.length">
         <ion-chip *ngFor="let f of filters">
           <ion-label>{{ filterChipLabel(f) }}</ion-label>
           <ion-icon name="close-circle" (click)="removeFilter(f)"></ion-icon>
@@ -65,21 +72,34 @@
         <ion-button size="small" fill="clear" (click)="clearAllFilters()">Clear filters</ion-button>
       </div>
 
-      <ion-list lines="none" *ngIf="facetGroups.length">
+      <ion-list lines="none" *ngIf="facetsEnabled && facetGroups.length">
         <ion-item-group *ngFor="let group of facetGroups; trackBy: trackFacetGroup" class="facet-group">
-          <ion-item-divider>
+          <ion-item button detail="false" lines="full" (click)="toggleFacetGroup(group.key)" class="facet-group-header">
             <ion-label>{{ group.label }}</ion-label>
-          </ion-item-divider>
-
-          <ion-item *ngFor="let option of group.options; trackBy: trackFacetOption">
-            <ion-checkbox
-              slot="start"
-              [checked]="isFacetSelected(option.filter)"
-              (ionChange)="onFacetToggled(group, option, $event.detail.checked)"
-            ></ion-checkbox>
-            <ion-label class="ion-text-wrap">{{ option.display }}</ion-label>
-            <ion-note slot="end">{{ option.count }}</ion-note>
+            <ion-icon
+              slot="end"
+              [name]="isFacetGroupCollapsed(group.key) ? 'chevron-down' : 'chevron-up'"
+            ></ion-icon>
           </ion-item>
+
+          <div class="facet-selected" *ngIf="selectedOptionsForGroup(group).length">
+            <ion-chip *ngFor="let option of selectedOptionsForGroup(group); trackBy: trackFacetOption">
+              <ion-label>{{ option.display }}</ion-label>
+              <ion-icon name="close-circle" (click)="removeFilter(option.filter)"></ion-icon>
+            </ion-chip>
+          </div>
+
+          <ng-container *ngIf="!isFacetGroupCollapsed(group.key)">
+            <ion-item *ngFor="let option of group.options; trackBy: trackFacetOption">
+              <ion-checkbox
+                slot="start"
+                [checked]="isFacetSelected(option.filter)"
+                (ionChange)="onFacetToggled(group, option, $event.detail.checked)"
+              ></ion-checkbox>
+              <ion-label class="ion-text-wrap">{{ option.display }}</ion-label>
+              <ion-note slot="end">{{ option.count }}</ion-note>
+            </ion-item>
+          </ng-container>
         </ion-item-group>
       </ion-list>
     </div>

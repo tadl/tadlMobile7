@@ -4,7 +4,6 @@ import { IonicModule } from '@ionic/angular';
 import { Router } from '@angular/router';
 import { finalize } from 'rxjs';
 import { Globals } from '../../globals';
-import { ToastService } from '../../services/toast.service';
 import { FeaturedService, type FeaturedCategoryPage } from '../../services/featured.service';
 
 type FeaturedTabKey = 'books' | 'video' | 'music';
@@ -12,7 +11,6 @@ type FeaturedTabKey = 'books' | 'video' | 'music';
 interface FeaturedTile {
   id: string;
   label: string;
-  previewCount: number;
   covers: string[];
 }
 
@@ -24,10 +22,14 @@ interface FeaturedTile {
   imports: [CommonModule, IonicModule],
 })
 export class FeaturedPage {
-  loading = false;
   selectedTab: FeaturedTabKey = 'books';
   private loadingTabs = new Set<FeaturedTabKey>();
   private loadedTabs = new Set<FeaturedTabKey>();
+  tabErrorByTab: Record<FeaturedTabKey, string | null> = {
+    books: null,
+    video: null,
+    music: null,
+  };
   tilesByTab: Record<FeaturedTabKey, FeaturedTile[]> = {
     books: [],
     video: [],
@@ -42,12 +44,11 @@ export class FeaturedPage {
   constructor(
     public globals: Globals,
     private featured: FeaturedService,
-    private toast: ToastService,
     private router: Router,
   ) {}
 
   ionViewWillEnter() {
-    this.refresh('books');
+    this.refresh(this.selectedTab);
   }
 
   refresh(tab: FeaturedTabKey = this.selectedTab, ev?: any) {
@@ -57,47 +58,56 @@ export class FeaturedPage {
     }
 
     this.loadingTabs.add(tab);
-    this.loading = true;
+    this.tabErrorByTab[tab] = null;
 
     const ids = this.tabCategoryIds[tab] ?? [];
     const tilesById = new Map<string, FeaturedTile>();
+    for (const t of this.tilesByTab[tab] ?? []) {
+      if (t?.id) tilesById.set(t.id, t);
+    }
     let completed = 0;
+    let successfulRequests = 0;
+    let failedRequests = 0;
 
     if (ids.length === 0) {
       this.tilesByTab[tab] = [];
       this.loadingTabs.delete(tab);
-      this.loading = this.loadingTabs.size > 0;
       ev?.target?.complete?.();
       return;
     }
 
     for (const id of ids) {
-      this.featured.fetchBrowseCategoryPage(id, 1, 12)
+      this.featured.fetchBrowseCategoryPage(id, 1, 6)
         .pipe(finalize(() => {
           completed += 1;
           if (completed === ids.length) {
-            this.tilesByTab[tab] = ids.map((categoryId) => tilesById.get(categoryId)).filter((v): v is FeaturedTile => !!v);
-            if (this.tilesByTab[tab].length === 0) {
-              this.toast.presentToast('Could not load featured categories for this tab.');
+            this.updateRenderedTiles(tab, ids, tilesById);
+            if (successfulRequests === 0 && failedRequests > 0) {
+              this.tabErrorByTab[tab] = 'Could not load featured categories for this tab.';
+            } else {
+              this.tabErrorByTab[tab] = null;
             }
             this.loadedTabs.add(tab);
             this.loadingTabs.delete(tab);
-            this.loading = this.loadingTabs.size > 0;
             ev?.target?.complete?.();
           }
         }))
         .subscribe({
           next: (page: FeaturedCategoryPage) => {
-            if (!page?.success) return;
+            if (!page?.success) {
+              failedRequests += 1;
+              return;
+            }
+            successfulRequests += 1;
             tilesById.set(id, {
               id,
               label: (page.title ?? `Category ${id}`).toString().trim() || `Category ${id}`,
-              previewCount: page.items?.length ?? 0,
               covers: (page.items ?? []).map((item) => this.coverUrl(item.image)).filter(Boolean).slice(0, 6),
             });
+            this.updateRenderedTiles(tab, ids, tilesById);
           },
           error: () => {
-            // Skip failed category and continue loading remaining tiles.
+            failedRequests += 1;
           },
         });
     }
@@ -120,17 +130,23 @@ export class FeaturedPage {
     });
   }
 
-  categorySubtitle(tile: FeaturedTile): string {
-    const n = tile?.previewCount ?? 0;
-    if (n <= 0) return 'No preview items';
-    return `${n} preview ${n === 1 ? 'item' : 'items'}`;
-  }
-
   coverUrl(url?: string): string {
     return (url ?? '').toString().trim();
   }
 
+  isTabLoading(tab: FeaturedTabKey): boolean {
+    return this.loadingTabs.has(tab);
+  }
+
+  retrySelectedTab() {
+    this.refresh(this.selectedTab);
+  }
+
   trackByTile(_idx: number, tile: FeaturedTile): string {
     return (tile?.id ?? '').toString().trim() || `${_idx}`;
+  }
+
+  private updateRenderedTiles(tab: FeaturedTabKey, ids: string[], tilesById: Map<string, FeaturedTile>) {
+    this.tilesByTab[tab] = ids.map((categoryId) => tilesById.get(categoryId)).filter((v): v is FeaturedTile => !!v);
   }
 }

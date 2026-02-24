@@ -20,6 +20,7 @@ import type { AspenHold } from '../../services/holds.service';
 import { CheckoutsService } from '../../services/checkouts.service';
 import type { AspenCheckout } from '../../services/checkouts.service';
 import { ListsService, type AspenUserList } from '../../services/lists.service';
+import { CopyDetailsPopoverComponent } from '../copy-details-popover/copy-details-popover.component';
 
 interface ItemDetailListContext {
   listId: string;
@@ -46,6 +47,13 @@ interface FormatProviderAction {
   source: string;
 }
 
+interface FormatShelfDetail {
+  location: string;
+  callNumber: string;
+  status: string;
+  availability: boolean | null;
+}
+
 @Component({
   standalone: true,
   selector: 'app-item-detail',
@@ -68,6 +76,7 @@ export class ItemDetailComponent implements OnInit {
 
   /** format label -> holdings count */
   private holdingsCountByFormat: Record<string, number> = {};
+  private holdingsDetailsByFormat: Record<string, FormatShelfDetail[]> = {};
   private providerStatusesByFormat: Record<string, FormatProviderStatus[]> = {};
   private providerActionsByFormat: Record<string, FormatProviderAction[]> = {};
   private loadedWorkId: string | null = null;
@@ -701,7 +710,58 @@ export class ItemDetailComponent implements OnInit {
   formatHoldingsText(formatLabel: string): string {
     const count = this.formatHoldingsCount(formatLabel);
     if (count <= 0) return '';
-    return `${count} ${count === 1 ? 'holding' : 'holdings'}`;
+    return `${count} ${count === 1 ? 'copy' : 'copies'}`;
+  }
+
+  formatShelfDetails(formatLabel: string): FormatShelfDetail[] {
+    const k = (formatLabel ?? '').toString();
+    return this.holdingsDetailsByFormat[k] ?? [];
+  }
+
+  hasFormatShelfDetails(formatLabel: string): boolean {
+    return this.formatShelfDetails(formatLabel).length > 0;
+  }
+
+  visibleFormatShelfDetails(formatLabel: string): FormatShelfDetail[] {
+    return this.formatShelfDetails(formatLabel).slice(0, 3);
+  }
+
+  formatShelfDetailsRemaining(formatLabel: string): number {
+    const total = this.formatShelfDetails(formatLabel).length;
+    return total > 3 ? total - 3 : 0;
+  }
+
+  formatShelfDetailText(detail: FormatShelfDetail): string {
+    const parts: string[] = [];
+    if (detail.location) parts.push(detail.location);
+    if (detail.callNumber) parts.push(detail.callNumber);
+    if (detail.status) parts.push(detail.status);
+    return parts.join(' • ');
+  }
+
+  async openCopyDetails(formatKey: string, ev: Event) {
+    ev?.stopPropagation?.();
+    const details = this.formatShelfDetails(formatKey);
+    if (!details.length) return;
+
+    const label =
+      (this.work?.formats as any)?.[formatKey]?.label?.toString?.().trim?.() ||
+      formatKey ||
+      'Copy details';
+
+    const modal = await this.modalCtrl.create({
+      component: CopyDetailsPopoverComponent,
+      componentProps: {
+        formatLabel: label,
+        title: (this.work?.title ?? this.hit?.title ?? 'Untitled').toString().trim() || 'Untitled',
+        author: (this.work?.author ?? this.hit?.author ?? '').toString().trim(),
+        coverUrl: (this.work?.cover ?? this.hit?.coverUrl ?? '').toString().trim(),
+        details,
+      },
+    });
+
+    this.globals.modal_open = true;
+    await modal.present();
   }
 
   providerStatusesForFormat(formatLabel: string): FormatProviderStatus[] {
@@ -904,26 +964,48 @@ export class ItemDetailComponent implements OnInit {
     forkJoin(calls).subscribe({
       next: (results) => {
         const byFormat: Record<string, number> = {};
+        const detailsByFormat: Record<string, FormatShelfDetail[]> = {};
 
         for (let i = 0; i < results.length; i++) {
           const res: any = results[i];
           const fmtKey = requests[i].formatKey;
 
           let total = 0;
+          const details: FormatShelfDetail[] = [];
           const holdings = res?.holdings;
           if (holdings && typeof holdings === 'object') {
             for (const k of Object.keys(holdings)) {
               const arr = holdings[k];
-              if (Array.isArray(arr)) total += arr.length;
+              if (!Array.isArray(arr)) continue;
+              total += arr.length;
+
+              for (const raw of arr) {
+                const location = (raw?.libraryDisplayName ?? raw?.location ?? '').toString().trim();
+                const callNumber = (raw?.callnumber ?? '').toString().trim();
+                const status = (raw?.statusFull ?? raw?.statusfull ?? raw?.status ?? '').toString().trim();
+                const availabilityRaw = raw?.availability;
+                const availability = availabilityRaw === true
+                  ? true
+                  : availabilityRaw === false
+                    ? false
+                    : null;
+                if (!location && !callNumber && !status) continue;
+                details.push({ location, callNumber, status, availability });
+              }
             }
           }
 
           byFormat[fmtKey] = total;
+          detailsByFormat[fmtKey] = this.dedupeShelfDetails(details);
         }
 
         this.holdingsCountByFormat = {
           ...this.holdingsCountByFormat,
           ...byFormat,
+        };
+        this.holdingsDetailsByFormat = {
+          ...this.holdingsDetailsByFormat,
+          ...detailsByFormat,
         };
       },
       error: () => {},
@@ -1002,6 +1084,7 @@ export class ItemDetailComponent implements OnInit {
     this.requestedHoldings.clear();
     this.requestedVariations.clear();
     this.holdingsCountByFormat = {};
+    this.holdingsDetailsByFormat = {};
     this.providerStatusesByFormat = {};
     this.providerActionsByFormat = {};
   }
@@ -1143,5 +1226,19 @@ export class ItemDetailComponent implements OnInit {
   private normalizeDescriptionText(value: any): string {
     if (value === null || value === undefined) return '';
     return String(value).replace(/\s+/g, ' ').trim();
+  }
+
+  private dedupeShelfDetails(details: FormatShelfDetail[]): FormatShelfDetail[] {
+    const out: FormatShelfDetail[] = [];
+    const seen = new Set<string>();
+
+    for (const d of details) {
+      const key = `${d.location}|${d.callNumber}|${d.status}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(d);
+    }
+
+    return out;
   }
 }

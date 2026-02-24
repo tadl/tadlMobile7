@@ -1,0 +1,36 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Copy Details</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="close()">Close</ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <div class="header">
+    <div class="cover" *ngIf="coverUrl">
+      <img [src]="coverUrl" alt="" />
+    </div>
+    <div class="meta">
+      <h2 class="title">{{ title }}</h2>
+      <div class="author" *ngIf="author">{{ author }}</div>
+      <div class="format">{{ formatLabel }}</div>
+    </div>
+  </div>
+
+  <ion-list lines="full" *ngIf="groupedDetails().length > 0; else noDetails">
+    <ion-item *ngFor="let d of groupedDetails()">
+      <ion-label class="ion-text-wrap">
+        <div class="line strong" *ngIf="d.location">{{ d.location }}</div>
+        <div class="line" *ngIf="d.callNumber">Call number: {{ d.callNumber }}</div>
+        <div class="line" *ngIf="copyCountText(d.count)">{{ copyCountText(d.count) }}</div>
+        <div class="line muted" *ngIf="d.status">{{ d.status }}</div>
+      </ion-label>
+    </ion-item>
+  </ion-list>
+
+  <ng-template #noDetails>
+    <ion-note>No copy details available.</ion-note>
+  </ng-template>
+</ion-content>

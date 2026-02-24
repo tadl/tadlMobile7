@@ -1,0 +1,49 @@
+:host {
+  display: block;
+}
+
+.header {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.cover img {
+  width: 72px;
+  height: auto;
+  border-radius: 8px;
+  display: block;
+}
+
+.meta {
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.author {
+  margin-top: 4px;
+  opacity: 0.85;
+}
+
+.format {
+  margin-top: 4px;
+  font-size: 13px;
+  opacity: 0.78;
+}
+
+.line {
+  margin: 2px 0;
+}
+
+.strong {
+  font-weight: 600;
+}
+
+.muted {
+  opacity: 0.8;
+}

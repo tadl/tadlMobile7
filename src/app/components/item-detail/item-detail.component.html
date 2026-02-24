@@ -115,6 +115,15 @@
               You have a hold on this format
             </ion-note>
 
+            <div class="shelf-details" *ngIf="hasFormatShelfDetails(('' + kv.key))">
+              <div class="shelf-detail" *ngFor="let d of visibleFormatShelfDetails(('' + kv.key))">
+                {{ formatShelfDetailText(d) }}
+              </div>
+              <ion-note class="shelf-more" *ngIf="formatShelfDetailsRemaining(('' + kv.key)) > 0">
+                + {{ formatShelfDetailsRemaining(('' + kv.key)) }} more
+              </ion-note>
+            </div>
+
             <div class="provider-status-list" *ngIf="hasProviderStatuses(('' + kv.key))">
               <div class="provider-status" *ngFor="let ps of providerStatusesForFormat(('' + kv.key))">
                 <span class="provider-name">{{ ps.providerLabel }}</span>
@@ -128,14 +137,26 @@
           </ion-label>
 
           <div class="format-actions" slot="end">
+            <div class="primary-actions">
+              <ion-button
+                size="small"
+                fill="solid"
+                *ngFor="let a of effectiveFormatActions(('' + kv.key), ($any(kv.value).actions || []))"
+                [disabled]="holdActionBusy || (hasHoldForFormat(('' + kv.key)) && isIlsHoldAction(a))"
+                (click)="handleFormatAction(a, ('' + kv.key))"
+              >
+                {{ a.title || 'Action' }}
+              </ion-button>
+            </div>
+
             <ion-button
               size="small"
-              fill="solid"
-              *ngFor="let a of effectiveFormatActions(('' + kv.key), ($any(kv.value).actions || []))"
-              [disabled]="holdActionBusy || (hasHoldForFormat(('' + kv.key)) && isIlsHoldAction(a))"
-              (click)="handleFormatAction(a, ('' + kv.key))"
+              fill="outline"
+              class="copy-details-button"
+              *ngIf="formatShelfDetailsRemaining(('' + kv.key)) > 0"
+              (click)="openCopyDetails(('' + kv.key), $event)"
             >
-              {{ a.title || 'Action' }}
+              Copy details
             </ion-button>
           </div>
         </ion-item>

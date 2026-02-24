@@ -139,6 +139,7 @@
 }
 
 .format-sub {
+  display: block;
   font-size: 13px;
   opacity: 0.75;
   margin-top: 4px;
@@ -148,6 +149,23 @@
 .you-hold-it {
   opacity: 0.85;
   font-weight: 600;
+}
+
+.shelf-details {
+  margin-top: 6px;
+}
+
+.shelf-detail {
+  font-size: 13px;
+  line-height: 1.25;
+  opacity: 0.88;
+  margin-top: 3px;
+}
+
+.shelf-more {
+  display: block;
+  margin-top: 4px;
+  opacity: 0.75;
 }
 
 .provider-status-list {
@@ -176,12 +194,19 @@
 
 .format-actions {
   flex: 0 0 auto;
-  max-width: 56%;
+  max-width: 58%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.primary-actions {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
-  margin: 10px 0;
 }
 
 .format-actions ion-button {
@@ -191,15 +216,23 @@
   --padding-end: 10px;
 }
 
+.copy-details-button {
+  width: 100%;
+}
+
 /* On narrow screens, stack buttons instead of crushing the label */
 @media (max-width: 420px) {
   .format-actions {
     max-width: 52%;
+    align-items: stretch;
+  }
+
+  .primary-actions {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .format-actions ion-button {
+  .primary-actions ion-button {
     width: 100%;
   }
 }

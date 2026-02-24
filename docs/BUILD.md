@@ -15,6 +15,9 @@ Use the release prep script to handle:
 - app ID selection per platform
 - `cap sync` (or optional platform re-create)
 - native version/build stamping
+- `src/app/globals.ts` stamping:
+  - `app_version` = `--version`
+  - `update_version` = `YYYYMMDD00` (or `--update-stamp`)
 - app icon/splash generation from `resources/`
 
 ### iOS
@@ -41,6 +44,7 @@ npm run prep:android:clean -- --version 7.0.1 --build 70001
 - `--skip-build` Skip `npm run build`
 - `--skip-assets` Skip `npx capacitor-assets generate --<platform>`
 - `--recreate` Remove and re-add native platform folder
+- `--update-stamp <YYYYMMDDNN>` Override `globals.update_version`
 
 ## Open native IDEs
 

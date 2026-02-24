@@ -101,6 +101,38 @@ function updateAndroidGradle(versionName, buildNumber, appId) {
   console.log('[release-prep] Patched Android applicationId/versionCode/versionName.');
 }
 
+function updateGlobalsVersion(versionName, updateStamp) {
+  const globalsPath = resolve('src/app/globals.ts');
+  if (!existsSync(globalsPath)) {
+    fail('src/app/globals.ts not found.');
+  }
+
+  let globals = readText(globalsPath);
+  globals = replaceAll(
+    globals,
+    /public app_version: string = '[^']*';/,
+    `public app_version: string = '${versionName}';`,
+    'globals app_version',
+  );
+  globals = replaceAll(
+    globals,
+    /public update_version: string = '[^']*';/,
+    `public update_version: string = '${updateStamp}';`,
+    'globals update_version',
+  );
+
+  writeText(globalsPath, globals);
+  console.log('[release-prep] Patched globals app_version/update_version.');
+}
+
+function defaultUpdateStamp() {
+  const d = new Date();
+  const yyyy = d.getFullYear().toString();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}${mm}${dd}00`;
+}
+
 function parseArgs(argv) {
   const [platformArg, ...rest] = argv;
   const platform = (platformArg ?? '').toLowerCase().trim();
@@ -115,6 +147,7 @@ function parseArgs(argv) {
     recreate: false,
     skipBuild: false,
     skipAssets: false,
+    updateStamp: '',
   };
 
   for (let i = 0; i < rest.length; i += 1) {
@@ -131,6 +164,9 @@ function parseArgs(argv) {
       opts.skipBuild = true;
     } else if (a === '--skip-assets') {
       opts.skipAssets = true;
+    } else if (a === '--update-stamp') {
+      opts.updateStamp = (rest[i + 1] ?? '').trim();
+      i += 1;
     } else {
       fail(`Unknown argument: ${a}`);
     }
@@ -138,6 +174,9 @@ function parseArgs(argv) {
 
   if (!opts.version) fail('Missing required --version argument (example: --version 7.0.1).');
   if (!/^\d+$/.test(opts.build)) fail('Missing or invalid --build argument (must be numeric).');
+  if (opts.updateStamp && !/^\d{10}$/.test(opts.updateStamp)) {
+    fail('Invalid --update-stamp format (expected YYYYMMDDNN, e.g. 2026022400).');
+  }
 
   return opts;
 }
@@ -145,6 +184,7 @@ function parseArgs(argv) {
 function main() {
   const opts = parseArgs(process.argv.slice(2));
   const appId = opts.platform === 'ios' ? IOS_APP_ID : ANDROID_APP_ID;
+  const updateStamp = opts.updateStamp || defaultUpdateStamp();
 
   const env = {
     TADL_TARGET: opts.platform,
@@ -155,6 +195,9 @@ function main() {
   console.log(`[release-prep] App ID: ${appId}`);
   console.log(`[release-prep] Version: ${opts.version}`);
   console.log(`[release-prep] Build: ${opts.build}`);
+  console.log(`[release-prep] Update stamp: ${updateStamp}`);
+
+  updateGlobalsVersion(opts.version, updateStamp);
 
   if (!opts.skipBuild) {
     run('npm', ['run', 'build']);

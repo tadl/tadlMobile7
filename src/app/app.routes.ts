@@ -48,6 +48,10 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/checkout-history/checkout-history.page').then(m => m.CheckoutHistoryPage),
   },
   {
+    path: 'account-preferences',
+    loadComponent: () => import('./pages/account-preferences/account-preferences.page').then(m => m.AccountPreferencesPage),
+  },
+  {
     path: 'my-lists',
     loadComponent: () => import('./pages/my-lists/my-lists.page').then(m => m.MyListsPage),
   },

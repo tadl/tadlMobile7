@@ -1,0 +1,140 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-menu-button menu="main"></ion-menu-button>
+    </ion-buttons>
+
+    <ion-title>Account Preferences</ion-title>
+
+    <ion-buttons slot="end">
+      <ion-button (click)="globals.open_account_menu()">
+        <ion-icon name="person-circle" slot="icon-only"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  <ion-refresher slot="fixed" (ionRefresh)="loadPreferences($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  <ion-list *ngIf="preferences">
+    <ion-item-divider>
+      <ion-label>Circulation Preferences</ion-label>
+    </ion-item-divider>
+
+    <ion-item>
+      <ion-label>Pickup Library</ion-label>
+      <ion-select
+        slot="end"
+        interface="popover"
+        [value]="preferences.pickup_library"
+        [disabled]="saving"
+        (ionChange)="onPickupLibraryChanged($event)"
+      >
+        <ion-select-option *ngFor="let opt of pickupOptions" [value]="opt.code">{{ opt.name }}</ion-select-option>
+      </ion-select>
+    </ion-item>
+
+    <ion-item>
+      <ion-label>Default Search Location</ion-label>
+      <ion-select
+        slot="end"
+        interface="popover"
+        [value]="preferences.default_search"
+        [disabled]="saving"
+        (ionChange)="onDefaultSearchChanged($event)"
+      >
+        <ion-select-option *ngFor="let opt of searchOptions" [value]="opt.code">{{ opt.name }}</ion-select-option>
+      </ion-select>
+    </ion-item>
+
+    <ion-item>
+      <ion-label>Keep Circulation History</ion-label>
+      <ion-toggle
+        slot="end"
+        [checked]="preferences.keep_circ_history"
+        [disabled]="saving"
+        (ionChange)="onKeepCircHistoryToggle($event)"
+      ></ion-toggle>
+    </ion-item>
+  </ion-list>
+
+  <ion-list *ngIf="preferences">
+    <ion-item-divider>
+      <ion-label>User Preferences</ion-label>
+      <ion-note slot="end">Tap to change</ion-note>
+    </ion-item-divider>
+
+    <ion-item button detail="true" [disabled]="saving" (click)="updateUsername()">
+      <ion-label>Username</ion-label>
+      <ion-note slot="end" color="dark">{{ preferences.username }}</ion-note>
+    </ion-item>
+
+    <ion-item button detail="true" [disabled]="saving" (click)="updateAlias()">
+      <ion-label>Holdshelf Alias</ion-label>
+      <ion-note slot="end" color="dark">{{ preferences.hold_shelf_alias }}</ion-note>
+    </ion-item>
+
+    <ion-item button detail="true" [disabled]="saving" (click)="updateEmail()">
+      <ion-label>Email Address</ion-label>
+      <ion-note slot="end" color="dark">{{ preferences.email }}</ion-note>
+    </ion-item>
+
+    <ion-item button detail="true" [disabled]="saving" (click)="updatePassword()">
+      <ion-label>Password</ion-label>
+      <ion-note slot="end" color="dark">(not displayed)</ion-note>
+    </ion-item>
+  </ion-list>
+
+  <ion-list *ngIf="preferences">
+    <ion-item-divider>
+      <ion-label>Notification Preferences</ion-label>
+    </ion-item-divider>
+
+    <ion-item button detail="true" [disabled]="saving" (click)="updatePhoneNotifyNumber()">
+      <ion-label>Phone Notify Number</ion-label>
+      <ion-note slot="end" color="dark">{{ preferences.phone_notify_number }}</ion-note>
+    </ion-item>
+
+    <ion-item button detail="true" [disabled]="saving" (click)="updateTextNotifyNumber()">
+      <ion-label>Text Notify Number</ion-label>
+      <ion-note slot="end" color="dark">{{ preferences.text_notify_number }}</ion-note>
+    </ion-item>
+
+    <ion-item>
+      <ion-label>Email Notify</ion-label>
+      <ion-toggle
+        slot="end"
+        [checked]="preferences.email_notify"
+        [disabled]="saving"
+        (ionChange)="onToggleNotify('email_notify', $event.detail.checked)"
+      ></ion-toggle>
+    </ion-item>
+
+    <ion-item>
+      <ion-label>Phone Notify</ion-label>
+      <ion-toggle
+        slot="end"
+        [checked]="preferences.phone_notify"
+        [disabled]="saving"
+        (ionChange)="onToggleNotify('phone_notify', $event.detail.checked)"
+      ></ion-toggle>
+    </ion-item>
+
+    <ion-item>
+      <ion-label>Text Notify</ion-label>
+      <ion-toggle
+        slot="end"
+        [checked]="preferences.text_notify"
+        [disabled]="saving"
+        (ionChange)="onToggleNotify('text_notify', $event.detail.checked)"
+      ></ion-toggle>
+    </ion-item>
+  </ion-list>
+
+  <ion-item *ngIf="!loading && !preferences">
+    <ion-label>No preference data available.</ion-label>
+  </ion-item>
+</ion-content>

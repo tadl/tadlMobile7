@@ -235,7 +235,7 @@ export class AccountMenuComponent implements OnInit {
   goHistory() {
     this.goAccountPage('/checkout-history');
   }
-  goPrefs() { this.toast.presentToast('Account preferences page coming next.'); }
+  goPrefs() { this.goAccountPage('/account-preferences'); }
 
   private refreshMyListsCount() {
     const snap = this.auth.snapshot();

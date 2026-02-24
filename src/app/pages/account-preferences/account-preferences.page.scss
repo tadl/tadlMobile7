@@ -1,0 +1,34 @@
+:host {
+  ion-item {
+    --min-height: 54px;
+  }
+
+  ion-item-divider ion-label {
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+
+  ion-item-divider ion-note {
+    font-size: 0.95rem;
+    opacity: 0.9;
+  }
+
+  ion-item ion-label {
+    font-size: 1.02rem;
+  }
+
+  ion-item ion-note[slot='end'] {
+    font-size: 0.96rem;
+    color: var(--ion-text-color);
+    opacity: 0.9;
+    max-width: 58%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  ion-select {
+    font-size: 1rem;
+    max-width: 58%;
+  }
+}

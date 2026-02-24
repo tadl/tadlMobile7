@@ -8,6 +8,8 @@ import { ListsService } from './lists.service';
 import { NewsService } from './news.service';
 import { EventsService } from './events.service';
 import { LocationsService } from './locations.service';
+import { AccountStoreService } from './account-store.service';
+import { AccountPreferencesService } from './account-preferences.service';
 
 @Injectable({ providedIn: 'root' })
 export class CacheWarmService {
@@ -19,6 +21,8 @@ export class CacheWarmService {
     private news: NewsService,
     private events: EventsService,
     private locations: LocationsService,
+    private accounts: AccountStoreService,
+    private accountPreferences: AccountPreferencesService,
   ) {}
 
   warmForActiveAccount(): void {
@@ -44,6 +48,17 @@ export class CacheWarmService {
       }),
       this.safeRun(async () => {
         await lastValueFrom(this.locations.getLocations());
+      }),
+      this.safeRun(async () => {
+        const snap = this.auth.snapshot();
+        const id = snap.activeAccountId ?? '';
+        const username = snap.activeAccountMeta?.username ?? '';
+        if (!id || !username) return;
+
+        const password = await this.accounts.getPassword(id);
+        if (!password) return;
+
+        await lastValueFrom(this.accountPreferences.fetchForAccount(id, username, password));
       }),
     ]);
   }

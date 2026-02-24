@@ -32,7 +32,7 @@ export class AppComponent implements OnInit {
     { title: 'Locations', url: '/locations', icon: 'compass' },
     { title: 'Events', url: '/events', icon: 'calendar' },
     { title: 'News', url: '/news', icon: 'megaphone' },
-    { title: 'Featured', url: '/featured', icon: 'star' },
+    { title: 'Featured Items', url: '/featured', icon: 'star' },
     { title: 'About', url: '/about', icon: 'information-circle' },
   ];
 

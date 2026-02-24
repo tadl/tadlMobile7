@@ -41,6 +41,12 @@
   padding: 10px 10px 0;
 }
 
+.facet-hint {
+  display: block;
+  width: 100%;
+  font-size: 0.95rem;
+}
+
 .facet-group {
   margin-top: 6px;
 }
@@ -49,11 +55,4 @@
   --inner-padding-start: 10px;
   --inner-padding-end: 10px;
   font-weight: 600;
-}
-
-.facet-selected {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 8px 10px 2px;
 }

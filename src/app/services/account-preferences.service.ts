@@ -57,10 +57,12 @@ export class AccountPreferencesService {
     return this.cache.read<string>(this.tokenCacheKey(id));
   }
 
-  fetchByCredentials(username: string, password: string): Observable<PreferencesPayload> {
-    const params = new HttpParams()
+  fetchByCredentials(username: string, password: string, token?: string): Observable<PreferencesPayload> {
+    let params = new HttpParams()
       .set('username', (username ?? '').trim())
       .set('password', (password ?? '').trim());
+    const t = (token ?? '').trim();
+    if (t) params = params.set('token', t);
 
     return this.http
       .get<any>(this.preferencesFetchUrl(), { params })
@@ -121,12 +123,12 @@ export class AccountPreferencesService {
           tap((res) => this.persistAccountCache(id, res)),
           switchMap((res) => {
             if (res.token && this.looksLikeValidPreferences(res.preferences)) return of(res);
-            return this.fetchByCredentials(username, password).pipe(
+            return this.fetchByCredentials(username, password, t).pipe(
               tap((fresh) => this.persistAccountCache(id, fresh)),
             );
           }),
           catchError(() =>
-            this.fetchByCredentials(username, password).pipe(
+            this.fetchByCredentials(username, password, t).pipe(
               tap((fresh) => this.persistAccountCache(id, fresh)),
             ),
           ),
@@ -212,7 +214,7 @@ export class AccountPreferencesService {
             );
           }),
           catchError(() =>
-            this.fetchByCredentials(user, pass).pipe(
+            this.fetchByCredentials(user, pass, token).pipe(
               tap((fresh) => this.persistAccountCache(id, fresh)),
               switchMap((fresh) => this.updateByToken(fresh.token, values, user, pass)),
             ),

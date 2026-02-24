@@ -7,7 +7,7 @@
     <ion-title>Search</ion-title>
 
     <ion-buttons slot="end">
-      <ion-button (click)="globals.open_account_menu()">
+      <ion-button aria-label="Open account menu" (click)="globals.open_account_menu()">
         <ion-icon name="person-circle" slot="icon-only"></ion-icon>
       </ion-button>
     </ion-buttons>
@@ -65,9 +65,10 @@
       </ion-item>
 
       <div class="facet-controls" *ngIf="facetsEnabled && filters.length">
-        <ion-chip *ngFor="let f of filters">
+        <ion-note class="facet-hint">Tap a filter badge to remove it.</ion-note>
+        <ion-chip button *ngFor="let f of filters" (click)="removeFilter(f)" [attr.aria-label]="'Remove filter ' + filterChipLabel(f)">
           <ion-label>{{ filterChipLabel(f) }}</ion-label>
-          <ion-icon name="close-circle" (click)="removeFilter(f)"></ion-icon>
+          <ion-icon name="close-circle" aria-hidden="true"></ion-icon>
         </ion-chip>
         <ion-button size="small" fill="clear" (click)="clearAllFilters()">Clear filters</ion-button>
       </div>
@@ -81,13 +82,6 @@
               [name]="isFacetGroupCollapsed(group.key) ? 'chevron-down' : 'chevron-up'"
             ></ion-icon>
           </ion-item>
-
-          <div class="facet-selected" *ngIf="selectedOptionsForGroup(group).length">
-            <ion-chip *ngFor="let option of selectedOptionsForGroup(group); trackBy: trackFacetOption">
-              <ion-label>{{ option.display }}</ion-label>
-              <ion-icon name="close-circle" (click)="removeFilter(option.filter)"></ion-icon>
-            </ion-chip>
-          </div>
 
           <ng-container *ngIf="!isFacetGroupCollapsed(group.key)">
             <ion-item *ngFor="let option of group.options; trackBy: trackFacetOption">

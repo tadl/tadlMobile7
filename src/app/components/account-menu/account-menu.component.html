@@ -1,18 +1,20 @@
 <ng-container *ngIf="auth.authState() | async as s">
   <!-- SWITCH USER (works both logged-out and logged-in) -->
   <ng-container *ngIf="!s.isLoggedIn || showSwitchUser; else loggedInMenu">
-    <div class="section-header">
-      <div class="section-title">Stored Accounts</div>
+    <ion-item lines="none" class="stored-accounts-header">
+      <ion-label class="section-title">Stored Accounts</ion-label>
       <ion-button
         *ngIf="s.isLoggedIn"
-        fill="clear"
+        slot="end"
+        fill="outline"
+        color="medium"
         size="small"
         class="section-action"
         (click)="closeSwitchUser()"
       >
-        Done
+        DONE
       </ion-button>
-    </div>
+    </ion-item>
 
     <ion-list *ngIf="storedAccounts.length > 0" lines="full" class="full-list">
       <ion-item
@@ -125,7 +127,7 @@
     </ng-container>
 
     <div class="actions">
-      <ion-button expand="block" (click)="showCard()">Show Card</ion-button>
+      <ion-button expand="block" (click)="showCard()">Your Library Card</ion-button>
       <ion-button expand="block" color="medium" (click)="showLogoutActions()">Logout</ion-button>
       <ion-button expand="block" fill="clear" (click)="toggleSwitchUser()">Switch User</ion-button>
     </div>

@@ -65,3 +65,16 @@
     top: env(safe-area-inset-top);
   }
 }
+
+/* Tighter default page gutters so content fills more of the viewport. */
+ion-content.ion-padding {
+  --padding-top: 10px;
+  --padding-bottom: 10px;
+  --padding-start: 8px;
+  --padding-end: 8px;
+}
+
+/* Reduce default card margins across pages (Ionic default is visually wide). */
+ion-card {
+  margin-inline: 6px;
+}

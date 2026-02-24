@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { Component, Input, OnChanges, OnInit, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { IonicModule, ModalController } from '@ionic/angular';
 
@@ -23,23 +23,32 @@ interface GroupedCopyDetailRow {
   styleUrls: ['./copy-details-popover.component.scss'],
   imports: [CommonModule, IonicModule],
 })
-export class CopyDetailsPopoverComponent {
+export class CopyDetailsPopoverComponent implements OnChanges, OnInit {
   @Input() formatLabel = 'Copy details';
   @Input() title = 'Untitled';
   @Input() author = '';
   @Input() coverUrl = '';
   @Input() details: CopyDetailRow[] = [];
+  groupedRows: GroupedCopyDetailRow[] = [];
 
-  constructor(private modal: ModalController) {}
+  constructor(private modalController: ModalController) {}
 
-  close() {
-    this.modal.dismiss();
+  ngOnInit(): void {
+    this.groupedRows = this.groupDetails(this.details ?? []);
   }
 
-  groupedDetails(): GroupedCopyDetailRow[] {
+  ngOnChanges(_changes: SimpleChanges): void {
+    this.groupedRows = this.groupDetails(this.details ?? []);
+  }
+
+  close() {
+    this.modalController.dismiss();
+  }
+
+  private groupDetails(details: CopyDetailRow[]): GroupedCopyDetailRow[] {
     const groups = new Map<string, { location: string; callNumber: string; statuses: string[]; count: number; availableCount: number }>();
 
-    for (const d of this.details ?? []) {
+    for (const d of details) {
       const location = (d?.location ?? '').toString().trim();
       const callNumber = (d?.callNumber ?? '').toString().trim();
       const status = (d?.status ?? '').toString().trim();
@@ -75,6 +84,10 @@ export class CopyDetailsPopoverComponent {
     }
 
     return rows;
+  }
+
+  trackByGroupedRow(_idx: number, row: GroupedCopyDetailRow): string {
+    return `${row.location}||${row.callNumber}||${row.status}||${row.count}`;
   }
 
   copyCountText(n: number): string {

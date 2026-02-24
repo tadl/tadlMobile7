@@ -19,8 +19,8 @@
     </div>
   </div>
 
-  <ion-list lines="full" *ngIf="groupedDetails().length > 0; else noDetails">
-    <ion-item *ngFor="let d of groupedDetails()">
+  <ion-list lines="full" *ngIf="groupedRows.length > 0; else noDetails">
+    <ion-item *ngFor="let d of groupedRows; trackBy: trackByGroupedRow">
       <ion-label class="ion-text-wrap">
         <div class="line strong" *ngIf="d.location">{{ d.location }}</div>
         <div class="line" *ngIf="d.callNumber">Call number: {{ d.callNumber }}</div>

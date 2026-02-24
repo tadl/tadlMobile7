@@ -82,6 +82,7 @@ export class ItemDetailComponent implements OnInit {
   private loadedWorkId: string | null = null;
   private requestedHoldings = new Set<string>();
   private requestedVariations = new Set<string>();
+  private copyDetailsModalOpen = false;
   private readonly descriptionPreviewChars = 320;
   descriptionExpanded = false;
 
@@ -142,6 +143,7 @@ export class ItemDetailComponent implements OnInit {
   }
 
   close() {
+    this.copyDetailsModalOpen = false;
     const payload: any = {};
     if (this.needsHoldsRefresh) payload.refreshHolds = true;
     if (this.needsCheckoutsRefresh) payload.refreshCheckouts = true;
@@ -741,6 +743,8 @@ export class ItemDetailComponent implements OnInit {
 
   async openCopyDetails(formatKey: string, ev: Event) {
     ev?.stopPropagation?.();
+    if (this.copyDetailsModalOpen) return;
+
     const details = this.formatShelfDetails(formatKey);
     if (!details.length) return;
 
@@ -749,19 +753,30 @@ export class ItemDetailComponent implements OnInit {
       formatKey ||
       'Copy details';
 
-    const modal = await this.modalCtrl.create({
-      component: CopyDetailsPopoverComponent,
-      componentProps: {
-        formatLabel: label,
-        title: (this.work?.title ?? this.hit?.title ?? 'Untitled').toString().trim() || 'Untitled',
-        author: (this.work?.author ?? this.hit?.author ?? '').toString().trim(),
-        coverUrl: (this.work?.cover ?? this.hit?.coverUrl ?? '').toString().trim(),
-        details,
-      },
-    });
+    this.copyDetailsModalOpen = true;
+    try {
+      const modal = await this.modalCtrl.create({
+        component: CopyDetailsPopoverComponent,
+        componentProps: {
+          formatLabel: label,
+          title: (this.work?.title ?? this.hit?.title ?? 'Untitled').toString().trim() || 'Untitled',
+          author: (this.work?.author ?? this.hit?.author ?? '').toString().trim(),
+          coverUrl: (this.work?.cover ?? this.hit?.coverUrl ?? '').toString().trim(),
+          details,
+        },
+      });
 
-    this.globals.modal_open = true;
-    await modal.present();
+      this.globals.modal_open = true;
+      modal.onDidDismiss().then(() => {
+        this.copyDetailsModalOpen = false;
+        // Parent item-detail modal remains open, so keep global flag true.
+        this.globals.modal_open = true;
+      });
+      await modal.present();
+    } catch {
+      this.copyDetailsModalOpen = false;
+      this.toast.presentToast('Could not open copy details.');
+    }
   }
 
   providerStatusesForFormat(formatLabel: string): FormatProviderStatus[] {

@@ -1,0 +1,31 @@
+.category-card {
+  margin: 10px 0;
+}
+
+ion-segment {
+  margin-bottom: 12px;
+}
+
+.cover-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.cover-grid img {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  object-fit: cover;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.cover-grid img.square-cover {
+  aspect-ratio: 1 / 1;
+}
+
+.view-all {
+  margin-top: 10px;
+  font-size: 13px;
+  opacity: 0.9;
+}

@@ -15,14 +15,48 @@
 </ion-header>
 
 <ion-content class="ion-padding">
-  <ion-card>
-    <ion-card-header>
-      <ion-card-title>Featured Items</ion-card-title>
-      <ion-card-subtitle>Wiring target: your existing list API</ion-card-subtitle>
-    </ion-card-header>
-    <ion-card-content>
-      Next step: point this page at the new “featured” endpoint (or Aspen browse/categories),
-      then add a detail modal similar to Events/News/Locations.
-    </ion-card-content>
-  </ion-card>
+  <ion-refresher slot="fixed" (ionRefresh)="refresh(selectedTab, $event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  <ion-segment [value]="selectedTab" (ionChange)="onTabChanged($event)">
+    <ion-segment-button value="books">
+      <ion-label>Books</ion-label>
+    </ion-segment-button>
+    <ion-segment-button value="video">
+      <ion-label>Video</ion-label>
+    </ion-segment-button>
+    <ion-segment-button value="music">
+      <ion-label>Music</ion-label>
+    </ion-segment-button>
+  </ion-segment>
+
+  <ion-list lines="none" *ngIf="tilesByTab[selectedTab].length > 0">
+    <ion-item-group *ngFor="let tile of tilesByTab[selectedTab]; trackBy: trackByTile">
+      <ion-card class="category-card" button (click)="openCategory(tile)">
+        <ion-card-header>
+          <ion-card-title>{{ tile.label }}</ion-card-title>
+          <ion-card-subtitle>{{ categorySubtitle(tile) }}</ion-card-subtitle>
+        </ion-card-header>
+        <ion-card-content>
+          <div class="cover-grid" *ngIf="tile.covers.length > 0">
+            <img
+              *ngFor="let cover of tile.covers"
+              [src]="cover"
+              [class.square-cover]="selectedTab === 'music'"
+              alt=""
+              (error)="$event.target.style.visibility='hidden'"
+            />
+          </div>
+          <div class="view-all">View all</div>
+        </ion-card-content>
+      </ion-card>
+    </ion-item-group>
+  </ion-list>
+
+  <ion-item *ngIf="!loading && tilesByTab[selectedTab].length === 0">
+    <ion-label class="ion-text-wrap">
+      No featured categories are available in this section.
+    </ion-label>
+  </ion-item>
 </ion-content>

@@ -24,6 +24,10 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/locations/locations.page').then(m => m.LocationsPage),
   },
   {
+    path: 'featured/:id',
+    loadComponent: () => import('./pages/featured-category/featured-category.page').then(m => m.FeaturedCategoryPage),
+  },
+  {
     path: 'featured',
     loadComponent: () => import('./pages/featured/featured.page').then(m => m.FeaturedPage),
   },

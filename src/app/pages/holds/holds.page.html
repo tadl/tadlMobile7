@@ -36,7 +36,7 @@
           <div class="title">{{ holdTitle(h) }}</div>
           <div class="sub" *ngIf="holdAuthor(h)">{{ holdAuthor(h) }}</div>
           <ion-note class="status">{{ holdStatus(h) }}</ion-note>
-          <ion-note *ngIf="h.pickupLocationName" class="pickup">Pickup: {{ h.pickupLocationName }}</ion-note>
+          <ion-note *ngIf="h.pickupLocationName" class="pickup">{{ h.pickupLocationName }}</ion-note>
         </ion-label>
 
         <div slot="end" class="hold-actions" (click)="$event.stopPropagation()">
@@ -71,7 +71,7 @@
           <div class="title">{{ holdTitle(h) }}</div>
           <div class="sub" *ngIf="holdAuthor(h)">{{ holdAuthor(h) }}</div>
           <ion-note class="status">{{ holdStatus(h) }}</ion-note>
-          <ion-note *ngIf="h.pickupLocationName" class="pickup">Pickup: {{ h.pickupLocationName }}</ion-note>
+          <ion-note *ngIf="h.pickupLocationName" class="pickup">{{ h.pickupLocationName }}</ion-note>
         </ion-label>
 
         <div slot="end" class="hold-actions" (click)="$event.stopPropagation()">

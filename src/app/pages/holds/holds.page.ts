@@ -260,6 +260,7 @@ export class HoldsPage {
     }
 
     const currentCode = ((h as any)?.currentPickupId ?? '').toString().trim();
+    const currentName = ((h as any)?.pickupLocationName ?? (h as any)?.currentPickupName ?? '').toString().trim();
     const buttons: ActionSheetButton[] = this.globals.pickupLocations.map((loc) => ({
       text: loc.code === currentCode ? `${loc.name} (Current)` : loc.name,
       handler: () => this.changePickupLocationNow(h, holdId, this.globals.pickupAspenNewLocation(loc)),
@@ -268,6 +269,7 @@ export class HoldsPage {
 
     const sheet = await this.actionSheet.create({
       header: 'Choose pickup location',
+      subHeader: currentName ? `Currently: ${currentName}` : undefined,
       buttons,
     });
 

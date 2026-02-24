@@ -23,6 +23,16 @@ function run(cmd, args, env = {}) {
   }
 }
 
+function runAllowFail(cmd, args, env = {}) {
+  const pretty = [cmd, ...args].join(' ');
+  console.log(`[release-prep] $ ${pretty}`);
+  const res = spawnSync(cmd, args, {
+    stdio: 'inherit',
+    env: { ...process.env, ...env },
+  });
+  return res.status === 0;
+}
+
 function readText(path) {
   return readFileSync(path, 'utf8');
 }
@@ -222,7 +232,12 @@ function main() {
   }
 
   if (!opts.skipAssets && existsSync(resolve('resources'))) {
-    run('npx', ['capacitor-assets', 'generate', `--${opts.platform}`]);
+    const ok = runAllowFail('npx', ['capacitor-assets', 'generate', `--${opts.platform}`]);
+    if (!ok) {
+      fail(
+        `Asset generation failed. Install with "npm i -D @capacitor/assets" and rerun (or pass --skip-assets).`,
+      );
+    }
   }
 
   console.log('[release-prep] Done.');

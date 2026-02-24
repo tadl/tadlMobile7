@@ -7,6 +7,14 @@ This project uses different app IDs per platform:
 
 `capacitor.config.ts` now resolves app IDs from env and defaults to the iOS ID.
 
+## Install toolchain once
+
+```bash
+npm install
+```
+
+This project expects `@capacitor/assets` for icon/splash generation.
+
 ## One-command prep
 
 Use the release prep script to handle:

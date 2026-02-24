@@ -16,22 +16,23 @@
 
 <ion-content>
   <div class="ion-padding">
-    <ion-searchbar
-      [(ngModel)]="lookfor"
-      placeholder="Search the catalog"
-      (ionClear)="hits = []; page = 1; totalPages = 1; infiniteDisabled = true"
-      (keyup.enter)="onSubmit()"
-    ></ion-searchbar>
-
-    <div class="actions">
-      <ion-button size="small" (click)="onSubmit()">
+    <ion-item lines="none" class="search-row">
+      <ion-searchbar
+        class="search-input"
+        [(ngModel)]="lookfor"
+        placeholder="Search the catalog"
+        (ionClear)="clearSearch()"
+        (keyup.enter)="onSubmit()"
+      ></ion-searchbar>
+      <ion-button size="small" class="search-go" (click)="onSubmit()">
         Search
       </ion-button>
+    </ion-item>
 
-      <ion-button size="small" fill="clear" (click)="toggleAdvanced()">
-        Advanced
-      </ion-button>
-    </div>
+    <ion-item lines="none" class="advanced-toggle">
+      <ion-label>Advanced</ion-label>
+      <ion-toggle slot="end" [(ngModel)]="showAdvanced"></ion-toggle>
+    </ion-item>
 
     <div *ngIf="showAdvanced" class="advanced">
       <ion-item>
@@ -56,9 +57,31 @@
         </ion-select>
       </ion-item>
 
-      <ion-note class="ion-padding-top">
-        Filters/facets coming next (we’ll pull them from getAvailableFacets / getAppliedFilters).
-      </ion-note>
+      <div class="facet-controls" *ngIf="filters.length">
+        <ion-chip *ngFor="let f of filters">
+          <ion-label>{{ filterChipLabel(f) }}</ion-label>
+          <ion-icon name="close-circle" (click)="removeFilter(f)"></ion-icon>
+        </ion-chip>
+        <ion-button size="small" fill="clear" (click)="clearAllFilters()">Clear filters</ion-button>
+      </div>
+
+      <ion-list lines="none" *ngIf="facetGroups.length">
+        <ion-item-group *ngFor="let group of facetGroups; trackBy: trackFacetGroup" class="facet-group">
+          <ion-item-divider>
+            <ion-label>{{ group.label }}</ion-label>
+          </ion-item-divider>
+
+          <ion-item *ngFor="let option of group.options; trackBy: trackFacetOption">
+            <ion-checkbox
+              slot="start"
+              [checked]="isFacetSelected(option.filter)"
+              (ionChange)="onFacetToggled(group, option, $event.detail.checked)"
+            ></ion-checkbox>
+            <ion-label class="ion-text-wrap">{{ option.display }}</ion-label>
+            <ion-note slot="end">{{ option.count }}</ion-note>
+          </ion-item>
+        </ion-item-group>
+      </ion-list>
     </div>
 
     <ion-note *ngIf="hits.length" class="ion-padding-top">
@@ -90,7 +113,7 @@
     </ion-item>
   </ion-list>
 
-  <ion-item *ngIf="!globals.api_loading && lookfor.trim() && hits.length === 0">
+  <ion-item *ngIf="!globals.api_loading && lastExecutedQuery && lastExecutedQuery === lookfor.trim() && hits.length === 0">
     <ion-label>No results.</ion-label>
   </ion-item>
 

@@ -10,6 +10,22 @@ import { ToastService } from '../../services/toast.service';
 import { SearchService, AspenSearchHit, AspenSearchIndex, AspenSearchSort } from '../../services/search.service';
 import { ItemDetailComponent } from '../../components/item-detail/item-detail.component';
 
+interface SearchFacetOption {
+  filter: string;
+  field: string;
+  value: string;
+  display: string;
+  count: number;
+  isApplied: boolean;
+}
+
+interface SearchFacetGroup {
+  key: string;
+  label: string;
+  multiSelect: boolean;
+  options: SearchFacetOption[];
+}
+
 @Component({
   standalone: true,
   selector: 'app-search',
@@ -20,14 +36,16 @@ import { ItemDetailComponent } from '../../components/item-detail/item-detail.co
 export class SearchPage {
   lookfor = '';
   hits: AspenSearchHit[] = [];
+  lastExecutedQuery = '';
 
   // advanced controls (start simple)
   showAdvanced = false;
   searchIndex: AspenSearchIndex = 'Keyword';
   sort: AspenSearchSort = 'relevance';
 
-  // later: facet filters become strings like "format:Book"
   filters: string[] = [];
+  facetGroups: SearchFacetGroup[] = [];
+  private facetDisplayByFilter = new Map<string, string>();
 
   // paging / infinite scroll
   page = 1;
@@ -56,16 +74,29 @@ export class SearchPage {
     this.runSearch(true);
   }
 
+  clearSearch() {
+    this.lastExecutedQuery = '';
+    this.hits = [];
+    this.page = 1;
+    this.totalPages = 1;
+    this.infiniteDisabled = true;
+  }
+
   runSearch(reset: boolean) {
     const q = (this.lookfor ?? '').trim();
 
     if (!q) {
+      this.lastExecutedQuery = '';
       this.hits = [];
       this.page = 1;
       this.totalPages = 1;
       this.infiniteDisabled = true;
+      this.facetGroups = [];
+      this.facetDisplayByFilter.clear();
       return;
     }
+
+    this.lastExecutedQuery = q;
 
     // If reset, start over.
     if (reset) {
@@ -102,6 +133,8 @@ export class SearchPage {
 
           const newHits = res.hits ?? [];
           this.totalPages = res.totalPages ?? this.totalPages ?? 1;
+          this.facetGroups = this.buildFacetGroups(res.facets);
+          this.rebuildFacetDisplayMap();
 
           if (reset) {
             this.hits = newHits;
@@ -176,6 +209,44 @@ export class SearchPage {
     this.showAdvanced = !this.showAdvanced;
   }
 
+  onFacetToggled(group: SearchFacetGroup, option: SearchFacetOption, checked: boolean) {
+    let next = [...this.filters];
+
+    if (checked) {
+      if (!group.multiSelect) {
+        next = next.filter(f => this.filterField(f) !== option.field);
+      }
+      if (!next.includes(option.filter)) {
+        next.push(option.filter);
+      }
+    } else {
+      next = next.filter(f => f !== option.filter);
+    }
+
+    this.filters = next;
+    this.runSearch(true);
+  }
+
+  isFacetSelected(filter: string): boolean {
+    return this.filters.includes(filter);
+  }
+
+  clearAllFilters() {
+    if (!this.filters.length) return;
+    this.filters = [];
+    this.runSearch(true);
+  }
+
+  removeFilter(filter: string) {
+    if (!this.filters.includes(filter)) return;
+    this.filters = this.filters.filter(f => f !== filter);
+    this.runSearch(true);
+  }
+
+  filterChipLabel(filter: string): string {
+    return this.facetDisplayByFilter.get(filter) || filter;
+  }
+
   async openDetail(hit: AspenSearchHit) {
     const modal = await this.modalController.create({
       component: ItemDetailComponent,
@@ -187,6 +258,14 @@ export class SearchPage {
 
   trackById(_idx: number, h: AspenSearchHit) {
     return h.key;
+  }
+
+  trackFacetGroup(_idx: number, g: SearchFacetGroup) {
+    return g.key;
+  }
+
+  trackFacetOption(_idx: number, o: SearchFacetOption) {
+    return o.filter;
   }
 
   listCountLabel(hit: AspenSearchHit): string {
@@ -215,5 +294,74 @@ export class SearchPage {
     const parsed = new Date(dateValue);
     if (Number.isNaN(parsed.getTime())) return String(value);
     return parsed.toLocaleDateString();
+  }
+
+  private buildFacetGroups(rawFacets?: Record<string, any>): SearchFacetGroup[] {
+    if (!rawFacets || typeof rawFacets !== 'object') return [];
+
+    const groups: SearchFacetGroup[] = [];
+
+    for (const [facetKey, facetInfo] of Object.entries(rawFacets)) {
+      const label = this.decodeLabel((facetInfo as any)?.label) || facetKey;
+      const multiSelect = !!(facetInfo as any)?.multiSelect;
+      const list = (facetInfo as any)?.list;
+      const listValues = Array.isArray(list) ? list : (list && typeof list === 'object' ? Object.values(list) : []);
+      const options: SearchFacetOption[] = [];
+
+      for (const rawOption of listValues as any[]) {
+        const value = (rawOption?.value ?? '').toString().trim();
+        if (!value) continue;
+
+        const field = this.inferFacetField(facetKey, rawOption);
+        const filter = `${field}:${value}`;
+        options.push({
+          filter,
+          field,
+          value,
+          display: this.decodeLabel(rawOption?.display) || value,
+          count: Number(rawOption?.count ?? 0) || 0,
+          isApplied: !!rawOption?.isApplied,
+        });
+      }
+
+      if (!options.length) continue;
+      groups.push({ key: facetKey, label, multiSelect, options });
+    }
+
+    return groups;
+  }
+
+  private inferFacetField(facetKey: string, rawOption: any): string {
+    const explicitField = (rawOption?.field ?? '').toString().trim();
+    if (explicitField) return explicitField;
+    return (facetKey ?? '').toString().trim() || 'unknown';
+  }
+
+  private filterField(filter: string): string {
+    const idx = filter.indexOf(':');
+    if (idx <= 0) return filter;
+    return filter.slice(0, idx);
+  }
+
+  private rebuildFacetDisplayMap() {
+    this.facetDisplayByFilter.clear();
+    for (const group of this.facetGroups) {
+      for (const option of group.options) {
+        this.facetDisplayByFilter.set(option.filter, `${group.label}: ${option.display}`);
+      }
+    }
+  }
+
+  private decodeLabel(input: any): string {
+    if (typeof input !== 'string') return '';
+    let s = input.replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+    try {
+      const txt = document.createElement('textarea');
+      txt.innerHTML = s;
+      s = txt.value;
+    } catch {
+      // ignore
+    }
+    return s;
   }
 }

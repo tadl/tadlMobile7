@@ -90,7 +90,7 @@
 
     <ion-card-content class="ion-no-padding formats-list">
       <ion-list lines="full">
-        <ion-item class="format-row" *ngFor="let kv of ($any(fmts) | keyvalue)">
+        <ion-item class="format-row" *ngFor="let kv of ($any(fmts) | keyvalue : formatSortComparator)">
           <ion-label class="format-label ion-text-wrap">
             <div class="format-title">
               {{ $any(kv.value).label || ('' + kv.key) }}
@@ -116,13 +116,24 @@
             <ion-note *ngIf="hasHoldForFormat(('' + kv.key))" class="format-sub you-hold-it">
               You have a hold on this format
             </ion-note>
+
+            <div class="provider-status-list" *ngIf="hasProviderStatuses(('' + kv.key))">
+              <div class="provider-status" *ngFor="let ps of providerStatusesForFormat(('' + kv.key))">
+                <span class="provider-name">{{ ps.providerLabel }}</span>
+                <span class="dot">•</span>
+                <span>{{ providerStatusSummary(ps) }}</span>
+                <ion-note class="provider-copies" *ngIf="ps.numCopiesMessage">
+                  {{ ps.numCopiesMessage }}
+                </ion-note>
+              </div>
+            </div>
           </ion-label>
 
           <div class="format-actions" slot="end">
             <ion-button
               size="small"
               fill="solid"
-              *ngFor="let a of ($any(kv.value).actions || [])"
+              *ngFor="let a of effectiveFormatActions(('' + kv.key), ($any(kv.value).actions || []))"
               [disabled]="holdActionBusy || (hasHoldForFormat(('' + kv.key)) && isIlsHoldAction(a))"
               (click)="handleFormatAction(a, ('' + kv.key))"
             >

@@ -69,6 +69,30 @@ export interface AspenItemAvailabilityResult {
   holdings: Record<string, AspenHoldingItem[]>;
 }
 
+export interface AspenVariationStatusIndicator {
+  isAvailable?: boolean;
+  isEContent?: boolean;
+  isAvailableOnline?: boolean;
+  groupedStatus?: string;
+  numCopiesMessage?: string;
+  numHolds?: number;
+}
+
+export interface AspenFormatVariation {
+  id?: string;
+  source?: string;
+  actions?: AspenWorkAction[];
+  statusIndicator?: AspenVariationStatusIndicator;
+}
+
+export interface AspenFormatVariationsResult {
+  success: boolean;
+  id?: string;
+  format?: string;
+  variations: Record<string, AspenFormatVariation>;
+  message?: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ItemService {
   constructor(
@@ -136,6 +160,36 @@ export class ItemService {
     return concat(cached$, network$);
   }
 
+  /**
+   * Format-level variation/status info (includes eContent provider details like OverDrive/Hoopla).
+   * GET /API/ItemAPI?method=getVariations&id=<groupedWorkKey>&format=<formatLabel>
+   */
+  getFormatVariations(groupedWorkKey: string, formatLabel: string): Observable<AspenFormatVariationsResult> {
+    const key = (groupedWorkKey || '').trim();
+    const format = (formatLabel || '').trim();
+
+    const params = new HttpParams()
+      .set('method', 'getVariations')
+      .set('id', key)
+      .set('format', format);
+
+    const cacheKey = `item:variations:${key}:${format.toLowerCase()}`;
+    const cached$ = from(this.cache.read<AspenFormatVariationsResult>(cacheKey)).pipe(
+      filter((v): v is AspenFormatVariationsResult => !!v && typeof v === 'object' && !!v.variations),
+    );
+
+    const network$ = this.http
+      .get<any>(`${this.globals.aspen_api_base}/ItemAPI`, { params })
+      .pipe(
+        map(raw => this.normalizeVariationsResult(raw?.result ?? raw, key, format)),
+        tap((result) => {
+          this.cache.write(cacheKey, result).catch(() => {});
+        }),
+      );
+
+    return concat(cached$, network$);
+  }
+
   stripIlsPrefix(id: string): string {
     const s = (id || '').trim();
     if (s.startsWith('ils:')) return s.slice(4);
@@ -172,5 +226,46 @@ export class ItemService {
     }
 
     return Array.from(ids);
+  }
+
+  private normalizeVariationsResult(input: any, groupedWorkKey: string, formatLabel: string): AspenFormatVariationsResult {
+    const sourceVariations = input?.variations;
+    const entries =
+      sourceVariations && typeof sourceVariations === 'object'
+        ? Object.entries(sourceVariations)
+        : [];
+
+    const variations: Record<string, AspenFormatVariation> = {};
+    for (const [label, rawVariation] of entries as Array<[string, any]>) {
+      variations[label] = {
+        id: typeof rawVariation?.id === 'string' ? rawVariation.id : undefined,
+        source: typeof rawVariation?.source === 'string' ? rawVariation.source : undefined,
+        actions: Array.isArray(rawVariation?.actions) ? rawVariation.actions : [],
+        statusIndicator: rawVariation?.statusIndicator && typeof rawVariation.statusIndicator === 'object'
+          ? {
+              isAvailable: !!rawVariation.statusIndicator?.isAvailable,
+              isEContent: !!rawVariation.statusIndicator?.isEContent,
+              isAvailableOnline: !!rawVariation.statusIndicator?.isAvailableOnline,
+              groupedStatus: typeof rawVariation.statusIndicator?.groupedStatus === 'string'
+                ? rawVariation.statusIndicator.groupedStatus
+                : undefined,
+              numCopiesMessage: typeof rawVariation.statusIndicator?.numCopiesMessage === 'string'
+                ? rawVariation.statusIndicator.numCopiesMessage
+                : undefined,
+              numHolds: Number.isFinite(Number(rawVariation.statusIndicator?.numHolds))
+                ? Number(rawVariation.statusIndicator.numHolds)
+                : undefined,
+            }
+          : undefined,
+      };
+    }
+
+    return {
+      success: !!input?.success,
+      id: typeof input?.id === 'string' ? input.id : groupedWorkKey,
+      format: typeof input?.format === 'string' ? input.format : formatLabel,
+      variations,
+      message: typeof input?.message === 'string' ? input.message : undefined,
+    };
   }
 }

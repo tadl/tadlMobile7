@@ -1,11 +1,41 @@
-.actions {
+.search-row {
   display: flex;
   gap: 10px;
   align-items: center;
+  --inner-padding-start: 0;
+  --inner-padding-end: 0;
+}
+
+.search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.search-go {
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.advanced-toggle {
+  --inner-padding-start: 0;
+  --inner-padding-end: 0;
+  margin-top: 2px;
 }
 
 .advanced {
   margin-top: 10px;
   border-radius: 12px;
   overflow: hidden;
+}
+
+.facet-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  padding: 10px 10px 0;
+}
+
+.facet-group {
+  margin-top: 6px;
 }

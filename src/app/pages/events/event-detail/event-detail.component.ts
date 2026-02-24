@@ -13,7 +13,7 @@ import {
 import { IonicModule } from '@ionic/angular';
 import { ModalController } from '@ionic/angular/standalone';
 import { ActivatedRoute } from '@angular/router';
-import { Subscription, firstValueFrom, isObservable } from 'rxjs';
+import { Subscription, isObservable, lastValueFrom } from 'rxjs';
 
 import { EventsService } from '../../../services/events.service';
 
@@ -232,7 +232,7 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
       const result = fn(id);
 
       if (isObservable(result)) {
-        this.event = (await firstValueFrom(result)) as EventLike;
+        this.event = (await lastValueFrom(result)) as EventLike;
       } else if (result && typeof (result as any).then === 'function') {
         this.event = (await result) as EventLike;
       } else {

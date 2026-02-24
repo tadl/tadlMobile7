@@ -1,5 +1,5 @@
 import { Component, Input, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule, KeyValue } from '@angular/common';
 import {
   IonicModule,
   ActionSheetController,
@@ -9,11 +9,11 @@ import {
 import { Router } from '@angular/router';
 import { forkJoin, of } from 'rxjs';
 import { catchError, finalize } from 'rxjs/operators';
-import { firstValueFrom } from 'rxjs';
+import { lastValueFrom } from 'rxjs';
 
 import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
-import { ItemService, AspenGroupedWork } from '../../services/item.service';
+import { ItemService, AspenGroupedWork, AspenFormatVariationsResult } from '../../services/item.service';
 import { AspenSearchHit } from '../../services/search.service';
 import { HoldsService } from '../../services/holds.service';
 import type { AspenHold } from '../../services/holds.service';
@@ -30,6 +30,20 @@ interface ItemDetailListContext {
 interface KnownListMembership {
   listId: string;
   listTitle: string;
+}
+
+interface FormatProviderStatus {
+  providerLabel: string;
+  source: string;
+  groupedStatus: string;
+  numCopiesMessage: string;
+  isAvailable: boolean;
+}
+
+interface FormatProviderAction {
+  title: string;
+  url: string;
+  source: string;
 }
 
 @Component({
@@ -54,6 +68,11 @@ export class ItemDetailComponent implements OnInit {
 
   /** format label -> holdings count */
   private holdingsCountByFormat: Record<string, number> = {};
+  private providerStatusesByFormat: Record<string, FormatProviderStatus[]> = {};
+  private providerActionsByFormat: Record<string, FormatProviderAction[]> = {};
+  private loadedWorkId: string | null = null;
+  private requestedHoldings = new Set<string>();
+  private requestedVariations = new Set<string>();
   private readonly descriptionPreviewChars = 320;
   descriptionExpanded = false;
 
@@ -101,7 +120,9 @@ export class ItemDetailComponent implements OnInit {
       next: (w) => {
         this.work = w ?? null;
         this.descriptionExpanded = false;
+        this.prepareWorkLoadState(this.work);
         this.loadHoldingsCountsForWork(this.work);
+        this.loadProviderStatusesForWork(this.work);
 
         // Attach hold/checkout for this grouped work so cards appear even when opened from Search
         this.refreshHoldForThisItem();
@@ -234,7 +255,7 @@ export class ItemDetailComponent implements OnInit {
 
   private async getListsForAction(): Promise<AspenUserList[]> {
     try {
-      const lists = await firstValueFrom(this.lists.fetchUserLists());
+      const lists = await lastValueFrom(this.lists.fetchUserLists());
       if (!lists?.length) {
         this.toast.presentToast('You do not have any lists yet.');
         return [];
@@ -330,7 +351,7 @@ export class ItemDetailComponent implements OnInit {
     if (!recordId) return;
 
     try {
-      const lists = await firstValueFrom(this.lists.fetchUserLists());
+      const lists = await lastValueFrom(this.lists.fetchUserLists());
       if (!lists?.length) return;
 
       const candidates = lists.filter((l) => Number((l as any)?.numTitles ?? 0) > 0);
@@ -344,7 +365,7 @@ export class ItemDetailComponent implements OnInit {
           const listId = (list?.id ?? '').toString().trim();
           if (!listId) return null;
           try {
-            const res = await firstValueFrom(this.lists.fetchListTitles(listId, 1, 500));
+            const res = await lastValueFrom(this.lists.fetchListTitles(listId, 1, 500));
             if (!res?.success || !Array.isArray(res?.titles)) return null;
             const found = res.titles.some((t) => ((t?.id ?? t?.shortId ?? '') as any).toString().trim() === recordId);
             if (!found) return null;
@@ -683,6 +704,51 @@ export class ItemDetailComponent implements OnInit {
     return `${count} ${count === 1 ? 'holding' : 'holdings'}`;
   }
 
+  providerStatusesForFormat(formatLabel: string): FormatProviderStatus[] {
+    const k = (formatLabel ?? '').toString();
+    return this.providerStatusesByFormat[k] ?? [];
+  }
+
+  providerStatusSummary(status: FormatProviderStatus): string {
+    const raw = (status?.groupedStatus ?? '').toString().trim();
+    if (raw) return raw;
+    return status?.isAvailable ? 'Available' : 'Not available';
+  }
+
+  hasProviderStatuses(formatLabel: string): boolean {
+    return this.providerStatusesForFormat(formatLabel).length > 0;
+  }
+
+  providerActionsForFormat(formatLabel: string): FormatProviderAction[] {
+    const k = (formatLabel ?? '').toString();
+    return this.providerActionsByFormat[k] ?? [];
+  }
+
+  effectiveFormatActions(formatKey: string, actions: any[]): any[] {
+    const base = this.visibleFormatActions(actions);
+    const providerActions = this.providerActionsForFormat(formatKey);
+    if (!providerActions.length) return base;
+
+    const filteredBase = base.filter((a) => !this.isGenericAccessAction(a));
+    const merged: any[] = [...filteredBase, ...providerActions];
+    const seen = new Set<string>();
+    const deduped: any[] = [];
+
+    for (const a of merged) {
+      const key = `${(a?.url ?? '').toString().trim()}|${(a?.title ?? '').toString().trim().toLowerCase()}`;
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      deduped.push(a);
+    }
+
+    return deduped;
+  }
+
+  visibleFormatActions(actions: any[]): any[] {
+    if (!Array.isArray(actions) || !actions.length) return [];
+    return actions.filter((a) => !this.isPreviewAction(a));
+  }
+
   hasHoldForFormat(formatKey: string): boolean {
     const h: any = this.hold;
     if (!h) return false;
@@ -707,6 +773,27 @@ export class ItemDetailComponent implements OnInit {
     const onclick = (action?.onclick ?? '').toString();
     return onclick.includes('showPlaceHold');
   }
+
+  isPreviewAction(action: any): boolean {
+    const type = (action?.type ?? '').toString().toLowerCase();
+    const title = (action?.title ?? '').toString().toLowerCase();
+    return type === 'overdrive_sample' || title.includes('preview');
+  }
+
+  isGenericAccessAction(action: any): boolean {
+    const title = (action?.title ?? '').toString().trim().toLowerCase();
+    return title === 'access online' || title === 'open online';
+  }
+
+  formatSortComparator = (a: KeyValue<string, any>, b: KeyValue<string, any>): number => {
+    const aDigital = this.isLikelyDigitalFormat(a.key, a.value);
+    const bDigital = this.isLikelyDigitalFormat(b.key, b.value);
+    if (aDigital !== bDigital) return aDigital ? 1 : -1;
+
+    const aLabel = ((a.value?.label ?? a.key) as string).toString().toLowerCase();
+    const bLabel = ((b.value?.label ?? b.key) as string).toString().toLowerCase();
+    return aLabel.localeCompare(bLabel);
+  };
 
   async handleFormatAction(action: any, formatKey: string) {
     const url = (action?.url ?? '').toString().trim();
@@ -782,6 +869,8 @@ export class ItemDetailComponent implements OnInit {
 
   private loadHoldingsCountsForWork(work: AspenGroupedWork | null) {
     if (!work?.formats) return;
+    const workId = (work.id ?? '').toString().trim();
+    if (!workId) return;
 
     const requests: Array<{ formatKey: string; ilsId: string }> = [];
 
@@ -798,7 +887,12 @@ export class ItemDetailComponent implements OnInit {
         }
       }
 
-      if (ilsId) requests.push({ formatKey, ilsId });
+      if (ilsId) {
+        const requestKey = `${workId}:${formatKey}:${ilsId}`;
+        if (this.requestedHoldings.has(requestKey)) continue;
+        this.requestedHoldings.add(requestKey);
+        requests.push({ formatKey, ilsId });
+      }
     }
 
     if (!requests.length) return;
@@ -827,10 +921,137 @@ export class ItemDetailComponent implements OnInit {
           byFormat[fmtKey] = total;
         }
 
-        this.holdingsCountByFormat = byFormat;
+        this.holdingsCountByFormat = {
+          ...this.holdingsCountByFormat,
+          ...byFormat,
+        };
       },
       error: () => {},
     });
+  }
+
+  private loadProviderStatusesForWork(work: AspenGroupedWork | null) {
+    if (!work?.id || !work?.formats) return;
+
+    const groupedWorkId = (work.id ?? '').toString().trim();
+    if (!groupedWorkId) return;
+
+    for (const [formatKey, fmt] of Object.entries(work.formats)) {
+      if (!this.shouldFetchVariationDetails(formatKey, fmt)) continue;
+      const requestKey = `${groupedWorkId}:${formatKey}`;
+      if (this.requestedVariations.has(requestKey)) continue;
+      this.requestedVariations.add(requestKey);
+
+      this.items.getFormatVariations(groupedWorkId, formatKey)
+        .pipe(catchError(() => of(null)))
+        .subscribe({
+          next: (res) => {
+            const statuses = this.extractDigitalProviderStatuses(res);
+            if (statuses.length) {
+              this.providerStatusesByFormat = {
+                ...this.providerStatusesByFormat,
+                [formatKey]: statuses,
+              };
+            }
+
+            const actions = this.extractDigitalProviderActions(res);
+            if (actions.length) {
+              this.providerActionsByFormat = {
+                ...this.providerActionsByFormat,
+                [formatKey]: actions,
+              };
+            }
+          },
+          error: () => {},
+        });
+    }
+  }
+
+  private extractDigitalProviderStatuses(result: AspenFormatVariationsResult | null): FormatProviderStatus[] {
+    if (!result?.variations || typeof result.variations !== 'object') return [];
+
+    const out: FormatProviderStatus[] = [];
+    for (const [label, variation] of Object.entries(result.variations)) {
+      const source = (variation?.source ?? '').toString().trim().toLowerCase();
+      const providerLabel = (label ?? '').toString().trim();
+      const isDigitalProvider =
+        source === 'overdrive' ||
+        source === 'hoopla' ||
+        providerLabel.toLowerCase().includes('libby') ||
+        providerLabel.toLowerCase().includes('hoopla');
+
+      if (!isDigitalProvider) continue;
+
+      out.push({
+        providerLabel: providerLabel || source || 'Provider',
+        source,
+        groupedStatus: (variation?.statusIndicator?.groupedStatus ?? '').toString().trim(),
+        numCopiesMessage: (variation?.statusIndicator?.numCopiesMessage ?? '').toString().trim(),
+        isAvailable: !!variation?.statusIndicator?.isAvailable,
+      });
+    }
+
+    return out;
+  }
+
+  private prepareWorkLoadState(work: AspenGroupedWork | null) {
+    const workId = (work?.id ?? '').toString().trim();
+    if (!workId || workId === this.loadedWorkId) return;
+
+    this.loadedWorkId = workId;
+    this.requestedHoldings.clear();
+    this.requestedVariations.clear();
+    this.holdingsCountByFormat = {};
+    this.providerStatusesByFormat = {};
+    this.providerActionsByFormat = {};
+  }
+
+  private shouldFetchVariationDetails(formatKey: string, fmt: any): boolean {
+    return this.isLikelyDigitalFormat(formatKey, fmt);
+  }
+
+  private isLikelyDigitalFormat(formatKey: string, fmt: any): boolean {
+    const key = (formatKey ?? '').toString().toLowerCase();
+    const category = ((fmt as any)?.category ?? '').toString().toLowerCase();
+    const actions: any[] = Array.isArray((fmt as any)?.actions) ? (fmt as any).actions : [];
+
+    if (key.includes('kindle') || key.includes('ebook') || key.includes('eaudiobook')) return true;
+    if (category.includes('ebook')) return true;
+
+    for (const a of actions) {
+      const title = (a?.title ?? '').toString().toLowerCase();
+      const type = (a?.type ?? '').toString().toLowerCase();
+      const url = (a?.url ?? '').toString().toLowerCase();
+      if (title.includes('libby') || title.includes('hoopla')) return true;
+      if (type.includes('overdrive') || type.includes('hoopla')) return true;
+      if (url.includes('overdrive.com') || url.includes('hoopladigital.com')) return true;
+    }
+
+    return false;
+  }
+
+  private extractDigitalProviderActions(result: AspenFormatVariationsResult | null): FormatProviderAction[] {
+    if (!result?.variations || typeof result.variations !== 'object') return [];
+
+    const out: FormatProviderAction[] = [];
+    for (const variation of Object.values(result.variations)) {
+      const source = (variation?.source ?? '').toString().trim().toLowerCase();
+      if (source !== 'overdrive' && source !== 'hoopla') continue;
+
+      for (const action of variation?.actions ?? []) {
+        if (this.isPreviewAction(action)) continue;
+        const url = (action?.url ?? '').toString().trim();
+        if (!url) continue;
+
+        let title = (action?.title ?? '').toString().trim() || 'Open';
+        if (this.isGenericAccessAction(action)) {
+          title = source === 'overdrive' ? 'Access in Libby' : 'Access in Hoopla';
+        }
+
+        out.push({ title, url, source });
+      }
+    }
+    return out;
   }
 
   private refreshHoldForThisItem() {

@@ -9,7 +9,11 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "lint": "ng lint"
+    "lint": "ng lint",
+    "prep:ios": "node scripts/release-prep.mjs ios",
+    "prep:android": "node scripts/release-prep.mjs android",
+    "prep:ios:clean": "node scripts/release-prep.mjs ios --recreate",
+    "prep:android:clean": "node scripts/release-prep.mjs android --recreate"
   },
   "private": true,
   "dependencies": {

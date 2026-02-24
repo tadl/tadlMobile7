@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { IonicModule, ModalController } from '@ionic/angular';
+import { IonicModule, ModalController, ActionSheetController, type ActionSheetButton } from '@ionic/angular';
 import { finalize } from 'rxjs';
 
 import { Globals } from '../../globals';
@@ -20,6 +20,7 @@ import { AspenSearchHit } from '../../services/search.service';
 export class HoldsPage {
   loading = false;
   hydratedFromCache = false;
+  private holdActionBusyKeys = new Set<string>();
 
   // We’re only showing ILS holds here (per your direction)
   ilsReady: AspenHold[] = [];
@@ -31,6 +32,7 @@ export class HoldsPage {
     private auth: AuthService,
     private holds: HoldsService,
     private modal: ModalController,
+    private actionSheet: ActionSheetController,
   ) {}
 
   async ionViewWillEnter() {
@@ -119,7 +121,9 @@ export class HoldsPage {
   }
 
   holdTitle(h: AspenHold): string {
-    return (h?.title ?? '').toString().trim() || 'Untitled';
+    const raw = (h?.title ?? '').toString().trim();
+    if (!raw) return 'Untitled';
+    return raw.replace(/\s*\/+\s*$/, '').trim() || raw;
   }
 
   holdAuthor(h: AspenHold): string {
@@ -131,6 +135,12 @@ export class HoldsPage {
     const s = (h?.statusMessage ?? h?.status ?? '').toString().trim();
     if (s) return s;
     return h?.['available'] ? 'Available' : 'Pending';
+  }
+
+  holdIsFrozen(h: AspenHold): boolean {
+    if ((h as any)?.frozen === true) return true;
+    const status = (h?.statusMessage ?? h?.status ?? '').toString().toLowerCase();
+    return status.includes('frozen') || status.includes('suspend') || status.includes('suspended');
   }
 
   async openHold(h: AspenHold) {
@@ -178,11 +188,150 @@ export class HoldsPage {
     await m.present();
   }
 
+  async openHoldActions(h: AspenHold, ev?: Event) {
+    ev?.stopPropagation();
+    ev?.preventDefault();
+
+    if (this.isHoldActionBusy(h)) return;
+
+    const frozen = this.holdIsFrozen(h);
+    const buttons: ActionSheetButton[] = [
+      {
+        text: frozen ? 'Activate hold' : 'Suspend hold',
+        handler: () => this.toggleHoldFrozen(h),
+      },
+      {
+        text: 'Change pickup location',
+        handler: () => this.changePickupLocation(h),
+      },
+      {
+        text: 'View details',
+        handler: () => this.openHold(h),
+      },
+      {
+        text: 'Cancel',
+        role: 'cancel',
+      },
+    ];
+
+    const sheet = await this.actionSheet.create({
+      header: this.holdTitle(h),
+      buttons,
+    });
+
+    await sheet.present();
+  }
+
+  private toggleHoldFrozen(h: AspenHold) {
+    if (this.isHoldActionBusy(h)) return;
+
+    const key = this.holdActionKey(h);
+    if (!key) return;
+    this.holdActionBusyKeys.add(key);
+
+    const op$ = this.holdIsFrozen(h) ? this.holds.thawHold(h) : this.holds.freezeHold(h);
+    op$
+      .pipe(finalize(() => this.holdActionBusyKeys.delete(key)))
+      .subscribe({
+        next: (res) => {
+          if (!res?.success) {
+            this.toast.presentToast(res?.message || 'Could not update hold.');
+            return;
+          }
+
+          (h as any).frozen = !this.holdIsFrozen(h);
+          (h as any).statusMessage = (h as any).frozen ? 'Frozen' : 'Active';
+
+          this.toast.presentToast(res?.message || ((h as any).frozen ? 'Hold suspended.' : 'Hold activated.'));
+          this.refresh();
+          this.auth.refreshActiveProfile().subscribe({ error: () => {} });
+        },
+        error: () => this.toast.presentToast('Could not update hold.'),
+      });
+  }
+
+  private async changePickupLocation(h: AspenHold) {
+    if (this.isHoldActionBusy(h)) return;
+
+    const holdId = Number((h as any)?.cancelId ?? (h as any)?.id ?? 0) || 0;
+    if (!holdId) {
+      this.toast.presentToast('This hold is missing a hold id.');
+      return;
+    }
+
+    const currentCode = ((h as any)?.currentPickupId ?? '').toString().trim();
+    const buttons: ActionSheetButton[] = this.globals.pickupLocations.map((loc) => ({
+      text: loc.code === currentCode ? `${loc.name} (Current)` : loc.name,
+      handler: () => this.changePickupLocationNow(h, holdId, this.globals.pickupAspenNewLocation(loc)),
+    }));
+    buttons.push({ text: 'Cancel', role: 'cancel' });
+
+    const sheet = await this.actionSheet.create({
+      header: 'Choose pickup location',
+      buttons,
+    });
+
+    await sheet.present();
+  }
+
+  private changePickupLocationNow(h: AspenHold, holdId: number, newLocation: string) {
+    if (this.isHoldActionBusy(h)) return;
+
+    const key = this.holdActionKey(h);
+    if (!key) return;
+    this.holdActionBusyKeys.add(key);
+
+    const parsed = this.parseAspenNewLocation(newLocation);
+    this.holds
+      .changeHoldPickUpLocation(holdId, newLocation, null)
+      .pipe(finalize(() => this.holdActionBusyKeys.delete(key)))
+      .subscribe({
+        next: (res) => {
+          if (!res?.success) {
+            this.toast.presentToast(res?.message || 'Could not change pickup location.');
+            return;
+          }
+
+          if (parsed) {
+            (h as any).currentPickupId = parsed.code;
+            (h as any).currentPickupName = this.globals.pickupNameForCode(parsed.code) ?? (h as any).currentPickupName;
+            (h as any).pickupLocationId = parsed.id;
+            (h as any).pickupLocationName = this.globals.pickupNameForCode(parsed.code) ?? (h as any).pickupLocationName;
+          }
+
+          this.toast.presentToast(res?.message || 'Pickup location updated.');
+          this.refresh();
+        },
+        error: () => this.toast.presentToast('Could not change pickup location.'),
+      });
+  }
+
+  isHoldActionBusy(h: AspenHold): boolean {
+    const key = this.holdActionKey(h);
+    return !!key && this.holdActionBusyKeys.has(key);
+  }
+
   trackByHold(_idx: number, h: AspenHold) {
     return (h as any)?.id ?? (h as any)?.recordId ?? (h as any)?.groupedWorkId ?? _idx;
   }
 
   get hasAnyData(): boolean {
     return (this.ilsReady?.length ?? 0) > 0 || (this.ilsPending?.length ?? 0) > 0;
+  }
+
+  private holdActionKey(h: AspenHold): string {
+    const raw = (h as any)?.id ?? (h as any)?.cancelId ?? (h as any)?.recordId ?? (h as any)?.groupedWorkId ?? '';
+    return String(raw).trim();
+  }
+
+  private parseAspenNewLocation(s: string): { id: string; code: string } | null {
+    const raw = (s ?? '').trim();
+    if (!raw) return null;
+    const parts = raw.split('_');
+    if (parts.length < 2) return null;
+    const id = parts[0].trim();
+    const code = parts.slice(1).join('_').trim();
+    if (!id || !code) return null;
+    return { id, code };
   }
 }

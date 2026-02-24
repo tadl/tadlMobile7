@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { IonicModule, ModalController } from '@ionic/angular';
-import { finalize } from 'rxjs';
+import { IonicModule, ModalController, ActionSheetController } from '@ionic/angular';
+import { catchError, concatMap, finalize, from, map, of, toArray } from 'rxjs';
 
 import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
@@ -19,6 +19,8 @@ import { AspenSearchHit } from '../../services/search.service';
 })
 export class CheckoutsPage {
   loading = false;
+  renewAllBusy = false;
+  private renewingKeys = new Set<string>();
 
   ilsCheckouts: AspenCheckout[] = [];
 
@@ -28,6 +30,7 @@ export class CheckoutsPage {
     private auth: AuthService,
     private checkouts: CheckoutsService,
     private modalCtrl: ModalController,
+    private actionSheetCtrl: ActionSheetController,
   ) {}
 
   ionViewWillEnter() {
@@ -95,6 +98,152 @@ export class CheckoutsPage {
     return dt.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
   }
 
+  checkoutRenewInfoText(c: AspenCheckout): string {
+    const used = Number(c?.renewCount);
+    const max = Number(c?.maxRenewals);
+
+    if (Number.isFinite(used) && Number.isFinite(max) && max >= 0) {
+      const left = Math.max(0, max - used);
+      return `Renewals left: ${left}`;
+    }
+    if (Number.isFinite(max) && max >= 0) return `Max renewals: ${max}`;
+    if (Number.isFinite(used) && used >= 0) return `Renewals used: ${used}`;
+    return '';
+  }
+
+  checkoutCanRenew(c: AspenCheckout): boolean {
+    return c?.canRenew === true || (c as any)?.canrenew === true;
+  }
+
+  isRenewing(c: AspenCheckout): boolean {
+    return this.renewingKeys.has(this.checkoutKey(c));
+  }
+
+  get renewableCount(): number {
+    return (this.ilsCheckouts ?? []).filter((c) => this.checkoutCanRenew(c)).length;
+  }
+
+  get hasRenewableCheckouts(): boolean {
+    return this.renewableCount > 0;
+  }
+
+  async openCheckoutActions(c: AspenCheckout, ev?: Event) {
+    ev?.stopPropagation();
+    ev?.preventDefault();
+
+    const canRenew = this.checkoutCanRenew(c);
+    const sheet = await this.actionSheetCtrl.create({
+      header: this.checkoutTitle(c),
+      subHeader: canRenew ? undefined : 'This item cannot be renewed.',
+      buttons: [
+        ...(canRenew
+          ? [{
+              text: 'Renew',
+              handler: () => this.renewSingle(c),
+            }]
+          : []),
+        {
+          text: 'View details',
+          handler: () => this.openCheckout(c),
+        },
+        {
+          text: 'Cancel',
+          role: 'cancel',
+        },
+      ],
+    });
+
+    await sheet.present();
+  }
+
+  async confirmRenewAll() {
+    if (this.renewAllBusy) return;
+    const count = this.renewableCount;
+    if (count <= 0) {
+      this.toast.presentToast('No renewable checkouts right now.');
+      return;
+    }
+
+    const sheet = await this.actionSheetCtrl.create({
+      header: 'Renew all checkouts?',
+      subHeader: `Try to renew ${count} item${count === 1 ? '' : 's'}. Items that cannot be renewed will be skipped.`,
+      buttons: [
+        {
+          text: 'Renew all',
+          handler: () => this.renewAll(),
+        },
+        { text: 'Cancel', role: 'cancel' },
+      ],
+    });
+    await sheet.present();
+  }
+
+  private renewSingle(c: AspenCheckout) {
+    if (!this.checkoutCanRenew(c) || this.renewAllBusy) return;
+    const key = this.checkoutKey(c);
+    if (!key || this.renewingKeys.has(key)) return;
+
+    this.renewingKeys.add(key);
+    this.checkouts.renewCheckout(c)
+      .pipe(finalize(() => this.renewingKeys.delete(key)))
+      .subscribe({
+        next: (res) => {
+          if (!res?.success) {
+            this.toast.presentToast(res?.message || 'Could not renew.');
+            return;
+          }
+          this.toast.presentToast(res?.message || 'Renewed.');
+          this.refresh();
+          this.auth.refreshActiveProfile().subscribe({ error: () => {} });
+        },
+        error: () => this.toast.presentToast('Could not renew.'),
+      });
+  }
+
+  private renewAll() {
+    const renewable = (this.ilsCheckouts ?? []).filter((c) => this.checkoutCanRenew(c));
+    if (!renewable.length) return;
+
+    this.renewAllBusy = true;
+    this.renewingKeys = new Set(renewable.map((c) => this.checkoutKey(c)));
+
+    from(renewable)
+      .pipe(
+        concatMap((checkout) =>
+          this.checkouts.renewCheckout(checkout).pipe(
+            map((res) => ({
+              success: !!res?.success,
+              message: (res?.message ?? '').toString().trim(),
+            })),
+            catchError(() => of({ success: false, message: '' })),
+          ),
+        ),
+        toArray(),
+        finalize(() => {
+          this.renewAllBusy = false;
+          this.renewingKeys.clear();
+        }),
+      )
+      .subscribe({
+        next: (results) => {
+          const ok = results.filter((r) => r.success).length;
+          const failed = results.length - ok;
+          if (failed === 0) {
+            this.toast.presentToast(`Renewed ${ok} item${ok === 1 ? '' : 's'}.`);
+          } else if (ok === 0) {
+            this.toast.presentToast('Could not renew any items.');
+          } else {
+            this.toast.presentToast(`Renewed ${ok} item${ok === 1 ? '' : 's'}; ${failed} failed.`);
+          }
+          this.refresh();
+          this.auth.refreshActiveProfile().subscribe({ error: () => {} });
+        },
+        error: () => {
+          this.toast.presentToast('Could not complete renew all.');
+        },
+      });
+  }
+
   async openCheckout(c: AspenCheckout) {
     const key = (c?.groupedWorkId ?? '').toString().trim();
 
@@ -136,5 +285,10 @@ export class CheckoutsPage {
 
   get hasAnyData(): boolean {
     return (this.ilsCheckouts?.length ?? 0) > 0;
+  }
+
+  private checkoutKey(c: AspenCheckout): string {
+    const raw = (c as any)?.id ?? (c as any)?.itemId ?? (c as any)?.barcode ?? (c as any)?.recordId ?? '';
+    return String(raw).trim();
   }
 }

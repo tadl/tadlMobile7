@@ -64,7 +64,6 @@
       <ion-list lines="full" class="full-list">
         <ion-item
           button
-          [disabled]="b.checkouts === 0"
           (click)="goCheckouts()"
         >
           <ion-label>Checkouts</ion-label>
@@ -78,29 +77,19 @@
 
         <ion-item
           button
-          [disabled]="b.holds === 0"
           (click)="goHolds()"
         >
-          <ion-label>Holds</ion-label>
+          <ion-label class="ion-text-wrap">
+            <div>Holds</div>
+            <ion-note *ngIf="b.ready > 0" class="menu-subnote">
+              {{ b.ready }} ready for pickup
+            </ion-note>
+          </ion-label>
           <ion-badge
             slot="end"
             [color]="b.holds === 0 ? 'medium' : undefined"
           >
             {{ b.holds }}
-          </ion-badge>
-        </ion-item>
-
-        <ion-item
-          button
-          [disabled]="b.ready === 0"
-          (click)="goReady()"
-        >
-          <ion-label>Holds Ready for Pickup</ion-label>
-          <ion-badge
-            slot="end"
-            [color]="b.ready === 0 ? 'medium' : undefined"
-          >
-            {{ b.ready }}
           </ion-badge>
         </ion-item>
 
@@ -120,6 +109,9 @@
 
         <ion-item button (click)="goMyLists()">
           <ion-label>My Lists</ion-label>
+          <ion-badge slot="end" [color]="myListsCount === 0 ? 'medium' : undefined">
+            {{ myListsCount }}
+          </ion-badge>
         </ion-item>
 
         <ion-item button (click)="goHistory()">

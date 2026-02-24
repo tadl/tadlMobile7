@@ -125,21 +125,26 @@ export class CheckoutsService {
    */
   renewCheckout(checkout: AspenCheckout): Observable<AspenMutationResult> {
     const recordId = this.pickRecordId(checkout);
-    const barcode = (checkout?.barcode ?? '').toString().trim();
+    const barcode = this.pickItemBarcode(checkout);
 
-    if (!recordId) return throwError(() => new Error('missing_record_id'));
     if (!barcode) return throwError(() => new Error('missing_barcode'));
 
-    return this.callUserApiMutation('renewItem', {
+    const params: Record<string, string> = {
       itemSource: this.pickItemSource(checkout),
       itemBarcode: barcode,
-      recordId: String(recordId),
-    });
+    };
+    if (recordId) params['recordId'] = recordId;
+
+    return this.callUserApiMutation('renewItem', params, { includeSessionId: false, includeUserId: true });
   }
 
   // ---------- Core mutation plumbing (same pattern as HoldsService) ----------
 
-  private callUserApiMutation(method: string, extraParams: Record<string, string>): Observable<AspenMutationResult> {
+  private callUserApiMutation(
+    method: string,
+    extraParams: Record<string, string>,
+    options?: { includeSessionId?: boolean; includeUserId?: boolean },
+  ): Observable<AspenMutationResult> {
     const snap = this.auth.snapshot();
     if (!snap.isLoggedIn || !snap.activeAccountId || !snap.activeAccountMeta) {
       return throwError(() => new Error('not_logged_in'));
@@ -156,8 +161,10 @@ export class CheckoutsService {
           switchMap(sessionId => {
             let params = new HttpParams().set('method', method);
 
-            params = params.set('sessionId', sessionId);
-            params = params.set('userId', String(userId));
+            const includeSessionId = options?.includeSessionId !== false;
+            const includeUserId = options?.includeUserId !== false;
+            if (includeSessionId) params = params.set('sessionId', sessionId);
+            if (includeUserId) params = params.set('userId', String(userId));
 
             for (const [k, v] of Object.entries(extraParams)) {
               params = params.set(k, (v ?? '').toString());
@@ -213,9 +220,30 @@ export class CheckoutsService {
     return Number.isFinite(n) && n > 0 ? n : null;
   }
 
-  private pickRecordId(checkout: AspenCheckout): number | null {
-    const n = Number((checkout as any)?.recordId);
-    return Number.isFinite(n) && n > 0 ? n : null;
+  private pickRecordId(checkout: AspenCheckout): string | null {
+    const candidates = [
+      (checkout as any)?.recordId,
+      (checkout as any)?.id,
+      (checkout as any)?.sourceId,
+    ];
+    for (const v of candidates) {
+      const s = (v ?? '').toString().trim();
+      if (s) return s;
+    }
+    return null;
+  }
+
+  private pickItemBarcode(checkout: AspenCheckout): string {
+    const candidates = [
+      (checkout as any)?.itemId,
+      (checkout as any)?.barcode,
+      (checkout as any)?.id,
+    ];
+    for (const v of candidates) {
+      const s = (v ?? '').toString().trim();
+      if (s) return s;
+    }
+    return '';
   }
 
   private pickItemSource(checkout: AspenCheckout): string {

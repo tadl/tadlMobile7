@@ -159,11 +159,12 @@ export class CheckoutHistoryPage {
   }
 
   whenText(i: AspenReadingHistoryItem): string {
-    const t = Number(i?.lastCheckoutTime ?? i?.checkoutTime ?? 0);
-    if (Number.isFinite(t) && t > 0) {
-      const dt = new Date(t * 1000);
+    const ts = this.pickUnixTimestamp(i);
+    if (ts > 0) {
+      const dt = new Date(ts * 1000);
       return `Last checkout: ${dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`;
     }
+
     const d = (i?.lastCheckout ?? i?.checkout ?? '').toString().trim();
     return d ? `Last checkout: ${d}` : '';
   }
@@ -234,5 +235,24 @@ export class CheckoutHistoryPage {
     if (raw === true) return true;
     const s = (raw ?? '').toString().trim().toLowerCase();
     return s === 'true' || s === '1' || s === 'yes';
+  }
+
+  private pickUnixTimestamp(i: AspenReadingHistoryItem): number {
+    const candidates = [
+      (i as any)?.lastCheckoutTime,
+      (i as any)?.checkoutTime,
+      (i as any)?.lastCheckout,
+      (i as any)?.checkout,
+    ];
+
+    for (const c of candidates) {
+      const n = Number(c);
+      if (!Number.isFinite(n) || n <= 0) continue;
+      // Support both seconds (10-digit) and milliseconds (13-digit).
+      if (n > 1_000_000_000_000) return Math.floor(n / 1000);
+      return Math.floor(n);
+    }
+
+    return 0;
   }
 }

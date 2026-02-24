@@ -32,3 +32,14 @@
   margin-top: 2px;
   opacity: 0.75;
 }
+
+.hold-actions {
+  display: flex;
+  align-items: center;
+}
+
+.hold-actions ion-button {
+  --padding-start: 4px;
+  --padding-end: 4px;
+  margin: 0;
+}

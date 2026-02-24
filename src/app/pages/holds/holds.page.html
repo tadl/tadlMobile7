@@ -38,6 +38,18 @@
           <ion-note class="status">{{ holdStatus(h) }}</ion-note>
           <ion-note *ngIf="h.pickupLocationName" class="pickup">Pickup: {{ h.pickupLocationName }}</ion-note>
         </ion-label>
+
+        <div slot="end" class="hold-actions" (click)="$event.stopPropagation()">
+          <ion-button
+            fill="clear"
+            size="small"
+            [disabled]="isHoldActionBusy(h)"
+            (click)="openHoldActions(h, $event)"
+            aria-label="Hold actions"
+          >
+            <ion-icon name="ellipsis-vertical" slot="icon-only"></ion-icon>
+          </ion-button>
+        </div>
       </ion-item>
     </ion-list>
   </ng-container>
@@ -62,9 +74,17 @@
           <ion-note *ngIf="h.pickupLocationName" class="pickup">Pickup: {{ h.pickupLocationName }}</ion-note>
         </ion-label>
 
-        <ion-note slot="end" *ngIf="h.position && h.holdQueueLength">
-          {{ h.position }} / {{ h.holdQueueLength }}
-        </ion-note>
+        <div slot="end" class="hold-actions" (click)="$event.stopPropagation()">
+          <ion-button
+            fill="clear"
+            size="small"
+            [disabled]="isHoldActionBusy(h)"
+            (click)="openHoldActions(h, $event)"
+            aria-label="Hold actions"
+          >
+            <ion-icon name="ellipsis-vertical" slot="icon-only"></ion-icon>
+          </ion-button>
+        </div>
       </ion-item>
     </ion-list>
   </ng-container>

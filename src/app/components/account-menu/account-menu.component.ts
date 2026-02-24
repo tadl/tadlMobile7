@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { IonicModule, ActionSheetController, ModalController } from '@ionic/angular';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { filter } from 'rxjs';
 
 import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
@@ -10,6 +11,7 @@ import { AuthService } from '../../services/auth.service';
 import { AccountStoreService, StoredAccountMeta } from '../../services/account-store.service';
 import { PatronService } from '../../services/patron.service';
 import { ShowCardModalComponent } from '../show-card-modal/show-card-modal.component';
+import { ListsService } from '../../services/lists.service';
 
 @Component({
   standalone: true,
@@ -21,6 +23,7 @@ import { ShowCardModalComponent } from '../show-card-modal/show-card-modal.compo
 export class AccountMenuComponent implements OnInit {
   username = '';
   password = '';
+  myListsCount = 0;
 
   storedAccounts: StoredAccountMeta[] = [];
   loadingAccounts = false;
@@ -37,10 +40,17 @@ export class AccountMenuComponent implements OnInit {
     private toast: ToastService,
     private actionSheet: ActionSheetController,
     private modal: ModalController,
+    private lists: ListsService,
   ) {}
 
   ngOnInit() {
     this.refreshStoredAccounts();
+    this.auth.authState()
+      .pipe(filter((s) => !!s?.isLoggedIn))
+      .subscribe(() => {
+        this.refreshMyListsCount();
+      });
+    this.refreshMyListsCount();
   }
 
   refreshStoredAccounts() {
@@ -209,30 +219,43 @@ export class AccountMenuComponent implements OnInit {
   }
 
   goHolds() {
-    this.globals.toggleMenu('account'); // close menu
-    this.router.navigateByUrl('/holds');
-  }
-
-  goReady() {
-    this.globals.toggleMenu('account');
-    this.router.navigateByUrl('/holds?tab=ready');
+    this.goAccountPage('/holds');
   }
 
   goCheckouts() {
-    this.globals.toggleMenu('account');
-    this.router.navigateByUrl('/checkouts');
+    this.goAccountPage('/checkouts');
   }
 
   goMyLists() {
-    this.globals.toggleMenu('account');
-    this.router.navigateByUrl('/my-lists');
+    this.goAccountPage('/my-lists');
   }
 
   // placeholders until we build pages
   goFines() { this.toast.presentToast('Fines page coming next.'); }
   goHistory() {
-    this.globals.toggleMenu('account');
-    this.router.navigateByUrl('/checkout-history');
+    this.goAccountPage('/checkout-history');
   }
   goPrefs() { this.toast.presentToast('Account preferences page coming next.'); }
+
+  private refreshMyListsCount() {
+    const snap = this.auth.snapshot();
+    if (!snap?.isLoggedIn || !snap?.activeAccountId) {
+      this.myListsCount = 0;
+      return;
+    }
+
+    this.lists.fetchUserLists().subscribe({
+      next: (list) => {
+        this.myListsCount = Array.isArray(list) ? list.length : 0;
+      },
+      error: () => {
+        // Keep previous value; this is a non-blocking badge enhancement.
+      },
+    });
+  }
+
+  private goAccountPage(url: string) {
+    this.globals.toggleMenu('account');
+    this.router.navigateByUrl(url);
+  }
 }

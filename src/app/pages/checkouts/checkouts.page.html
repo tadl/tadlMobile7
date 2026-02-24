@@ -7,6 +7,12 @@
     <ion-title>Checkouts</ion-title>
 
     <ion-buttons slot="end">
+      <ion-button
+        (click)="confirmRenewAll()"
+        [disabled]="loading || renewAllBusy || !hasRenewableCheckouts"
+      >
+        Renew all
+      </ion-button>
       <ion-button (click)="globals.open_account_menu()">
         <ion-icon name="person-circle" slot="icon-only"></ion-icon>
       </ion-button>
@@ -33,15 +39,27 @@
         <div class="title">{{ checkoutTitle(c) }}</div>
         <div class="sub" *ngIf="checkoutAuthor(c)">{{ checkoutAuthor(c) }}</div>
 
-        <ion-note *ngIf="dueText(c)" class="due">
+        <ion-note *ngIf="dueText(c)" class="checkout-meta">
           Due: {{ dueText(c) }}
+        </ion-note>
+        <ion-note *ngIf="checkoutRenewInfoText(c)" class="checkout-meta">
+          {{ checkoutRenewInfoText(c) }}
         </ion-note>
 
         <ion-note *ngIf="c.overdue" class="overdue">Overdue</ion-note>
       </ion-label>
 
-      <ion-badge slot="end" color="success" *ngIf="c.canRenew">Renewable</ion-badge>
-      <ion-badge slot="end" color="medium" *ngIf="!c.canRenew">No renew</ion-badge>
+      <div slot="end" class="checkout-actions" (click)="$event.stopPropagation()">
+        <ion-button
+          fill="clear"
+          size="small"
+          [disabled]="renewAllBusy || isRenewing(c)"
+          (click)="openCheckoutActions(c, $event)"
+          aria-label="Checkout actions"
+        >
+          <ion-icon name="ellipsis-vertical" slot="icon-only"></ion-icon>
+        </ion-button>
+      </div>
     </ion-item>
   </ion-list>
 

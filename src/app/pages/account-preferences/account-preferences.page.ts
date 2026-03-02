@@ -534,7 +534,7 @@ export class AccountPreferencesPage {
               this.toast.presentToast('Could not load account preferences.');
               return;
             }
-            this.token = res.token;
+            this.token = (res.token ?? '').toString().trim();
             this.preferences = res.preferences;
             if (this.activeAccountId && this.token) {
               void this.prefsService.persistTokenForAccount(this.activeAccountId, this.token);
@@ -577,6 +577,11 @@ export class AccountPreferencesPage {
           if (!res.success) {
             this.toast.presentToast(res.message || 'Could not update preferences.');
             return;
+          }
+
+          const freshToken = (res.token ?? '').toString().trim();
+          if (freshToken) {
+            this.token = freshToken;
           }
 
           if (res.preferences) {

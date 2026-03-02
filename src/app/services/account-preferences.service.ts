@@ -33,6 +33,7 @@ export interface PreferencesPayload {
 export interface PreferencesUpdateResult {
   success: boolean;
   message: string;
+  token?: string;
   preferences?: AccountPreferences;
   raw: any;
 }
@@ -57,12 +58,10 @@ export class AccountPreferencesService {
     return this.cache.read<string>(this.tokenCacheKey(id));
   }
 
-  fetchByCredentials(username: string, password: string, token?: string): Observable<PreferencesPayload> {
-    let params = new HttpParams()
+  fetchByCredentials(username: string, password: string): Observable<PreferencesPayload> {
+    const params = new HttpParams()
       .set('username', (username ?? '').trim())
       .set('password', (password ?? '').trim());
-    const t = (token ?? '').trim();
-    if (t) params = params.set('token', t);
 
     return this.http
       .get<any>(this.preferencesFetchUrl(), { params })
@@ -81,59 +80,12 @@ export class AccountPreferencesService {
       );
   }
 
-  fetchByToken(token: string, username?: string, password?: string): Observable<PreferencesPayload> {
-    let params = new HttpParams().set('token', (token ?? '').trim());
-    const user = (username ?? '').trim();
-    const pass = (password ?? '').trim();
-    if (user) params = params.set('username', user);
-    if (pass) params = params.set('password', pass);
-
-    return this.http
-      .get<any>(this.preferencesFetchUrl(), { params })
-      .pipe(
-        map((raw) => {
-          const root = raw?.result ?? raw ?? {};
-          const user = root?.user ?? {};
-          const preferences = this.normalizePreferences(root?.preferences ?? {});
-          const tokenFromResponse = (user?.token ?? '').toString().trim();
-
-          return {
-            token: tokenFromResponse || (token ?? '').toString().trim(),
-            preferences,
-            raw,
-          } satisfies PreferencesPayload;
-        }),
-      );
-  }
-
   fetchForAccount(accountId: string, username: string, password: string): Observable<PreferencesPayload> {
     const id = (accountId ?? '').trim();
     if (!id) return this.fetchByCredentials(username, password);
 
-    return from(this.cache.read<string>(this.tokenCacheKey(id))).pipe(
-      switchMap((cachedToken) => {
-        const t = (cachedToken ?? '').toString().trim();
-        if (!t) {
-          return this.fetchByCredentials(username, password).pipe(
-            tap((res) => this.persistAccountCache(id, res)),
-          );
-        }
-
-        return this.fetchByToken(t, username, password).pipe(
-          tap((res) => this.persistAccountCache(id, res)),
-          switchMap((res) => {
-            if (res.token && this.looksLikeValidPreferences(res.preferences)) return of(res);
-            return this.fetchByCredentials(username, password, t).pipe(
-              tap((fresh) => this.persistAccountCache(id, fresh)),
-            );
-          }),
-          catchError(() =>
-            this.fetchByCredentials(username, password, t).pipe(
-              tap((fresh) => this.persistAccountCache(id, fresh)),
-            ),
-          ),
-        );
-      }),
+    return this.fetchByCredentials(username, password).pipe(
+      tap((res) => this.persistAccountCache(id, res)),
     );
   }
 
@@ -162,6 +114,7 @@ export class AccountPreferencesService {
       .pipe(
         map((raw) => {
           const root = raw?.result ?? raw ?? {};
+          const user = root?.user ?? {};
           const prefs = root?.preferences ? this.normalizePreferences(root.preferences) : undefined;
           const message = this.extractMessage(root);
           const success = this.inferSuccess(root);
@@ -169,6 +122,7 @@ export class AccountPreferencesService {
           return {
             success,
             message,
+            token: (user?.token ?? '').toString().trim(),
             preferences: prefs,
             raw,
           } satisfies PreferencesUpdateResult;
@@ -214,7 +168,7 @@ export class AccountPreferencesService {
             );
           }),
           catchError(() =>
-            this.fetchByCredentials(user, pass, token).pipe(
+            this.fetchByCredentials(user, pass).pipe(
               tap((fresh) => this.persistAccountCache(id, fresh)),
               switchMap((fresh) => this.updateByToken(fresh.token, values, user, pass)),
             ),

@@ -8,17 +8,23 @@
 </ion-header>
 
 <ion-content class="ion-padding">
-  <img
-    *ngIf="heroImage()"
-    [src]="heroImage()!"
-    [alt]="titleFor()"
-    class="hero"
-  />
+  <ion-card class="news-card">
+    <img
+      *ngIf="heroImage()"
+      [src]="heroImage()!"
+      [alt]="titleFor()"
+      class="hero"
+    />
 
-  <h2 [innerText]="titleFor()"></h2>
-  <p class="muted" *ngIf="dateFor()">{{ dateFor() }}</p>
+    <ion-card-header>
+      <ion-card-title class="title" [innerText]="titleFor()"></ion-card-title>
+      <ion-card-subtitle class="meta" *ngIf="dateFor()">{{ dateFor() }}</ion-card-subtitle>
+    </ion-card-header>
 
-  <div *ngIf="htmlContent()" [innerHTML]="htmlContent()"></div>
+    <ion-card-content>
+      <div class="news-body prose" *ngIf="htmlContent()" [innerHTML]="htmlContent()"></div>
+    </ion-card-content>
+  </ion-card>
 
   <ion-button expand="block" *ngIf="postUrl()" (click)="openLink(postUrl()!)">
     View on web

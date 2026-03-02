@@ -43,22 +43,23 @@
     </ion-card-content>
   </ion-card>
 
-  <ion-card>
-    <ion-card-content>
+  <ion-card class="search-card">
+    <ion-card-content class="search-card-content">
       <form action="/search" method="get">
         <ion-searchbar
+          class="home-searchbar"
           name="lookfor"
           placeholder="Search books, movies, music..."
           inputmode="search"
           enterkeyhint="search"
         ></ion-searchbar>
 
-        <div class="ion-margin-top" style="display: flex; gap: 12px; align-items: center;">
-          <ion-button type="submit" expand="block" style="flex: 1;">
+        <div class="home-search-actions">
+          <ion-button type="submit" class="home-search-submit">
             Search
           </ion-button>
 
-          <ion-button fill="clear" routerLink="/search">
+          <ion-button fill="clear" routerLink="/search" class="home-search-advanced">
             Advanced Search
           </ion-button>
         </div>

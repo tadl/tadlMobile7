@@ -67,13 +67,9 @@ export class AboutPage implements OnInit {
   }
 
   private async hasSecureStorage(): Promise<boolean> {
-    const key = 'about_secure_storage_probe';
-    const value = 'ok';
     try {
-      await SecureStoragePlugin.set({ key, value });
-      const read = await SecureStoragePlugin.get({ key }).catch(() => null);
-      await SecureStoragePlugin.remove({ key });
-      return !read || read?.value === value;
+      const platform = await SecureStoragePlugin.getPlatform();
+      return ['ios', 'android', 'web'].includes((platform?.value ?? '').toLowerCase());
     } catch {
       return false;
     }

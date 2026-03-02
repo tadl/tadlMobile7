@@ -70,3 +70,14 @@ testem.log
 Thumbs.db
 
 *.keystore
+
+# Native local build/signing state
+/android/.gradle-local/
+/android/signing.properties
+/android/local.properties
+/ios/**/*.xcuserstate
+/ios/**/*.xcuserdata/
+/ios/**/*.xcscmblueprint
+/ios/**/*.xccheckout
+/ios/**/DerivedData/
+/ios/**/.DS_Store

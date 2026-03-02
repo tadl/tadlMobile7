@@ -4,6 +4,11 @@ App/output
 App/App/public
 DerivedData
 xcuserdata
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+*.xcarchive
+*.ipa
 
 # Cordova plugins for Capacitor
 capacitor-cordova-ios-plugins

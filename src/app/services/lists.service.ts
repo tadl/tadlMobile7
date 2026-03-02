@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
-import { Observable, from, map, switchMap, throwError, concat, filter, tap } from 'rxjs';
+import { Observable, from, map, switchMap, throwError, concat, filter, tap, finalize, shareReplay } from 'rxjs';
 
 import { Globals } from '../globals';
 import { AuthService } from './auth.service';
@@ -55,6 +55,8 @@ export interface AspenListMutationResult {
 
 @Injectable({ providedIn: 'root' })
 export class ListsService {
+  private userListsFetch$: Observable<AspenUserList[]> | null = null;
+
   constructor(
     private http: HttpClient,
     private globals: Globals,
@@ -72,7 +74,7 @@ export class ListsService {
       filter((v): v is AspenUserList[] => Array.isArray(v)),
     );
 
-    const network$ = this.callListApi('getUserLists').pipe(
+    const network$ = this.userListsFetch$ ?? this.callListApi('getUserLists').pipe(
       map((r: any) => {
         if (!r?.success) return [];
         const lists = Array.isArray(r?.lists) ? r.lists : [];
@@ -84,7 +86,13 @@ export class ListsService {
       tap((lists) => {
         if (accountId) this.cache.write(cacheKey, lists).catch(() => {});
       }),
+      finalize(() => {
+        this.userListsFetch$ = null;
+      }),
+      shareReplay({ bufferSize: 1, refCount: true }),
     );
+
+    this.userListsFetch$ = network$;
 
     return concat(cached$, network$);
   }

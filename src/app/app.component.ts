@@ -6,6 +6,7 @@ import { Platform } from '@ionic/angular/standalone';
 import { App } from '@capacitor/app';
 import { fromEvent, Observable } from 'rxjs';
 import { distinctUntilChanged } from 'rxjs/operators';
+import { Router } from '@angular/router';
 
 import { Globals } from './globals';
 import { AuthService } from './services/auth.service';
@@ -39,6 +40,7 @@ export class AppComponent implements OnInit {
   // Bind in templates: *ngIf="isLoading$ | async"
   isLoading$: Observable<boolean>;
   private lastWarmedAccountId: string | null = null;
+  private lastResumeRefreshAt = 0;
 
   constructor(
     public globals: Globals,
@@ -46,6 +48,7 @@ export class AppComponent implements OnInit {
     private auth: AuthService,
     private loading: LoadingService,
     private cacheWarm: CacheWarmService,
+    private router: Router,
   ) {
     this.isLoading$ = this.loading.isLoading$();
 
@@ -56,6 +59,11 @@ export class AppComponent implements OnInit {
       App.addListener('backButton', ({ canGoBack }) => {
         if (canGoBack) this.globals.go_back();
         else this.globals.confirm_exit();
+      });
+
+      App.addListener('appStateChange', ({ isActive }) => {
+        if (!isActive) return;
+        this.handleAppResume();
       });
 
       fromEvent(document, 'didDismiss').subscribe(() => {
@@ -85,6 +93,22 @@ export class AppComponent implements OnInit {
         this.lastWarmedAccountId = s.activeAccountId;
         this.cacheWarm.warmForActiveAccount();
       });
+  }
+
+  private handleAppResume() {
+    const snap = this.auth.snapshot();
+    if (!snap.isLoggedIn || !snap.activeAccountId) return;
+
+    const now = Date.now();
+    if (now - this.lastResumeRefreshAt < 10000) return;
+    this.lastResumeRefreshAt = now;
+
+    this.auth.refreshActiveProfile().subscribe({ error: () => {} });
+
+    const path = this.router.url || '/home';
+    if (path === '/' || path.startsWith('/home')) {
+      this.cacheWarm.warmForActiveAccount();
+    }
   }
 
   // Called by (ionDidOpen) on the account menu in app.component.html

@@ -1,7 +1,7 @@
 // src/app/services/checkouts.service.ts
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
-import { Observable, map, switchMap, from, throwError, concat, filter, tap } from 'rxjs';
+import { Observable, map, switchMap, from, throwError, concat, filter, tap, finalize, shareReplay } from 'rxjs';
 import { Preferences } from '@capacitor/preferences';
 
 import { Globals } from '../globals';
@@ -61,6 +61,7 @@ const PREF_APP_SESSION_ID = 'app:aspenSessionId';
 @Injectable({ providedIn: 'root' })
 export class CheckoutsService {
   private sessionId: string | null = null;
+  private activeFetch$: Observable<AspenCheckout[]> | null = null;
 
   constructor(
     private http: HttpClient,
@@ -85,7 +86,7 @@ export class CheckoutsService {
       filter((v): v is AspenCheckout[] => Array.isArray(v)),
     );
 
-    const network$ = from(this.accounts.getPassword(snap.activeAccountId)).pipe(
+    const network$ = this.activeFetch$ ?? from(this.accounts.getPassword(snap.activeAccountId)).pipe(
       switchMap(password => {
         if (!password) return throwError(() => new Error('missing_password'));
 
@@ -111,7 +112,13 @@ export class CheckoutsService {
             }),
           );
       }),
+      finalize(() => {
+        this.activeFetch$ = null;
+      }),
+      shareReplay({ bufferSize: 1, refCount: true }),
     );
+
+    this.activeFetch$ = network$;
 
     return concat(cached$, network$);
   }

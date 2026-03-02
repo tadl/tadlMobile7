@@ -1,7 +1,7 @@
 // src/app/services/patron.service.ts
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams, HttpHeaders } from '@angular/common/http';
-import { Observable, map } from 'rxjs';
+import { Observable, finalize, map, shareReplay } from 'rxjs';
 import { Globals } from '../globals';
 
 export interface AspenPatronProfileResponse {
@@ -20,6 +20,8 @@ export interface PatronBadges {
 
 @Injectable({ providedIn: 'root' })
 export class PatronService {
+  private profileFetches = new Map<string, Observable<AspenPatronProfileResponse>>();
+
   constructor(private http: HttpClient, private globals: Globals) {}
 
   /**
@@ -30,6 +32,10 @@ export class PatronService {
    * Your proxy currently requires api=tadl-prod for ILS requests, so we include it via globals.
    */
   getPatronProfile(username: string, password: string): Observable<AspenPatronProfileResponse> {
+    const key = `${(username ?? '').trim()}\u0000${(password ?? '').trim()}`;
+    const existing = this.profileFetches.get(key);
+    if (existing) return existing;
+
     const params = new HttpParams()
       .set('method', 'getPatronProfile')
       .set('linkedUsers', 'true')
@@ -45,7 +51,7 @@ export class PatronService {
       'Content-Type': 'application/x-www-form-urlencoded',
     });
 
-    return this.http
+    const request$ = this.http
       .post<any>(`${this.globals.aspen_api_base}/UserAPI`, body.toString(), { params, headers })
       .pipe(
         map(raw => {
@@ -56,7 +62,14 @@ export class PatronService {
             message: r?.message,
           } satisfies AspenPatronProfileResponse;
         }),
+        finalize(() => {
+          this.profileFetches.delete(key);
+        }),
+        shareReplay({ bufferSize: 1, refCount: true }),
       );
+
+    this.profileFetches.set(key, request$);
+    return request$;
   }
 
   badgesFromProfile(profile: any): PatronBadges {

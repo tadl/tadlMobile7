@@ -34,3 +34,15 @@
   --padding-end: 4px;
   margin: 0;
 }
+
+.checkouts-summary-item {
+  --min-height: 52px;
+}
+
+.checkouts-summary-item ion-label {
+  font-weight: 600;
+}
+
+.checkouts-summary-item ion-button {
+  margin: 0;
+}

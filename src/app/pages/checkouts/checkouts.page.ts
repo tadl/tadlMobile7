@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { IonicModule, ModalController, ActionSheetController } from '@ionic/angular';
-import { catchError, concatMap, finalize, from, map, of, toArray } from 'rxjs';
+import { catchError, concatMap, finalize, from, map, of, switchMap, timer, toArray } from 'rxjs';
 
 import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
@@ -18,6 +18,7 @@ import { AspenSearchHit } from '../../services/search.service';
   imports: [CommonModule, IonicModule],
 })
 export class CheckoutsPage {
+  private static readonly BULK_ACTION_DELAY_MS = 450;
   loading = false;
   renewAllBusy = false;
   private renewingKeys = new Set<string>();
@@ -127,6 +128,37 @@ export class CheckoutsPage {
     return this.renewableCount > 0;
   }
 
+  async openBulkActions(ev?: Event) {
+    ev?.stopPropagation();
+    ev?.preventDefault();
+
+    const buttons: any[] = [];
+
+    if (this.hasRenewableCheckouts) {
+      buttons.push({
+        text: 'Renew all',
+        handler: () => this.confirmRenewAll(),
+      });
+    }
+
+    buttons.push({
+      text: 'Refresh',
+      handler: () => this.refresh(),
+    });
+    buttons.push({
+      text: 'Cancel',
+      role: 'cancel',
+    });
+
+    const sheet = await this.actionSheetCtrl.create({
+      header: 'Bulk actions',
+      subHeader: `${this.ilsCheckouts.length} item${this.ilsCheckouts.length === 1 ? '' : 's'} checked out`,
+      buttons,
+    });
+
+    await sheet.present();
+  }
+
   async openCheckoutActions(c: AspenCheckout, ev?: Event) {
     ev?.stopPropagation();
     ev?.preventDefault();
@@ -209,13 +241,15 @@ export class CheckoutsPage {
 
     from(renewable)
       .pipe(
-        concatMap((checkout) =>
-          this.checkouts.renewCheckout(checkout).pipe(
+        concatMap((checkout, idx) =>
+          timer(idx === 0 ? 0 : CheckoutsPage.BULK_ACTION_DELAY_MS).pipe(
+            switchMap(() => this.checkouts.renewCheckout(checkout)),
             map((res) => ({
               success: !!res?.success,
               message: (res?.message ?? '').toString().trim(),
+              rateLimited: false,
             })),
-            catchError(() => of({ success: false, message: '' })),
+            catchError((err) => of({ success: false, message: '', rateLimited: err?.status === 429 })),
           ),
         ),
         toArray(),
@@ -228,7 +262,10 @@ export class CheckoutsPage {
         next: (results) => {
           const ok = results.filter((r) => r.success).length;
           const failed = results.length - ok;
-          if (failed === 0) {
+          const rateLimited = results.some((r) => r.rateLimited);
+          if (rateLimited) {
+            this.toast.presentToast('Aspen rate-limited the bulk renew request. Some items may not have updated yet.', 6000);
+          } else if (failed === 0) {
             this.toast.presentToast(`Renewed ${ok} item${ok === 1 ? '' : 's'}.`);
           } else if (ok === 0) {
             this.toast.presentToast('Could not renew any items.');
@@ -236,7 +273,6 @@ export class CheckoutsPage {
             this.toast.presentToast(`Renewed ${ok} item${ok === 1 ? '' : 's'}; ${failed} failed.`);
           }
           this.refresh();
-          this.auth.refreshActiveProfile().subscribe({ error: () => {} });
         },
         error: () => {
           this.toast.presentToast('Could not complete renew all.');

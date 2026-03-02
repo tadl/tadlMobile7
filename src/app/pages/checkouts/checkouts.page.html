@@ -7,12 +7,6 @@
     <ion-title>Checkouts</ion-title>
 
     <ion-buttons slot="end">
-      <ion-button
-        (click)="confirmRenewAll()"
-        [disabled]="loading || renewAllBusy || !hasRenewableCheckouts"
-      >
-        Renew all
-      </ion-button>
       <ion-button aria-label="Open account menu" (click)="globals.open_account_menu()">
         <ion-icon name="person-circle" slot="icon-only"></ion-icon>
       </ion-button>
@@ -26,6 +20,23 @@
   </ion-refresher>
 
   <ion-list *ngIf="hasAnyData" lines="full" class="full-list">
+    <ion-item class="checkouts-summary-item">
+      <ion-label class="ion-text-wrap">
+        {{ ilsCheckouts.length }} item{{ ilsCheckouts.length === 1 ? '' : 's' }} checked out
+      </ion-label>
+
+      <ion-button
+        slot="end"
+        size="small"
+        fill="clear"
+        aria-label="Checkout bulk actions"
+        [disabled]="loading || renewAllBusy"
+        (click)="openBulkActions($event)"
+      >
+        <ion-icon name="ellipsis-vertical" slot="icon-only"></ion-icon>
+      </ion-button>
+    </ion-item>
+
     <ion-item
       button
       *ngFor="let c of ilsCheckouts; trackBy: trackByCheckout"

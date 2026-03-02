@@ -63,7 +63,7 @@ export class HoldsPage {
     this.refresh();
   }
 
-  refresh(ev?: any) {
+  refresh(ev?: any, opts?: { suppressErrorToast?: boolean }) {
     if (this.loading) {
       ev?.target?.complete?.();
       return;
@@ -97,7 +97,9 @@ export class HoldsPage {
           }
         },
         error: () => {
-          this.toast.presentToast('Could not refresh holds.');
+          if (!opts?.suppressErrorToast) {
+            this.toast.presentToast('Could not refresh holds.');
+          }
         },
       });
   }
@@ -239,10 +241,10 @@ export class HoldsPage {
             return;
           }
 
-          (h as any).frozen = !this.holdIsFrozen(h);
-          (h as any).statusMessage = (h as any).frozen ? 'Frozen' : 'Active';
+          const nowFrozen = !this.holdIsFrozen(h);
+          this.applyHoldFrozenState(h, nowFrozen);
 
-          this.toast.presentToast(res?.message || ((h as any).frozen ? 'Hold suspended.' : 'Hold activated.'));
+          this.toast.presentToast(res?.message || (nowFrozen ? 'Hold suspended.' : 'Hold activated.'));
           this.refresh();
           this.auth.refreshActiveProfile().subscribe({ error: () => {} });
         },
@@ -335,5 +337,40 @@ export class HoldsPage {
     const code = parts.slice(1).join('_').trim();
     if (!id || !code) return null;
     return { id, code };
+  }
+
+  private applyHoldFrozenState(hold: AspenHold, frozen: boolean) {
+    const key = this.holdActionKey(hold);
+    const match = this.findHoldByKey(key);
+    if (!match) return;
+
+    (match as any).frozen = frozen;
+    (match as any).statusMessage = frozen ? 'Frozen' : 'Active';
+    (match as any).status = frozen ? 'Frozen' : 'Active';
+
+    this.ilsReady = [...this.ilsReady];
+    this.ilsPending = [...this.ilsPending];
+    void this.persistLocalHolds();
+  }
+
+  private removeHoldFromLists(hold: AspenHold) {
+    const key = this.holdActionKey(hold);
+    this.ilsReady = this.ilsReady.filter((h) => this.holdActionKey(h) !== key);
+    this.ilsPending = this.ilsPending.filter((h) => this.holdActionKey(h) !== key);
+  }
+
+  private findHoldByKey(key: string): AspenHold | null {
+    if (!key) return null;
+    return (
+      this.ilsReady.find((h) => this.holdActionKey(h) === key) ??
+      this.ilsPending.find((h) => this.holdActionKey(h) === key) ??
+      null
+    );
+  }
+
+  private async persistLocalHolds() {
+    const snap = this.auth.snapshot();
+    if (!snap.activeAccountId) return;
+    await this.holds.setCachedHolds(snap.activeAccountId, [...this.ilsReady, ...this.ilsPending]);
   }
 }

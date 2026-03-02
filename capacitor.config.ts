@@ -10,7 +10,7 @@ const resolvedAppId =
 
 const config: CapacitorConfig = {
   appId: resolvedAppId,
-  appName: 'TADL Mobile',
+  appName: 'TADL',
   webDir: 'www'
 };
 

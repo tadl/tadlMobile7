@@ -79,6 +79,25 @@ function updateIosProject(versionName, buildNumber, appId) {
   console.log('[release-prep] Patched iOS project version/build/appId.');
 }
 
+function updateIosInfoPlistDisplayName(appName) {
+  const plistPath = resolve('ios/App/App/Info.plist');
+  if (!existsSync(plistPath)) {
+    console.log('[release-prep] iOS Info.plist not present yet, skipping display name patch.');
+    return;
+  }
+
+  let plist = readText(plistPath);
+  plist = replaceAll(
+    plist,
+    /<key>CFBundleDisplayName<\/key>\s*<string>[^<]*<\/string>/,
+    `<key>CFBundleDisplayName</key>\n        <string>${appName}</string>`,
+    'CFBundleDisplayName',
+  );
+
+  writeText(plistPath, plist);
+  console.log('[release-prep] Patched iOS display name.');
+}
+
 function updateAndroidGradle(versionName, buildNumber, appId) {
   const gradlePath = resolve('android/app/build.gradle');
   if (!existsSync(gradlePath)) {
@@ -109,6 +128,31 @@ function updateAndroidGradle(versionName, buildNumber, appId) {
 
   writeText(gradlePath, gradle);
   console.log('[release-prep] Patched Android applicationId/versionCode/versionName.');
+}
+
+function updateAndroidStrings(appName) {
+  const stringsPath = resolve('android/app/src/main/res/values/strings.xml');
+  if (!existsSync(stringsPath)) {
+    console.log('[release-prep] Android strings.xml not present yet, skipping display name patch.');
+    return;
+  }
+
+  let strings = readText(stringsPath);
+  strings = replaceAll(
+    strings,
+    /<string name="app_name">[^<]*<\/string>/,
+    `<string name="app_name">${appName}</string>`,
+    'android app_name',
+  );
+  strings = replaceAll(
+    strings,
+    /<string name="title_activity_main">[^<]*<\/string>/,
+    `<string name="title_activity_main">${appName}</string>`,
+    'android title_activity_main',
+  );
+
+  writeText(stringsPath, strings);
+  console.log('[release-prep] Patched Android display name.');
 }
 
 function updateGlobalsVersion(versionName, updateDate, buildNum) {
@@ -207,6 +251,7 @@ function parseArgs(argv) {
 function main() {
   const opts = parseArgs(process.argv.slice(2));
   const appId = opts.platform === 'ios' ? IOS_APP_ID : ANDROID_APP_ID;
+  const appName = 'TADL';
   let updateDate = opts.updateDate || defaultUpdateDate();
   let buildNum = opts.buildNum || '00';
 
@@ -222,6 +267,7 @@ function main() {
 
   console.log(`[release-prep] Platform: ${opts.platform}`);
   console.log(`[release-prep] App ID: ${appId}`);
+  console.log(`[release-prep] App Name: ${appName}`);
   console.log(`[release-prep] Version: ${opts.version}`);
   console.log(`[release-prep] Build: ${opts.build}`);
   console.log(`[release-prep] Update date: ${updateDate}`);
@@ -247,8 +293,10 @@ function main() {
 
   if (opts.platform === 'ios') {
     updateIosProject(opts.version, opts.build, appId);
+    updateIosInfoPlistDisplayName(appName);
   } else {
     updateAndroidGradle(opts.version, opts.build, appId);
+    updateAndroidStrings(appName);
   }
 
   if (!opts.skipAssets && existsSync(resolve('resources'))) {

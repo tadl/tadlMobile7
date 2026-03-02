@@ -47,7 +47,7 @@ export class AboutPage implements OnInit {
 
     const secureAvailable = await this.hasSecureStorage();
     this.storageDriver = this.computeStorageDriver();
-    this.credentialStorage = secureAvailable ? 'secure-storage' : 'secure-storage (unavailable)';
+    this.credentialStorage = this.describeCredentialStorage(secureAvailable);
   }
 
   private updateScreenSize() {
@@ -60,14 +60,20 @@ export class AboutPage implements OnInit {
     return 'preferences (web)';
   }
 
+  private describeCredentialStorage(secureAvailable: boolean): string {
+    if (secureAvailable) return 'secure-storage';
+    if (this.globals.device_info?.isVirtual) return 'secure-storage (simulator unavailable)';
+    return 'secure-storage (unavailable)';
+  }
+
   private async hasSecureStorage(): Promise<boolean> {
     const key = 'about_secure_storage_probe';
     const value = 'ok';
     try {
       await SecureStoragePlugin.set({ key, value });
-      const read = await SecureStoragePlugin.get({ key });
+      const read = await SecureStoragePlugin.get({ key }).catch(() => null);
       await SecureStoragePlugin.remove({ key });
-      return read?.value === value;
+      return !read || read?.value === value;
     } catch {
       return false;
     }

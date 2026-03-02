@@ -1,0 +1,26 @@
+.about-item {
+  align-items: flex-start;
+}
+
+.about-item-stacked {
+  --inner-padding-top: 12px;
+  --inner-padding-bottom: 12px;
+}
+
+.about-value {
+  max-width: 58%;
+  text-align: right;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.about-value-wrap {
+  display: block;
+}
+
+.about-inline-value {
+  margin: 6px 0 0;
+  color: var(--ion-color-step-600, #b5b5b5);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}

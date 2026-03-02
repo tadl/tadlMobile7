@@ -8,6 +8,7 @@ import {
 import { Browser } from '@capacitor/browser';
 import { Device } from '@capacitor/device';
 import { App } from '@capacitor/app';
+import { Network } from '@capacitor/network';
 import { format } from 'date-fns';
 
 export interface PickupLocationOption {
@@ -25,8 +26,9 @@ export class Globals {
   ) {}
 
   // ---- app identity / toggles ----
-  public app_version: string = '7.0.0';
-  public update_version: string = '2026030200';
+  public app_version: string = '7.0.1';
+  public update_version: string = '20260302';
+  public build_num: string = '01';
 
   public device_info: any;
   public system_color: any = window.matchMedia('(prefers-color-scheme: dark)');
@@ -97,6 +99,7 @@ export class Globals {
   private connectionChangeHandler = () => this.updateNetworkFromEnvironment();
   private browserOnlineHandler = () => this.updateNetworkFromEnvironment();
   private browserOfflineHandler = () => this.updateNetworkFromEnvironment();
+  private nativeNetworkListenerHandle: { remove: () => Promise<void> } | null = null;
 
   // ---- helpers ----
   async open_page(url: string) {
@@ -162,12 +165,31 @@ export class Globals {
     if (conn?.addEventListener) {
       conn.addEventListener('change', this.connectionChangeHandler);
     }
+
+    void this.initNativeNetworkTracking();
   }
 
   private updateNetworkFromEnvironment() {
     const online = typeof navigator?.onLine === 'boolean' ? navigator.onLine : true;
     this.net_status = online ? 'online' : 'offline';
     this.net_type = this.pickNetworkType(online);
+  }
+
+  private async initNativeNetworkTracking() {
+    try {
+      const status = await Network.getStatus();
+      this.applyNativeNetworkStatus(status.connected, status.connectionType);
+      this.nativeNetworkListenerHandle ??= await Network.addListener('networkStatusChange', status => {
+        this.applyNativeNetworkStatus(status.connected, status.connectionType);
+      });
+    } catch {
+      // Browser fallback remains in place when the native plugin is unavailable.
+    }
+  }
+
+  private applyNativeNetworkStatus(connected: boolean, connectionType?: string) {
+    this.net_status = connected ? 'online' : 'offline';
+    this.net_type = this.normalizeNetworkType(connected, connectionType ?? '');
   }
 
   private pickNetworkType(online: boolean): string {
@@ -179,11 +201,7 @@ export class Globals {
     const isDesktop = this.platform.is('desktop');
 
     if (rawTransport) {
-      if (rawTransport.includes('wifi')) return 'wifi';
-      if (rawTransport.includes('ethernet') || rawTransport.includes('wired')) return 'ethernet';
-      if (rawTransport.includes('cell')) return 'cellular';
-      if (rawTransport === 'none') return 'none';
-      return rawTransport;
+      return this.normalizeNetworkType(true, rawTransport);
     }
 
     // effectiveType (2g/3g/4g) is link quality, not transport; on desktop it often
@@ -200,6 +218,19 @@ export class Globals {
     if (isDesktop) return 'ethernet';
 
     return 'unknown';
+  }
+
+  private normalizeNetworkType(online: boolean, rawType: string): string {
+    const type = (rawType || '').toLowerCase().trim();
+    if (!online || type === 'none') return 'none';
+    if (type.includes('wifi') || type === 'wlan') return 'wifi';
+    if (type.includes('ethernet') || type.includes('wired')) return 'ethernet';
+    if (type.includes('cell') || type === '4g' || type === '3g' || type === '2g' || type === '5g') return 'cellular';
+    if (type === 'unknown' || !type) {
+      if (this.device_info?.isVirtual) return 'simulator';
+      return online ? 'unknown' : 'none';
+    }
+    return type;
   }
 
   private getBrowserConnection(): any {

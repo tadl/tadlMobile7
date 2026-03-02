@@ -111,7 +111,7 @@ function updateAndroidGradle(versionName, buildNumber, appId) {
   console.log('[release-prep] Patched Android applicationId/versionCode/versionName.');
 }
 
-function updateGlobalsVersion(versionName, updateStamp) {
+function updateGlobalsVersion(versionName, updateDate, buildNum) {
   const globalsPath = resolve('src/app/globals.ts');
   if (!existsSync(globalsPath)) {
     fail('src/app/globals.ts not found.');
@@ -127,20 +127,26 @@ function updateGlobalsVersion(versionName, updateStamp) {
   globals = replaceAll(
     globals,
     /public update_version: string = '[^']*';/,
-    `public update_version: string = '${updateStamp}';`,
+    `public update_version: string = '${updateDate}';`,
     'globals update_version',
+  );
+  globals = replaceAll(
+    globals,
+    /public build_num: string = '[^']*';/,
+    `public build_num: string = '${buildNum}';`,
+    'globals build_num',
   );
 
   writeText(globalsPath, globals);
-  console.log('[release-prep] Patched globals app_version/update_version.');
+  console.log('[release-prep] Patched globals app_version/update_version/build_num.');
 }
 
-function defaultUpdateStamp() {
+function defaultUpdateDate() {
   const d = new Date();
   const yyyy = d.getFullYear().toString();
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
-  return `${yyyy}${mm}${dd}00`;
+  return `${yyyy}${mm}${dd}`;
 }
 
 function parseArgs(argv) {
@@ -157,7 +163,8 @@ function parseArgs(argv) {
     recreate: false,
     skipBuild: false,
     skipAssets: false,
-    updateStamp: '',
+    updateDate: '',
+    buildNum: '',
   };
 
   for (let i = 0; i < rest.length; i += 1) {
@@ -174,8 +181,11 @@ function parseArgs(argv) {
       opts.skipBuild = true;
     } else if (a === '--skip-assets') {
       opts.skipAssets = true;
-    } else if (a === '--update-stamp') {
-      opts.updateStamp = (rest[i + 1] ?? '').trim();
+    } else if (a === '--update-stamp' || a === '--update-date') {
+      opts.updateDate = (rest[i + 1] ?? '').trim();
+      i += 1;
+    } else if (a === '--build-num') {
+      opts.buildNum = (rest[i + 1] ?? '').trim();
       i += 1;
     } else {
       fail(`Unknown argument: ${a}`);
@@ -184,8 +194,11 @@ function parseArgs(argv) {
 
   if (!opts.version) fail('Missing required --version argument (example: --version 7.0.1).');
   if (!/^\d+$/.test(opts.build)) fail('Missing or invalid --build argument (must be numeric).');
-  if (opts.updateStamp && !/^\d{10}$/.test(opts.updateStamp)) {
-    fail('Invalid --update-stamp format (expected YYYYMMDDNN, e.g. 2026022400).');
+  if (opts.updateDate && !/^\d{8}(\d{2})?$/.test(opts.updateDate)) {
+    fail('Invalid --update-date/--update-stamp format (expected YYYYMMDD or YYYYMMDDNN, e.g. 20260302 or 2026030201).');
+  }
+  if (opts.buildNum && !/^\d{2}$/.test(opts.buildNum)) {
+    fail('Invalid --build-num format (expected two digits, e.g. 00 or 01).');
   }
 
   return opts;
@@ -194,7 +207,13 @@ function parseArgs(argv) {
 function main() {
   const opts = parseArgs(process.argv.slice(2));
   const appId = opts.platform === 'ios' ? IOS_APP_ID : ANDROID_APP_ID;
-  const updateStamp = opts.updateStamp || defaultUpdateStamp();
+  let updateDate = opts.updateDate || defaultUpdateDate();
+  let buildNum = opts.buildNum || '00';
+
+  if (/^\d{10}$/.test(updateDate)) {
+    buildNum = updateDate.slice(-2);
+    updateDate = updateDate.slice(0, 8);
+  }
 
   const env = {
     TADL_TARGET: opts.platform,
@@ -205,9 +224,10 @@ function main() {
   console.log(`[release-prep] App ID: ${appId}`);
   console.log(`[release-prep] Version: ${opts.version}`);
   console.log(`[release-prep] Build: ${opts.build}`);
-  console.log(`[release-prep] Update stamp: ${updateStamp}`);
+  console.log(`[release-prep] Update date: ${updateDate}`);
+  console.log(`[release-prep] Daily build number: ${buildNum}`);
 
-  updateGlobalsVersion(opts.version, updateStamp);
+  updateGlobalsVersion(opts.version, updateDate, buildNum);
 
   if (!opts.skipBuild) {
     run('npm', ['run', 'build']);

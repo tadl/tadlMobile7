@@ -29,7 +29,10 @@ export class AccountStoreService {
     if (!value) return [];
     try {
       const parsed = JSON.parse(value);
-      if (Array.isArray(parsed)) return parsed as StoredAccountMeta[];
+      if (Array.isArray(parsed)) {
+        const normalized = await this.normalizeAccounts(parsed as StoredAccountMeta[]);
+        return normalized;
+      }
     } catch {
       // ignore
     }
@@ -58,16 +61,12 @@ export class AccountStoreService {
       acct.username = meta.username;
       acct.label = meta.label;
       acct.lastUsedAt = now;
-
-      // move to top
-      const rest = accounts.filter(a => a.id !== acct!.id);
-      rest.unshift(acct);
-      await Preferences.set({ key: PREF_ACCOUNTS_INDEX, value: JSON.stringify(rest) });
-      return acct;
     }
 
-    await Preferences.set({ key: PREF_ACCOUNTS_INDEX, value: JSON.stringify(accounts) });
-    return acct;
+    // Move the canonical account to the top, then collapse any duplicate ids/usernames.
+    const rest = accounts.filter(a => a.id !== acct.id);
+    const normalized = await this.normalizeAccounts([acct, ...rest], acct.id);
+    return normalized.find(a => a.id === acct.id) ?? acct;
   }
 
   async removeAccount(accountId: string): Promise<void> {
@@ -164,5 +163,57 @@ export class AccountStoreService {
   private newId(): string {
     // no crypto dependency; good enough as internal key
     return 'acct_' + Math.random().toString(36).slice(2, 10) + '_' + Date.now().toString(36);
+  }
+
+  private async normalizeAccounts(accounts: StoredAccountMeta[], preferredId?: string): Promise<StoredAccountMeta[]> {
+    const seenIds = new Set<string>();
+    const seenUsernames = new Set<string>();
+    const duplicateIds: string[] = [];
+    const ordered = [...(accounts ?? [])];
+
+    if (preferredId) {
+      ordered.sort((a, b) => {
+        if (a?.id === preferredId) return -1;
+        if (b?.id === preferredId) return 1;
+        return 0;
+      });
+    }
+
+    const normalized: StoredAccountMeta[] = [];
+
+    for (const account of ordered) {
+      const id = (account?.id ?? '').toString().trim();
+      const username = (account?.username ?? '').toString().trim();
+      if (!id || !username) {
+        if (id) duplicateIds.push(id);
+        continue;
+      }
+      if (seenIds.has(id) || seenUsernames.has(username)) {
+        duplicateIds.push(id);
+        continue;
+      }
+      seenIds.add(id);
+      seenUsernames.add(username);
+      normalized.push({
+        ...account,
+        id,
+        username,
+        label: (account?.label ?? '').toString(),
+      });
+    }
+
+    await Preferences.set({ key: PREF_ACCOUNTS_INDEX, value: JSON.stringify(normalized) });
+
+    for (const duplicateId of duplicateIds) {
+      if (!duplicateId) continue;
+      await this.deletePassword(duplicateId);
+      await this.clearCachedProfile(duplicateId);
+      const active = await this.getActiveAccountId();
+      if (active === duplicateId) {
+        await this.setActiveAccountId(null);
+      }
+    }
+
+    return normalized;
   }
 }

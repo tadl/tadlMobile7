@@ -1,6 +1,6 @@
 // src/app/services/auth.service.ts
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, from, switchMap, map, tap, throwError } from 'rxjs';
+import { BehaviorSubject, Observable, from, switchMap, map, tap, throwError, catchError, of } from 'rxjs';
 
 import { AccountStoreService, StoredAccountMeta } from './account-store.service';
 import { PatronService } from './patron.service';
@@ -194,11 +194,19 @@ export class AuthService {
 
     return from(this.accounts.getPassword(snap.activeAccountId)).pipe(
       switchMap(password => {
-        if (!password) return from([snap]);
+        if (!password) {
+          return from(this.invalidateActiveSession(false)).pipe(
+            map(() => this.snapshot()),
+          );
+        }
 
         return this.patron.getPatronProfile(snap.activeAccountMeta!.username, password).pipe(
           switchMap(res => {
-            if (!res.success || !res.profile) return from([snap]);
+            if (!res.success || !res.profile) {
+              return from(this.invalidateActiveSession(true)).pipe(
+                map(() => this.snapshot()),
+              );
+            }
 
             return from(this.accounts.cacheProfile(snap.activeAccountId!, res.profile)).pipe(
               map(() => {
@@ -212,8 +220,50 @@ export class AuthService {
               }),
             );
           }),
+          catchError(() => of(snap)),
         );
       }),
     );
+  }
+
+  async updateActiveAccountUsername(username: string): Promise<void> {
+    const nextUsername = (username ?? '').trim();
+    const snap = this.snapshot();
+    const active = snap.activeAccountMeta;
+    if (!nextUsername || !active || !snap.activeAccountId) return;
+
+    const updatedMeta = await this.accounts.upsertAccountMeta({
+      id: active.id,
+      username: nextUsername,
+      label: active.label,
+    });
+
+    const next: AuthState = {
+      ...snap,
+      activeAccountMeta: updatedMeta,
+      profile: snap.profile ? { ...snap.profile, username: nextUsername } : snap.profile,
+    };
+    this.state$.next(next);
+  }
+
+  private async invalidateActiveSession(removeStoredAccount: boolean): Promise<void> {
+    const snap = this.snapshot();
+    if (snap.activeAccountId) {
+      if (removeStoredAccount) {
+        await this.accounts.removeAccount(snap.activeAccountId);
+      } else {
+        await this.accounts.clearCachedProfile(snap.activeAccountId);
+        await this.accounts.setActiveAccountId(null);
+      }
+    } else {
+      await this.accounts.setActiveAccountId(null);
+    }
+
+    this.state$.next({
+      isLoggedIn: false,
+      activeAccountId: null,
+      activeAccountMeta: null,
+      profile: null,
+    });
   }
 }

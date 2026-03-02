@@ -134,6 +134,10 @@
     </ion-item>
   </ion-list>
 
+  <ion-item *ngIf="loading && !preferences">
+    <ion-label>Loading account preferences...</ion-label>
+  </ion-item>
+
   <ion-item *ngIf="!loading && !preferences">
     <ion-label>No preference data available.</ion-label>
   </ion-item>

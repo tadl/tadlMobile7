@@ -189,7 +189,7 @@ export class AccountPreferencesPage {
               {
                 user_prefs_changed: true,
                 username_changed: true,
-                username,
+                new_username: username,
                 current_password: currentPassword,
               },
               undefined,
@@ -536,6 +536,7 @@ export class AccountPreferencesPage {
             }
             this.token = (res.token ?? '').toString().trim();
             this.preferences = res.preferences;
+            void this.syncUsernameFromPreferences(res.preferences);
             if (this.activeAccountId && this.token) {
               void this.prefsService.persistTokenForAccount(this.activeAccountId, this.token);
             }
@@ -586,6 +587,7 @@ export class AccountPreferencesPage {
 
           if (res.preferences) {
             this.preferences = res.preferences;
+            void this.syncUsernameFromPreferences(res.preferences);
             if (this.activeAccountId) {
               void this.prefsService.persistPreferencesForAccount(this.activeAccountId, res.preferences);
             }
@@ -609,14 +611,21 @@ export class AccountPreferencesPage {
   }
 
   private async persistUsername(newUsername: string) {
-    const snap = this.auth.snapshot();
-    if (!snap.activeAccountMeta) return;
-    await this.accounts.upsertAccountMeta({
-      id: snap.activeAccountMeta.id,
-      username: newUsername,
-      label: snap.activeAccountMeta.label,
-    });
+    await this.auth.updateActiveAccountUsername(newUsername);
+    if (this.preferences) {
+      this.preferences = {
+        ...this.preferences,
+        username: newUsername,
+      };
+    }
     this.activeUsername = newUsername;
+  }
+
+  private async syncUsernameFromPreferences(preferences: AccountPreferences | null) {
+    const nextUsername = (preferences?.username ?? '').toString().trim();
+    if (!nextUsername || nextUsername === this.activeUsername) return;
+    await this.auth.updateActiveAccountUsername(nextUsername);
+    this.activeUsername = nextUsername;
   }
 
   private async persistPassword(newPassword: string) {
@@ -649,6 +658,7 @@ export class AccountPreferencesPage {
           if (!res?.preferences) return;
           this.token = (res.token ?? '').toString().trim() || this.token;
           this.preferences = res.preferences;
+          void this.syncUsernameFromPreferences(res.preferences);
           if (this.activeAccountId && this.token) {
             void this.prefsService.persistTokenForAccount(this.activeAccountId, this.token);
           }

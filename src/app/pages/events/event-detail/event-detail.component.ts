@@ -165,10 +165,28 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
   get location(): string | null {
     return (
       this.event?.location ||
-      this.event?.room ||
       (this.event as any)?.venue ||
       null
     ) as string | null;
+  }
+
+  get displayRoom(): string | null {
+    const location = (this.event?.location ?? '').toString().trim();
+    const room = (this.event?.room ?? '').toString().trim();
+    if (!room) return null;
+    return location === 'Main Library - Traverse City' ? room : null;
+  }
+
+  get recommendedAgeGroupsLabel(): string | null {
+    const raw = (this.event?.['age_group'] ?? null) as unknown;
+    if (!Array.isArray(raw)) return null;
+
+    const labels = raw
+      .map((v) => `${v ?? ''}`.trim())
+      .filter((v) => !!v);
+
+    if (!labels.length) return null;
+    return labels.join(', ');
   }
 
   get imageUrl(): string | null {

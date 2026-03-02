@@ -51,27 +51,41 @@
 
       <ion-card-content>
         <div class="details">
-          <div class="when" *ngIf="startsAtDate; else noWhen">
+          <div class="when-card" *ngIf="startsAtDate; else noWhen">
             <ion-icon name="calendar-outline" aria-hidden="true"></ion-icon>
-            <span class="when-text">
-              {{ startsAtDate | date : 'EEE, MMM d, y' }}
-              <span class="time" *ngIf="!event?.allDay">
-                • {{ startsAtDate | date : 'h:mm a' }}
-              </span>
-            </span>
+            <div class="when-copy">
+              <div class="when-date">{{ startsAtDate | date : 'EEE, MMM d, y' }}</div>
+              <div class="when-time" *ngIf="!event?.allDay">{{ startsAtDate | date : 'h:mm a' }}</div>
+            </div>
           </div>
 
           <ng-template #noWhen>
-            <div class="when muted">—</div>
+            <div class="when-card muted">Date and time unavailable</div>
           </ng-template>
 
-          <div class="where" *ngIf="location; else noWhere">
-            {{ location }}
+          <div class="meta-list">
+            <div class="meta-row" *ngIf="location; else noWhere">
+              <span class="meta-label">Location</span>
+              <span class="meta-value">{{ location }}</span>
+            </div>
+
+            <ng-template #noWhere>
+              <div class="meta-row muted">
+                <span class="meta-label">Location</span>
+                <span class="meta-value">Unavailable</span>
+              </div>
+            </ng-template>
+
+            <div class="meta-row" *ngIf="displayRoom">
+              <span class="meta-label">Room</span>
+              <span class="meta-value">{{ displayRoom }}</span>
+            </div>
+
+            <div class="meta-row" *ngIf="recommendedAgeGroupsLabel">
+              <span class="meta-label">Recommended age groups</span>
+              <span class="meta-value">{{ recommendedAgeGroupsLabel }}</span>
+            </div>
           </div>
-
-          <ng-template #noWhere>
-            <div class="where muted">—</div>
-          </ng-template>
         </div>
 
         <div class="desc" *ngIf="descriptionText; else noDesc">

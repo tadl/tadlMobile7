@@ -8,6 +8,7 @@ import {
 import { Browser } from '@capacitor/browser';
 import { Device } from '@capacitor/device';
 import { App } from '@capacitor/app';
+import { AppLauncher } from '@capacitor/app-launcher';
 import { Network } from '@capacitor/network';
 import { format } from 'date-fns';
 
@@ -104,6 +105,20 @@ export class Globals {
   // ---- helpers ----
   async open_page(url: string) {
     await Browser.open({ url });
+  }
+
+  async open_external_page(url: string) {
+    const target = (url ?? '').toString().trim();
+    if (!target) return;
+
+    try {
+      await AppLauncher.openUrl({ url: target });
+      return;
+    } catch {
+      // Fall back to the in-app browser when the launcher path is unavailable.
+    }
+
+    await Browser.open({ url: target });
   }
 
   day_today() {

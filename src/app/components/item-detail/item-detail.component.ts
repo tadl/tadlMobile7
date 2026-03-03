@@ -907,7 +907,7 @@ export class ItemDetailComponent implements OnInit {
   async handleFormatAction(action: any, formatKey: string) {
     const url = (action?.url ?? '').toString().trim();
     if (url) {
-      this.globals.open_page(url);
+      await this.globals.open_external_page(url);
       return;
     }
 

@@ -113,9 +113,7 @@
           (click)="goFines()"
         >
           <ion-label>Fines</ion-label>
-          <ion-note
-            slot="end"
-          >
+          <ion-note slot="end" class="menu-value">
             {{ b.finesText || ('$' + (b.finesVal | number:'1.2-2')) }}
           </ion-note>
         </ion-item>

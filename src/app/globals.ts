@@ -72,6 +72,7 @@ export class Globals {
 
   // New locations host
   public locations_base: string = 'https://locations.tools.tadl.org';
+  public fines_payment_url: string = 'https://pay.catalog.tadl.org/pay';
 
   // Locations APIs
   public locations_group: string = 'tadl';

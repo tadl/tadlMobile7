@@ -59,6 +59,12 @@ ion-note {
   opacity: 0.9;
 }
 
+.menu-value {
+  opacity: 1;
+  color: var(--ion-text-color);
+  font-weight: 600;
+}
+
 .menu-subnote {
   display: block;
   margin-top: 2px;

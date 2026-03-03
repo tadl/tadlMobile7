@@ -230,8 +230,7 @@ export class AccountMenuComponent implements OnInit {
     this.goAccountPage('/my-lists');
   }
 
-  // placeholders until we build pages
-  goFines() { this.toast.presentToast('Fines page coming next.'); }
+  goFines() { this.goAccountPage('/fines'); }
   goHistory() {
     this.goAccountPage('/checkout-history');
   }

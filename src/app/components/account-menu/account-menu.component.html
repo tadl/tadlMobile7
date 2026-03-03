@@ -110,13 +110,11 @@
 
         <ion-item
           button
-          [disabled]="b.finesVal === 0"
           (click)="goFines()"
         >
           <ion-label>Fines</ion-label>
           <ion-note
             slot="end"
-            [style.opacity]="b.finesVal === 0 ? '0.55' : '1'"
           >
             {{ b.finesText || ('$' + (b.finesVal | number:'1.2-2')) }}
           </ion-note>

@@ -24,7 +24,7 @@ export class HoldsPage {
 
   // We’re only showing ILS holds here (per your direction)
   ilsReady: AspenHold[] = [];
-  ilsPending: AspenHold[] = [];
+  ilsNotReady: AspenHold[] = [];
 
   constructor(
     public globals: Globals,
@@ -43,7 +43,7 @@ export class HoldsPage {
     const snap = this.auth.snapshot();
     if (!snap.isLoggedIn || !snap.activeAccountId) {
       this.ilsReady = [];
-      this.ilsPending = [];
+      this.ilsNotReady = [];
       return;
     }
 
@@ -106,20 +106,25 @@ export class HoldsPage {
 
   private partitionIlsHolds(holds: AspenHold[]) {
     const ready: AspenHold[] = [];
-    const pending: AspenHold[] = [];
+    const notReady: AspenHold[] = [];
 
     for (const h of holds ?? []) {
-      const isReady =
-        h?.['available'] === true ||
-        (typeof h?.status === 'string' && h.status.toLowerCase().includes('ready')) ||
-        (typeof h?.statusMessage === 'string' && h.statusMessage.toLowerCase().includes('ready'));
-
-      if (isReady) ready.push(h);
-      else pending.push(h);
+      if (this.holdDisplayState(h) === 'ready') ready.push(h);
+      else notReady.push(h);
     }
 
+    notReady.sort((a, b) => {
+      const aFrozen = this.holdDisplayState(a) === 'frozen';
+      const bFrozen = this.holdDisplayState(b) === 'frozen';
+      if (aFrozen !== bFrozen) return aFrozen ? 1 : -1;
+
+      const aPos = Number(a?.position ?? Number.MAX_SAFE_INTEGER);
+      const bPos = Number(b?.position ?? Number.MAX_SAFE_INTEGER);
+      return aPos - bPos;
+    });
+
     this.ilsReady = ready;
-    this.ilsPending = pending;
+    this.ilsNotReady = notReady;
   }
 
   holdTitle(h: AspenHold): string {
@@ -134,15 +139,18 @@ export class HoldsPage {
   }
 
   holdStatus(h: AspenHold): string {
-    const s = (h?.statusMessage ?? h?.status ?? '').toString().trim();
-    if (s) return s;
-    return h?.['available'] ? 'Available' : 'Pending';
+    switch (this.holdDisplayState(h)) {
+      case 'ready':
+        return 'Ready for pickup';
+      case 'frozen':
+        return 'Suspended';
+      default:
+        return 'Active';
+    }
   }
 
   holdIsFrozen(h: AspenHold): boolean {
-    if ((h as any)?.frozen === true) return true;
-    const status = (h?.statusMessage ?? h?.status ?? '').toString().toLowerCase();
-    return status.includes('frozen') || status.includes('suspend') || status.includes('suspended');
+    return this.holdDisplayState(h) === 'frozen';
   }
 
   async openHold(h: AspenHold) {
@@ -237,18 +245,16 @@ export class HoldsPage {
       .subscribe({
         next: (res) => {
           if (!res?.success) {
-            this.toast.presentToast(res?.message || 'Could not update hold.');
+            this.toast.presentToast(this.holdIsFrozen(h) ? 'Could not activate hold.' : 'Could not suspend hold.');
             return;
           }
 
           const nowFrozen = !this.holdIsFrozen(h);
           this.applyHoldFrozenState(h, nowFrozen);
 
-          this.toast.presentToast(res?.message || (nowFrozen ? 'Hold suspended.' : 'Hold activated.'));
-          this.refresh();
-          this.auth.refreshActiveProfile().subscribe({ error: () => {} });
+          this.toast.presentToast(nowFrozen ? 'Hold suspended.' : 'Hold activated.');
         },
-        error: () => this.toast.presentToast('Could not update hold.'),
+        error: () => this.toast.presentToast(this.holdIsFrozen(h) ? 'Could not activate hold.' : 'Could not suspend hold.'),
       });
   }
 
@@ -304,7 +310,7 @@ export class HoldsPage {
           }
 
           this.toast.presentToast(res?.message || 'Pickup location updated.');
-          this.refresh();
+          void this.persistLocalHolds();
         },
         error: () => this.toast.presentToast('Could not change pickup location.'),
       });
@@ -320,7 +326,7 @@ export class HoldsPage {
   }
 
   get hasAnyData(): boolean {
-    return (this.ilsReady?.length ?? 0) > 0 || (this.ilsPending?.length ?? 0) > 0;
+    return (this.ilsReady?.length ?? 0) > 0 || (this.ilsNotReady?.length ?? 0) > 0;
   }
 
   private holdActionKey(h: AspenHold): string {
@@ -345,25 +351,24 @@ export class HoldsPage {
     if (!match) return;
 
     (match as any).frozen = frozen;
-    (match as any).statusMessage = frozen ? 'Frozen' : 'Active';
-    (match as any).status = frozen ? 'Frozen' : 'Active';
+    (match as any).statusMessage = frozen ? 'Suspended' : 'Active';
+    (match as any).status = frozen ? 'Suspended' : 'Pending';
 
-    this.ilsReady = [...this.ilsReady];
-    this.ilsPending = [...this.ilsPending];
+    this.partitionIlsHolds([...this.ilsReady, ...this.ilsNotReady]);
     void this.persistLocalHolds();
   }
 
   private removeHoldFromLists(hold: AspenHold) {
     const key = this.holdActionKey(hold);
     this.ilsReady = this.ilsReady.filter((h) => this.holdActionKey(h) !== key);
-    this.ilsPending = this.ilsPending.filter((h) => this.holdActionKey(h) !== key);
+    this.ilsNotReady = this.ilsNotReady.filter((h) => this.holdActionKey(h) !== key);
   }
 
   private findHoldByKey(key: string): AspenHold | null {
     if (!key) return null;
     return (
       this.ilsReady.find((h) => this.holdActionKey(h) === key) ??
-      this.ilsPending.find((h) => this.holdActionKey(h) === key) ??
+      this.ilsNotReady.find((h) => this.holdActionKey(h) === key) ??
       null
     );
   }
@@ -371,6 +376,28 @@ export class HoldsPage {
   private async persistLocalHolds() {
     const snap = this.auth.snapshot();
     if (!snap.activeAccountId) return;
-    await this.holds.setCachedHolds(snap.activeAccountId, [...this.ilsReady, ...this.ilsPending]);
+    await this.holds.setCachedHolds(snap.activeAccountId, [...this.ilsReady, ...this.ilsNotReady]);
+  }
+
+  private holdDisplayState(h: AspenHold): 'ready' | 'active' | 'frozen' {
+    if (h?.available === true) return 'ready';
+
+    const statusBits = [
+      (h?.statusMessage ?? '').toString().toLowerCase(),
+      (h?.status ?? '').toString().toLowerCase(),
+    ]
+      .join(' ')
+      .trim();
+
+    if (statusBits.includes('ready to pickup') || statusBits.includes('ready for pickup')) {
+      return 'ready';
+    }
+
+    if ((h as any)?.frozen === true) return 'frozen';
+    if (statusBits.includes('frozen') || statusBits.includes('suspend') || statusBits.includes('suspended')) {
+      return 'frozen';
+    }
+
+    return 'active';
   }
 }

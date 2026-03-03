@@ -54,15 +54,14 @@
     </ion-list>
   </ng-container>
 
-  <!-- PENDING section only if > 0 -->
-  <ng-container *ngIf="ilsPending.length > 0">
+  <ng-container *ngIf="ilsNotReady.length > 0">
     <div class="section-title">
-      Pending
-      <ion-badge class="count-badge">{{ ilsPending.length }}</ion-badge>
+      Not ready
+      <ion-badge class="count-badge">{{ ilsNotReady.length }}</ion-badge>
     </div>
 
     <ion-list lines="full" class="full-list">
-      <ion-item button *ngFor="let h of ilsPending; trackBy: trackByHold" (click)="openHold(h)">
+      <ion-item button *ngFor="let h of ilsNotReady; trackBy: trackByHold" (click)="openHold(h)">
         <ion-thumbnail slot="start" *ngIf="h.coverUrl">
           <img [src]="h.coverUrl" alt="" />
         </ion-thumbnail>

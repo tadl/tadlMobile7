@@ -533,8 +533,8 @@ export class ItemDetailComponent implements OnInit {
     const h: any = this.hold;
     if (!h) return '';
     const raw = (h?.statusMessage ?? h?.status ?? '').toString().trim();
-    if (raw) return raw;
-    return this.holdIsFrozen() ? 'Frozen' : 'Active';
+    if (raw && /ready/i.test(raw)) return raw;
+    return this.holdIsFrozen() ? 'Suspended' : 'Active';
   }
 
   holdPickupText(): string {
@@ -568,7 +568,7 @@ export class ItemDetailComponent implements OnInit {
       .subscribe({
         next: (res) => {
           if (!res?.success) {
-            this.toast.presentToast(res?.message || 'Could not suspend hold.');
+            this.toast.presentToast('Could not suspend hold.');
             return;
           }
 
@@ -576,9 +576,9 @@ export class ItemDetailComponent implements OnInit {
 
           // optimistic UI update
           (this.hold as any).frozen = true;
-          (this.hold as any).statusMessage = 'Frozen';
+          (this.hold as any).statusMessage = 'Suspended';
 
-          this.toast.presentToast(res?.message || 'Hold suspended.');
+          this.toast.presentToast('Hold suspended.');
 
           // authoritative refresh (ensures pickup/status/etc stays correct)
           this.refreshHoldForThisItem();
@@ -597,7 +597,7 @@ export class ItemDetailComponent implements OnInit {
       .subscribe({
         next: (res) => {
           if (!res?.success) {
-            this.toast.presentToast(res?.message || 'Could not activate hold.');
+            this.toast.presentToast('Could not activate hold.');
             return;
           }
 
@@ -607,7 +607,7 @@ export class ItemDetailComponent implements OnInit {
           (this.hold as any).frozen = false;
           (this.hold as any).statusMessage = 'Active';
 
-          this.toast.presentToast(res?.message || 'Hold activated.');
+          this.toast.presentToast('Hold activated.');
 
           // authoritative refresh
           this.refreshHoldForThisItem();

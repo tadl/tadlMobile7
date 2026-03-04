@@ -1,0 +1,165 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/home"></ion-back-button>
+    </ion-buttons>
+
+    <ion-title>Account</ion-title>
+
+    <ion-buttons slot="end">
+      <ion-menu-button menu="main"></ion-menu-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+<ng-container *ngIf="auth.authState() | async as s">
+  <ng-container *ngIf="!s.isLoggedIn; else loggedInMenu">
+    <ion-item *ngIf="storedAccounts.length > 0" lines="none" class="stored-accounts-header">
+      <ion-label class="section-title">Stored Accounts</ion-label>
+    </ion-item>
+
+    <ion-list *ngIf="storedAccounts.length > 0" lines="full" class="full-list">
+      <ion-item
+        button
+        *ngFor="let a of storedAccounts"
+        (click)="tapStoredAccount(a)"
+      >
+        <ion-label class="ion-text-wrap">
+          <div class="acct-title">{{ accountLabel(a) }}</div>
+          <ion-note>{{ a.username }}</ion-note>
+        </ion-label>
+
+        <ion-badge *ngIf="s.isLoggedIn && s.activeAccountId === a.id" slot="end">
+          Active
+        </ion-badge>
+      </ion-item>
+    </ion-list>
+
+    <div class="section-header">
+      <div class="section-title">Log in</div>
+    </div>
+
+    <ion-list lines="full" class="full-list">
+      <ion-item>
+        <ion-label position="stacked">Library card / username</ion-label>
+        <ion-input
+          [(ngModel)]="username"
+          autocomplete="off"
+          autocapitalize="off"
+          autocorrect="off"
+          spellcheck="false"
+        ></ion-input>
+      </ion-item>
+
+      <ion-item>
+        <ion-label position="stacked">PIN / password</ion-label>
+        <ion-input
+          [(ngModel)]="password"
+          type="password"
+          autocomplete="off"
+          autocapitalize="off"
+          autocorrect="off"
+          spellcheck="false"
+        ></ion-input>
+      </ion-item>
+    </ion-list>
+
+    <div class="actions">
+      <ion-button expand="block" (click)="submitLogin()">Log In</ion-button>
+      <ion-button expand="block" fill="clear" (click)="troubleLoggingIn()">Trouble logging in?</ion-button>
+    </div>
+  </ng-container>
+
+  <!-- LOGGED IN NORMAL MENU -->
+  <ng-template #loggedInMenu>
+    <div class="section-header">
+      <div class="logged-in-as">Logged in as</div>
+      <div class="logged-in-name">{{ loggedInNameUpper(s.profile) }}</div>
+    </div>
+
+    <ng-container *ngIf="patron.badgesFromProfile(s.profile) as b">
+      <ion-list lines="full" class="full-list">
+        <ion-item
+          button
+          (click)="goCheckouts()"
+        >
+          <ion-label class="ion-text-wrap">
+            <div>Checkouts</div>
+            <ion-note *ngIf="overdueCount(s.profile) > 0" class="menu-subnote">
+              {{ overdueCount(s.profile) }} overdue
+            </ion-note>
+          </ion-label>
+          <ion-badge
+            slot="end"
+            [color]="b.checkouts === 0 ? 'medium' : undefined"
+          >
+            {{ b.checkouts }}
+          </ion-badge>
+        </ion-item>
+
+        <ion-item
+          button
+          (click)="goHolds()"
+        >
+          <ion-label class="ion-text-wrap">
+            <div>Holds</div>
+            <ion-note *ngIf="b.ready > 0" class="menu-subnote">
+              {{ b.ready }} ready for pickup
+            </ion-note>
+          </ion-label>
+          <ion-badge
+            slot="end"
+            [color]="b.holds === 0 ? 'medium' : undefined"
+          >
+            {{ b.holds }}
+          </ion-badge>
+        </ion-item>
+
+        <ion-item
+          button
+          (click)="goFines()"
+        >
+          <ion-label>Fines</ion-label>
+          <ion-note slot="end" class="menu-value">
+            {{ b.finesText || ('$' + (b.finesVal | number:'1.2-2')) }}
+          </ion-note>
+        </ion-item>
+
+        <ion-item button (click)="goMyLists()">
+          <ion-label>My Lists</ion-label>
+          <ion-badge slot="end" [color]="myListsCount === 0 ? 'medium' : undefined">
+            {{ myListsCount }}
+          </ion-badge>
+        </ion-item>
+
+        <ion-item button (click)="goHistory()">
+          <ion-label>Checkout History</ion-label>
+        </ion-item>
+
+        <ion-item button (click)="goPrefs()">
+          <ion-label>Account Preferences</ion-label>
+        </ion-item>
+      </ion-list>
+    </ng-container>
+
+    <div class="actions">
+      <ion-button expand="block" (click)="showCard()">Your Library Card</ion-button>
+      <ion-button expand="block" color="medium" (click)="showLogoutActions()">Logout</ion-button>
+      <ion-button expand="block" fill="clear" (click)="openSwitchUserModal()">Switch User</ion-button>
+    </div>
+  </ng-template>
+
+  <div class="theme-section">
+    <div class="theme-label">Theme</div>
+    <ion-segment [value]="themeMode()" (ionChange)="onThemeChange($event)">
+      <ion-segment-button value="light">
+        <ion-label>Light</ion-label>
+      </ion-segment-button>
+      <ion-segment-button value="dark">
+        <ion-label>Dark</ion-label>
+      </ion-segment-button>
+    </ion-segment>
+  </div>
+</ng-container>
+</ion-content>

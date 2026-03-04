@@ -1,15 +1,11 @@
 <ion-header>
   <ion-toolbar>
-    <ion-buttons slot="start">
-      <ion-menu-button menu="main"></ion-menu-button>
-    </ion-buttons>
+    <ion-buttons slot="start"></ion-buttons>
 
     <ion-title>TADL Mobile</ion-title>
 
     <ion-buttons slot="end">
-      <ion-button aria-label="Open account menu" (click)="globals.open_account_menu()">
-        <ion-icon name="person-circle" slot="icon-only"></ion-icon>
-      </ion-button>
+      <ion-menu-button menu="main"></ion-menu-button>
     </ion-buttons>
   </ion-toolbar>
 </ion-header>
@@ -74,57 +70,53 @@
 
   <ng-container *ngIf="auth.authState() | async as s">
     <ng-container *ngIf="patron.badgesFromProfile(s.profile) as b">
-      <ion-card *ngIf="s.isLoggedIn && showAccountShortcuts(s.profile)" class="home-section-card">
-        <ion-card-header>
-          <ion-card-title>Your Account</ion-card-title>
-        </ion-card-header>
-        <ion-list lines="full" class="home-account-list">
-          <ion-item *ngIf="b.holds > 0" button routerLink="/holds">
-            <ion-icon name="bookmark-outline" slot="start"></ion-icon>
-            <ion-label>Holds</ion-label>
-            <ion-badge slot="end">{{ b.holds }}</ion-badge>
-          </ion-item>
+      <ion-card class="home-section-card">
+        <div class="home-section-header">
+          <div class="home-section-title">Your Account</div>
+          <ion-button *ngIf="s.isLoggedIn" size="small" (click)="showCard()">View card</ion-button>
+        </div>
+        <ng-container *ngIf="!s.isLoggedIn; else loggedInAccountLinks">
+          <div class="home-account-login">
+            <ion-button expand="block" routerLink="/account">
+              Log in
+            </ion-button>
+          </div>
+        </ng-container>
 
-          <ion-item *ngIf="b.checkouts > 0" button routerLink="/checkouts">
-            <ion-icon name="albums-outline" slot="start"></ion-icon>
-            <ion-label>Checkouts</ion-label>
-            <ion-badge slot="end">{{ b.checkouts }}</ion-badge>
-          </ion-item>
+        <ng-template #loggedInAccountLinks>
+          <ion-list lines="full" class="home-account-list">
+            <ng-container *ngIf="s.isLoggedIn">
+              <ion-item button routerLink="/account">
+                <ion-icon name="person-circle-outline" slot="start"></ion-icon>
+                <ion-label>Account</ion-label>
+              </ion-item>
 
-          <ion-item *ngIf="b.finesVal > 0" button routerLink="/fines">
-            <ion-icon name="card-outline" slot="start"></ion-icon>
-            <ion-label>Fines</ion-label>
-            <ion-note slot="end">{{ b.finesText || ('$' + (b.finesVal | number:'1.2-2')) }}</ion-note>
-          </ion-item>
-        </ion-list>
+              <ion-item *ngIf="b.holds > 0" button routerLink="/holds">
+                <ion-icon name="bookmark-outline" slot="start"></ion-icon>
+                <ion-label>Holds</ion-label>
+                <ion-badge slot="end">{{ b.holds }}</ion-badge>
+              </ion-item>
+
+              <ion-item *ngIf="b.checkouts > 0" button routerLink="/checkouts">
+                <ion-icon name="albums-outline" slot="start"></ion-icon>
+                <ion-label>Checkouts</ion-label>
+                <ion-badge slot="end">{{ b.checkouts }}</ion-badge>
+              </ion-item>
+
+              <ion-item *ngIf="b.finesVal > 0" button routerLink="/fines">
+                <ion-icon name="card-outline" slot="start"></ion-icon>
+                <ion-label>Fines</ion-label>
+                <ion-note slot="end">{{ b.finesText || ('$' + (b.finesVal | number:'1.2-2')) }}</ion-note>
+              </ion-item>
+            </ng-container>
+          </ion-list>
+        </ng-template>
+
+        <div *ngIf="s.isLoggedIn" class="home-account-actions">
+          <ion-button expand="block" color="medium" (click)="showLogoutActions()">Logout</ion-button>
+          <ion-button expand="block" fill="clear" (click)="showSwitchUser()">Switch User</ion-button>
+        </div>
       </ion-card>
     </ng-container>
   </ng-container>
-
-  <ion-card class="home-section-card">
-    <ion-card-header>
-      <ion-card-title>Explore</ion-card-title>
-    </ion-card-header>
-    <ion-list lines="full" class="home-explore-list">
-      <ion-item button routerLink="/events">
-        <ion-icon name="calendar" slot="start"></ion-icon>
-        <ion-label>Events</ion-label>
-      </ion-item>
-
-      <ion-item button routerLink="/news">
-        <ion-icon name="megaphone" slot="start"></ion-icon>
-        <ion-label>News</ion-label>
-      </ion-item>
-
-      <ion-item button routerLink="/locations">
-        <ion-icon name="compass" slot="start"></ion-icon>
-        <ion-label>Locations</ion-label>
-      </ion-item>
-
-      <ion-item button routerLink="/featured">
-        <ion-icon name="star" slot="start"></ion-icon>
-        <ion-label>Featured</ion-label>
-      </ion-item>
-    </ion-list>
-  </ion-card>
 </ion-content>

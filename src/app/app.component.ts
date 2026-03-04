@@ -10,7 +10,6 @@ import { Router } from '@angular/router';
 
 import { Globals } from './globals';
 import { AuthService } from './services/auth.service';
-import { AccountMenuComponent } from './components/account-menu/account-menu.component';
 import { LoadingService } from './services/loading.service';
 import { CacheWarmService } from './services/cache-warm.service';
 
@@ -23,12 +22,12 @@ import { CacheWarmService } from './services/cache-warm.service';
     CommonModule,
     RouterModule,
     IonicModule,
-    AccountMenuComponent,
   ],
 })
 export class AppComponent implements OnInit {
   public appPages: Array<{ title: string; url: string; icon: string }> = [
     { title: 'Home', url: '/home', icon: 'home' },
+    { title: 'Account', url: '/account', icon: 'person-circle' },
     { title: 'Search', url: '/search', icon: 'search' },
     { title: 'Locations', url: '/locations', icon: 'compass' },
     { title: 'Events', url: '/events', icon: 'calendar' },
@@ -115,12 +114,4 @@ export class AppComponent implements OnInit {
     }
   }
 
-  // Called by (ionDidOpen) on the account menu in app.component.html
-  accountMenuDidOpen() {
-    // Update counts/badges whenever the user opens the account menu.
-    this.auth.refreshActiveProfile().subscribe({
-      next: () => {},
-      error: (err) => console.warn('[Auth] refreshActiveProfile failed', err),
-    });
-  }
 }

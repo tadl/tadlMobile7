@@ -31,8 +31,8 @@ export class Globals {
   ) {}
 
   // ---- app identity / toggles ----
-  public app_version: string = '7.0.2';
-  public update_version: string = '20260303';
+  public app_version: string = '7.0.3';
+  public update_version: string = '20260304';
   public build_num: string = '00';
 
   public device_info: any;

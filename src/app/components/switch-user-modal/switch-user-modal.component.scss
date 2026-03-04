@@ -1,0 +1,47 @@
+:host {
+  display: block;
+}
+
+.full-list {
+  margin: 0;
+  padding: 0;
+}
+
+.section-header {
+  padding: 12px 16px 6px 16px;
+}
+
+.stored-accounts-header {
+  --padding-start: 16px;
+  --inner-padding-end: 16px;
+  --min-height: 52px;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 700;
+  opacity: 0.98;
+}
+
+.stored-accounts-header .section-title {
+  font-size: 18px;
+}
+
+.acct-title {
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+ion-note {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.actions {
+  padding: 12px 16px 18px 16px;
+}
+
+.actions ion-button {
+  margin-top: 10px;
+}

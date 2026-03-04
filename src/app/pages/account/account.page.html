@@ -14,21 +14,9 @@
 
 <ion-content>
 <ng-container *ngIf="auth.authState() | async as s">
-  <!-- SWITCH USER (works both logged-out and logged-in) -->
-  <ng-container *ngIf="!s.isLoggedIn || showSwitchUser; else loggedInMenu">
-    <ion-item lines="none" class="stored-accounts-header">
+  <ng-container *ngIf="!s.isLoggedIn; else loggedInMenu">
+    <ion-item *ngIf="storedAccounts.length > 0" lines="none" class="stored-accounts-header">
       <ion-label class="section-title">Stored Accounts</ion-label>
-      <ion-button
-        *ngIf="s.isLoggedIn"
-        slot="end"
-        fill="outline"
-        color="medium"
-        size="small"
-        class="section-action"
-        (click)="closeSwitchUser()"
-      >
-        DONE
-      </ion-button>
     </ion-item>
 
     <ion-list *ngIf="storedAccounts.length > 0" lines="full" class="full-list">
@@ -96,7 +84,12 @@
           button
           (click)="goCheckouts()"
         >
-          <ion-label>Checkouts</ion-label>
+          <ion-label class="ion-text-wrap">
+            <div>Checkouts</div>
+            <ion-note *ngIf="overdueCount(s.profile) > 0" class="menu-subnote">
+              {{ overdueCount(s.profile) }} overdue
+            </ion-note>
+          </ion-label>
           <ion-badge
             slot="end"
             [color]="b.checkouts === 0 ? 'medium' : undefined"
@@ -153,7 +146,7 @@
     <div class="actions">
       <ion-button expand="block" (click)="showCard()">Your Library Card</ion-button>
       <ion-button expand="block" color="medium" (click)="showLogoutActions()">Logout</ion-button>
-      <ion-button expand="block" fill="clear" (click)="toggleSwitchUser()">Switch User</ion-button>
+      <ion-button expand="block" fill="clear" (click)="openSwitchUserModal()">Switch User</ion-button>
     </div>
   </ng-template>
 

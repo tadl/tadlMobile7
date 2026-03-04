@@ -1,12 +1,14 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { IonicModule, ModalController } from '@ionic/angular';
+import { IonicModule, ModalController, ActionSheetController } from '@ionic/angular';
 import { RouterModule } from '@angular/router';
 import { Globals } from '../../globals';
 import { AuthState, AuthService } from '../../services/auth.service';
 import { PatronService } from '../../services/patron.service';
 import { ToastService } from '../../services/toast.service';
 import { ShowCardModalComponent } from '../../components/show-card-modal/show-card-modal.component';
+import { AccountStoreService } from '../../services/account-store.service';
+import { SwitchUserModalComponent } from '../../components/switch-user-modal/switch-user-modal.component';
 
 @Component({
   standalone: true,
@@ -21,7 +23,9 @@ export class HomePage {
     public auth: AuthService,
     public patron: PatronService,
     private modal: ModalController,
+    private actionSheet: ActionSheetController,
     private toast: ToastService,
+    private accounts: AccountStoreService,
   ) {}
 
   isDarkMode(): boolean {
@@ -57,8 +61,7 @@ export class HomePage {
   }
 
   showAccountShortcuts(profile: any): boolean {
-    const b = this.patron.badgesFromProfile(profile);
-    return b.checkouts > 0 || b.holds > 0 || b.finesVal > 0;
+    return !!this.auth.snapshot()?.isLoggedIn;
   }
 
   async showCard() {
@@ -76,5 +79,52 @@ export class HomePage {
     });
     this.globals.modal_open = true;
     await m.present();
+  }
+
+  async showSwitchUser() {
+    const m = await this.modal.create({
+      component: SwitchUserModalComponent,
+    });
+    this.globals.modal_open = true;
+    await m.present();
+  }
+
+  async showLogoutActions() {
+    const snap = this.auth.snapshot();
+    const activeId = snap.activeAccountId;
+
+    const sheet = await this.actionSheet.create({
+      header: 'Logout',
+      buttons: [
+        {
+          text: 'Logout',
+          role: 'destructive',
+          handler: () => {
+            this.auth.logout().subscribe({
+              next: () => this.toast.presentToast('Logged out.'),
+              error: () => this.toast.presentToast('Logout failed.'),
+            });
+          },
+        },
+        {
+          text: 'Logout and remove saved account',
+          role: 'destructive',
+          handler: () => {
+            this.auth.logout().subscribe({
+              next: async () => {
+                try {
+                  if (activeId) await this.accounts.removeAccount(activeId);
+                } catch {}
+                this.toast.presentToast('Logged out and removed saved account.');
+              },
+              error: () => this.toast.presentToast('Logout failed.'),
+            });
+          },
+        },
+        { text: 'Cancel', role: 'cancel' },
+      ],
+    });
+
+    await sheet.present();
   }
 }

@@ -3,7 +3,6 @@ import { CommonModule } from '@angular/common';
 import { IonicModule, ActionSheetController, ModalController } from '@ionic/angular';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { filter } from 'rxjs';
 
 import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
@@ -11,7 +10,7 @@ import { AuthService } from '../../services/auth.service';
 import { AccountStoreService, StoredAccountMeta } from '../../services/account-store.service';
 import { PatronService } from '../../services/patron.service';
 import { ShowCardModalComponent } from '../../components/show-card-modal/show-card-modal.component';
-import { ListsService } from '../../services/lists.service';
+import { SwitchUserModalComponent } from '../../components/switch-user-modal/switch-user-modal.component';
 
 @Component({
   standalone: true,
@@ -28,9 +27,6 @@ export class AccountPage implements OnInit {
   storedAccounts: StoredAccountMeta[] = [];
   loadingAccounts = false;
 
-  // when true, show "stored accounts + login form" while still logged in
-  showSwitchUser = false;
-
   constructor(
     public globals: Globals,
     public auth: AuthService,
@@ -40,17 +36,14 @@ export class AccountPage implements OnInit {
     private toast: ToastService,
     private actionSheet: ActionSheetController,
     private modal: ModalController,
-    private lists: ListsService,
   ) {}
 
   ngOnInit() {
     this.refreshStoredAccounts();
-    this.auth.authState()
-      .pipe(filter((s) => !!s?.isLoggedIn))
-      .subscribe(() => {
-        this.refreshMyListsCount();
-      });
     this.refreshMyListsCount();
+    this.auth.authState().subscribe((s) => {
+      this.myListsCount = this.listCountFromProfile(s?.profile);
+    });
   }
 
   refreshStoredAccounts() {
@@ -80,22 +73,16 @@ export class AccountPage implements OnInit {
     return this.loggedInName(profile).toUpperCase();
   }
 
+  overdueCount(profile: any): number {
+    const n = Number(profile?.numOverdue ?? 0);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  }
+
   // Small label for list (keep it compact)
   accountLabel(a: StoredAccountMeta): string {
     // if stored meta label exists, use it; otherwise fall back
     const label = (a?.label ?? '').toString().trim();
     return label || a.username || 'Account';
-  }
-
-  toggleSwitchUser() {
-    this.showSwitchUser = !this.showSwitchUser;
-    if (this.showSwitchUser) this.refreshStoredAccounts();
-  }
-
-  // “Cancel” by selecting the active account in the list
-  closeSwitchUser() {
-    this.showSwitchUser = false;
-    this.password = '';
   }
 
   troubleLoggingIn() {
@@ -115,7 +102,6 @@ export class AccountPage implements OnInit {
       next: () => {
         this.password = '';
         this.username = '';
-        this.showSwitchUser = false;
         this.refreshStoredAccounts();
       },
       error: (e) => {
@@ -129,15 +115,13 @@ export class AccountPage implements OnInit {
   tapStoredAccount(acct: StoredAccountMeta) {
     const snap = this.auth.snapshot();
 
-    // If they tap the currently active account, that’s the “cancel”
+    // If they tap the currently active account, there is nothing to switch.
     if (snap.isLoggedIn && snap.activeAccountId === acct.id) {
-      this.closeSwitchUser();
       return;
     }
 
     this.auth.switchAccount(acct.id).subscribe({
       next: () => {
-        this.showSwitchUser = false;
         this.refreshStoredAccounts();
       },
       error: (e) => {
@@ -165,7 +149,6 @@ export class AccountPage implements OnInit {
             this.auth.logout().subscribe({
               next: () => {
                 this.toast.presentToast('Logged out.');
-                this.showSwitchUser = false;
               },
               error: () => this.toast.presentToast('Logout failed.'),
             });
@@ -184,7 +167,6 @@ export class AccountPage implements OnInit {
                   // ignore, but we can warn later if you want
                 }
                 this.toast.presentToast('Logged out and removed saved account.');
-                this.showSwitchUser = false;
                 this.refreshStoredAccounts();
               },
               error: () => this.toast.presentToast('Logout failed.'),
@@ -213,6 +195,14 @@ export class AccountPage implements OnInit {
     const m = await this.modal.create({
       component: ShowCardModalComponent,
       componentProps: { barcode, melcatId },
+    });
+    this.globals.modal_open = true;
+    await m.present();
+  }
+
+  async openSwitchUserModal() {
+    const m = await this.modal.create({
+      component: SwitchUserModalComponent,
     });
     this.globals.modal_open = true;
     await m.present();
@@ -247,23 +237,15 @@ export class AccountPage implements OnInit {
   }
 
   private refreshMyListsCount() {
-    const snap = this.auth.snapshot();
-    if (!snap?.isLoggedIn || !snap?.activeAccountId) {
-      this.myListsCount = 0;
-      return;
-    }
-
-    this.lists.fetchUserLists().subscribe({
-      next: (list) => {
-        this.myListsCount = Array.isArray(list) ? list.length : 0;
-      },
-      error: () => {
-        // Keep previous value; this is a non-blocking badge enhancement.
-      },
-    });
+    this.myListsCount = this.listCountFromProfile(this.auth.snapshot()?.profile);
   }
 
   private goAccountPage(url: string) {
     this.router.navigateByUrl(url);
+  }
+
+  private listCountFromProfile(profile: any): number {
+    const n = Number(profile?.numLists ?? 0);
+    return Number.isFinite(n) && n > 0 ? n : 0;
   }
 }

@@ -45,6 +45,10 @@
   margin-top: 0;
 }
 
+.home-section-card {
+  margin-top: 0;
+}
+
 .search-card-content {
   padding-top: 14px;
   padding-bottom: 14px;
@@ -84,4 +88,32 @@
   white-space: nowrap;
   text-align: center;
   flex: 1;
+}
+
+.home-account-list {
+  margin: 0;
+  background: transparent;
+}
+
+.home-account-list ion-item {
+  --padding-start: 16px;
+  --inner-padding-end: 16px;
+  --min-height: 46px;
+}
+
+.home-account-list ion-note {
+  color: var(--ion-text-color);
+  font-weight: 600;
+  opacity: 1;
+}
+
+.home-explore-list {
+  margin: 0;
+  background: transparent;
+}
+
+.home-explore-list ion-item {
+  --padding-start: 16px;
+  --inner-padding-end: 16px;
+  --min-height: 46px;
 }

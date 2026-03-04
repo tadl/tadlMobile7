@@ -51,4 +51,9 @@ export class HomePage {
     if (!parts.length) return 'You have no items checked out or on hold.';
     return `You have ${parts.join(', ')}.`;
   }
+
+  showAccountShortcuts(profile: any): boolean {
+    const b = this.patron.badgesFromProfile(profile);
+    return b.checkouts > 0 || b.holds > 0 || b.finesVal > 0;
+  }
 }

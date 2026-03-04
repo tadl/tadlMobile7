@@ -43,6 +43,9 @@ import {
   trashOutline,
   ellipsisVertical,
   navigateOutline,
+  personCircleOutline,
+  bookmarkOutline,
+  albumsOutline,
 } from 'ionicons/icons';
 
 import { routes } from './app/app.routes';
@@ -73,6 +76,9 @@ addIcons({
   'trash-outline': trashOutline,
   'ellipsis-vertical': ellipsisVertical,
   'navigate-outline': navigateOutline,
+  'person-circle-outline': personCircleOutline,
+  'bookmark-outline': bookmarkOutline,
+  'albums-outline': albumsOutline,
 });
 
 bootstrapApplication(AppComponent, {

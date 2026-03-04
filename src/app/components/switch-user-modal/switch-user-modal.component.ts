@@ -27,7 +27,7 @@ export class SwitchUserModalComponent implements OnInit {
     public auth: AuthService,
     private accounts: AccountStoreService,
     private toast: ToastService,
-    private modal: ModalController,
+    private modalCtrl: ModalController,
   ) {}
 
   ngOnInit() {
@@ -35,7 +35,7 @@ export class SwitchUserModalComponent implements OnInit {
   }
 
   close() {
-    void this.modal.dismiss();
+    void this.modalCtrl.dismiss();
     this.globals.modal_open = false;
   }
 

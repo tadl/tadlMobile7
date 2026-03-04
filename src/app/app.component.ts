@@ -41,6 +41,8 @@ export class AppComponent implements OnInit {
   isLoading$: Observable<boolean>;
   private lastWarmedAccountId: string | null = null;
   private lastResumeRefreshAt = 0;
+  private splashHidden = false;
+  private readonly appBootStartedAt = Date.now();
 
   constructor(
     public globals: Globals,
@@ -130,7 +132,16 @@ export class AppComponent implements OnInit {
   }
 
   private hideLaunchSplash() {
-    SplashScreen.hide().catch(() => {});
+    if (this.splashHidden) return;
+    const minVisibleMs = 900;
+    const elapsed = Date.now() - this.appBootStartedAt;
+    const remaining = Math.max(0, minVisibleMs - elapsed);
+
+    window.setTimeout(() => {
+      if (this.splashHidden) return;
+      this.splashHidden = true;
+      SplashScreen.hide().catch(() => {});
+    }, remaining);
   }
 
 }

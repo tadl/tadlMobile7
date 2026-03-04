@@ -138,9 +138,10 @@ export class AccountStoreService {
   // ---------- Cached profile (Preferences) ----------
 
   async cacheProfile(accountId: string, profile: any): Promise<void> {
+    const sanitized = this.sanitizeProfile(profile);
     await Preferences.set({
       key: PREF_PROFILE_CACHE_PREFIX + accountId,
-      value: JSON.stringify(profile ?? {}),
+      value: JSON.stringify(sanitized),
     });
   }
 
@@ -148,7 +149,18 @@ export class AccountStoreService {
     const { value } = await Preferences.get({ key: PREF_PROFILE_CACHE_PREFIX + accountId });
     if (!value) return null;
     try {
-      return JSON.parse(value);
+      const parsed = JSON.parse(value);
+      const sanitized = this.sanitizeProfile(parsed);
+
+      // Backfill sanitized value so any legacy cached sensitive fields are removed at rest.
+      if (JSON.stringify(parsed) !== JSON.stringify(sanitized)) {
+        await Preferences.set({
+          key: PREF_PROFILE_CACHE_PREFIX + accountId,
+          value: JSON.stringify(sanitized),
+        });
+      }
+
+      return sanitized;
     } catch {
       return null;
     }
@@ -169,7 +181,7 @@ export class AccountStoreService {
     const seenIds = new Set<string>();
     const seenUsernames = new Set<string>();
     const duplicateIds: string[] = [];
-    const ordered = [...(accounts ?? [])];
+    const ordered = [...(accounts ?? [])] as Array<StoredAccountMeta & Record<string, any>>;
 
     if (preferredId) {
       ordered.sort((a, b) => {
@@ -194,11 +206,22 @@ export class AccountStoreService {
       }
       seenIds.add(id);
       seenUsernames.add(username);
+      // Migrate any legacy in-index password fields into secure storage and strip them from Preferences.
+      const migratedPassword = this.extractLegacyPassword(account);
+      if (migratedPassword) {
+        const existing = await this.getPassword(id);
+        if (!existing) {
+          await this.setPassword(id, migratedPassword);
+        }
+      }
+
       normalized.push({
-        ...account,
         id,
         username,
         label: (account?.label ?? '').toString(),
+        lastUsedAt: Number.isFinite(Number(account?.lastUsedAt))
+          ? Number(account.lastUsedAt)
+          : undefined,
       });
     }
 
@@ -215,5 +238,44 @@ export class AccountStoreService {
     }
 
     return normalized;
+  }
+
+  private extractLegacyPassword(input: Record<string, any> | null | undefined): string | null {
+    if (!input || typeof input !== 'object') return null;
+    const candidates = ['password', 'cat_password', 'ils_password', 'passwd', 'pwd'];
+    for (const key of candidates) {
+      const raw = input[key];
+      const value = (raw ?? '').toString().trim();
+      if (value) return value;
+    }
+    return null;
+  }
+
+  private sanitizeProfile(profile: any): any {
+    return this.deepStripSensitiveFields(profile);
+  }
+
+  private deepStripSensitiveFields(value: any): any {
+    if (Array.isArray(value)) {
+      return value.map((item) => this.deepStripSensitiveFields(item));
+    }
+
+    if (!value || typeof value !== 'object') {
+      return value;
+    }
+
+    const out: Record<string, any> = {};
+    for (const [key, v] of Object.entries(value)) {
+      const normalized = key.toLowerCase();
+      if (
+        normalized.includes('password') ||
+        normalized === 'pwd' ||
+        normalized === 'passwd'
+      ) {
+        continue;
+      }
+      out[key] = this.deepStripSensitiveFields(v);
+    }
+    return out;
   }
 }

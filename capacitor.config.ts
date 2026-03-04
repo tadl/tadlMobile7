@@ -11,7 +11,14 @@ const resolvedAppId =
 const config: CapacitorConfig = {
   appId: resolvedAppId,
   appName: 'TADL',
-  webDir: 'www'
+  webDir: 'www',
+  plugins: {
+    SplashScreen: {
+      launchAutoHide: false,
+      // Keep native splash visible until app explicitly hides after first navigation.
+      launchShowDuration: 0,
+    },
+  },
 };
 
 export default config;

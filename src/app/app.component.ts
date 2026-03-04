@@ -4,9 +4,10 @@ import { RouterModule } from '@angular/router';
 import { IonicModule } from '@ionic/angular';
 import { Platform } from '@ionic/angular/standalone';
 import { App } from '@capacitor/app';
+import { SplashScreen } from '@capacitor/splash-screen';
 import { fromEvent, Observable } from 'rxjs';
-import { distinctUntilChanged } from 'rxjs/operators';
-import { Router } from '@angular/router';
+import { distinctUntilChanged, filter, take } from 'rxjs/operators';
+import { NavigationEnd, Router } from '@angular/router';
 
 import { Globals } from './globals';
 import { AuthService } from './services/auth.service';
@@ -69,6 +70,8 @@ export class AppComponent implements OnInit {
       fromEvent(document, 'didDismiss').subscribe(() => {
         this.globals.modal_open = false;
       });
+
+      this.whenInitialNavigationReady();
     });
   }
 
@@ -112,6 +115,22 @@ export class AppComponent implements OnInit {
     if (path === '/' || path.startsWith('/home')) {
       this.cacheWarm.warmForActiveAccount();
     }
+  }
+
+  private whenInitialNavigationReady() {
+    this.router.events
+      .pipe(
+        filter((e): e is NavigationEnd => e instanceof NavigationEnd),
+        take(1),
+      )
+      .subscribe(() => this.hideLaunchSplash());
+
+    // Fallback: don't block forever if navigation events are delayed unexpectedly.
+    window.setTimeout(() => this.hideLaunchSplash(), 3500);
+  }
+
+  private hideLaunchSplash() {
+    SplashScreen.hide().catch(() => {});
   }
 
 }

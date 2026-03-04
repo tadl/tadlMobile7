@@ -76,7 +76,6 @@ export class AppComponent implements OnInit {
     this.auth.restore().subscribe({
       next: (s) => {
         if (!s?.isLoggedIn || !s?.activeAccountId) return;
-        this.auth.refreshActiveProfile().subscribe({ error: () => {} });
       },
       error: (err) => console.warn('[Auth] restore failed', err),
     });

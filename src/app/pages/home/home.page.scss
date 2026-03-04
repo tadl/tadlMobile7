@@ -126,10 +126,21 @@
   --min-height: 46px;
 }
 
-.home-account-list ion-note {
+.home-account-list ion-note[slot='end'] {
   color: var(--ion-text-color);
   font-weight: 600;
   opacity: 1;
+}
+
+.menu-row-title {
+  font-size: 1rem;
+  line-height: 1.25;
+  font-weight: 500;
+}
+
+.menu-subnote {
+  display: block;
+  margin-top: 2px;
 }
 
 .home-account-login {

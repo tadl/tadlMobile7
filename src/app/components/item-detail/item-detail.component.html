@@ -76,7 +76,7 @@
       <div class="hold-line" *ngIf="holdPickupText()">{{ holdPickupText() }}</div>
       <div class="hold-line" *ngIf="holdStatusText()">
         Status:
-        <span class="hold-status" [class.frozen]="holdIsFrozen()" [class.active]="!holdIsFrozen()">
+        <span class="hold-status" [ngClass]="holdStatusClass()">
           {{ holdStatusText() }}
         </span>
       </div>

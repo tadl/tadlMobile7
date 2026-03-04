@@ -149,6 +149,17 @@ export class HoldsPage {
     }
   }
 
+  holdStatusClass(h: AspenHold): string {
+    switch (this.holdDisplayState(h)) {
+      case 'ready':
+        return 'status-ready';
+      case 'frozen':
+        return 'status-suspended';
+      default:
+        return 'status-active';
+    }
+  }
+
   holdIsFrozen(h: AspenHold): boolean {
     return this.holdDisplayState(h) === 'frozen';
   }

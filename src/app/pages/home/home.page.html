@@ -93,13 +93,23 @@
 
               <ion-item *ngIf="b.holds > 0" button routerLink="/holds">
                 <ion-icon name="bookmark-outline" slot="start"></ion-icon>
-                <ion-label>Holds</ion-label>
+                <ion-label class="ion-text-wrap">
+                  <div class="menu-row-title">Holds</div>
+                  <ion-note *ngIf="b.ready > 0" class="menu-subnote">
+                    {{ b.ready }} ready for pickup
+                  </ion-note>
+                </ion-label>
                 <ion-badge slot="end">{{ b.holds }}</ion-badge>
               </ion-item>
 
               <ion-item *ngIf="b.checkouts > 0" button routerLink="/checkouts">
                 <ion-icon name="albums-outline" slot="start"></ion-icon>
-                <ion-label>Checkouts</ion-label>
+                <ion-label class="ion-text-wrap">
+                  <div class="menu-row-title">Checkouts</div>
+                  <ion-note *ngIf="overdueCount(s.profile) > 0" class="menu-subnote">
+                    {{ overdueCount(s.profile) }} overdue
+                  </ion-note>
+                </ion-label>
                 <ion-badge slot="end">{{ b.checkouts }}</ion-badge>
               </ion-item>
 

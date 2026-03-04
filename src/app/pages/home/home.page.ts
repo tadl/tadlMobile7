@@ -60,6 +60,11 @@ export class HomePage {
     return `You have ${parts.join(', ')}.`;
   }
 
+  overdueCount(profile: any): number {
+    const n = Number(profile?.numOverdue ?? 0);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  }
+
   showAccountShortcuts(profile: any): boolean {
     return !!this.auth.snapshot()?.isLoggedIn;
   }

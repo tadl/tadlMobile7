@@ -537,6 +537,13 @@ export class ItemDetailComponent implements OnInit {
     return this.holdIsFrozen() ? 'Suspended' : 'Active';
   }
 
+  holdStatusClass(): string {
+    const txt = this.holdStatusText().toLowerCase();
+    if (txt.includes('ready')) return 'status-ready';
+    if (txt.includes('suspend')) return 'status-suspended';
+    return 'status-active';
+  }
+
   holdPickupText(): string {
     const h: any = this.hold;
     if (!h) return '';

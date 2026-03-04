@@ -24,7 +24,16 @@
 .status {
   display: block;
   margin-top: 6px;
-  opacity: 0.85;
+  opacity: 0.95;
+}
+
+.status-active,
+.status-ready {
+  color: #4c8f5a;
+}
+
+.status-suspended {
+  color: #a14b4b;
 }
 
 .pickup {

@@ -99,12 +99,13 @@
   font-weight: 600;
 }
 
-.hold-status.frozen {
-  color: var(--ion-color-danger);
+.hold-status.status-active,
+.hold-status.status-ready {
+  color: #4c8f5a;
 }
 
-.hold-status.active {
-  color: var(--ion-color-success);
+.hold-status.status-suspended {
+  color: #a14b4b;
 }
 
 .hold-actions {

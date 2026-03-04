@@ -92,7 +92,7 @@ export class FinesPage {
 
   async payFines() {
     if (!this.canPayFines) return;
-    await this.globals.open_external_page(this.globals.fines_payment_url);
+    await this.globals.open_page(this.globals.fines_payment_url);
   }
 
   fineReason(fine: AspenFine): string {

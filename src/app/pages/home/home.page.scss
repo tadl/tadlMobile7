@@ -80,12 +80,22 @@
 }
 
 .home-searchbar {
-  --background: rgba(255, 255, 255, 0.08);
+  --background: #f3f5f8;
   --border-radius: 18px;
   --box-shadow: none;
+  --color: rgba(0, 0, 0, 0.86);
+  --placeholder-color: rgba(0, 0, 0, 0.5);
+  --icon-color: rgba(0, 0, 0, 0.45);
   --placeholder-opacity: 0.8;
   --padding-start: 8px;
   margin: 0;
+}
+
+:host-context(.ion-palette-dark) .home-searchbar {
+  --background: rgba(255, 255, 255, 0.08);
+  --color: rgba(255, 255, 255, 0.92);
+  --placeholder-color: rgba(255, 255, 255, 0.65);
+  --icon-color: rgba(255, 255, 255, 0.6);
 }
 
 .home-search-actions {

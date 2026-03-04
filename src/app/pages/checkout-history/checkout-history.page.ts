@@ -148,10 +148,7 @@ export class CheckoutHistoryPage {
 
   titleText(i: AspenReadingHistoryItem): string {
     const raw = (i?.title ?? '').toString().trim();
-    if (!raw) return 'Untitled';
-    const withoutResponsibility = raw.split(/\s+\/\s+/)[0]?.trim() ?? raw;
-    const withoutSubtitle = withoutResponsibility.split(/\s+:\s+/)[0]?.trim() ?? withoutResponsibility;
-    return withoutSubtitle.replace(/[\s:\/]+$/, '').trim() || raw;
+    return this.normalizeTitle(raw);
   }
 
   authorText(i: AspenReadingHistoryItem): string {
@@ -222,12 +219,25 @@ export class CheckoutHistoryPage {
   }
 
   private normalizeHistoryItems(items: AspenReadingHistoryItem[]): AspenReadingHistoryItem[] {
-    return (items ?? [])
+    const normalized = (items ?? [])
       .filter((i) => !this.isCurrentlyCheckedOut(i))
       .map((i) => {
         const groupedWorkId = (i?.groupedWorkId ?? i?.['permanentId'] ?? i?.['groupedWorkPermanentId'] ?? '').toString().trim();
         return groupedWorkId ? { ...i, groupedWorkId } : i;
       });
+
+    // Aspen can return duplicate transaction rows for the same work with
+    // tiny title metadata differences; collapse those to one visible row.
+    const seen = new Set<string>();
+    const deduped: AspenReadingHistoryItem[] = [];
+    for (const i of normalized) {
+      const key = this.historyDedupeKey(i);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      deduped.push(i);
+    }
+
+    return deduped;
   }
 
   private isCurrentlyCheckedOut(i: AspenReadingHistoryItem): boolean {
@@ -253,6 +263,46 @@ export class CheckoutHistoryPage {
       return Math.floor(n);
     }
 
+    return 0;
+  }
+
+  private normalizeTitle(rawTitle: string): string {
+    const raw = (rawTitle ?? '').toString().trim();
+    if (!raw) return 'Untitled';
+    // Aspen titles are often MARC-ish: "Title : subtitle / responsibility".
+    // Normalize with loose spacing so variants render consistently.
+    const withoutResponsibility = raw.split(/\s*\/\s*/)[0]?.trim() ?? raw;
+    const withoutSubtitle = withoutResponsibility.split(/\s*:\s*/)[0]?.trim() ?? withoutResponsibility;
+    return withoutSubtitle.replace(/[\s:\/]+$/, '').trim() || raw;
+  }
+
+  private historyDedupeKey(i: AspenReadingHistoryItem): string {
+    const workId = (i?.groupedWorkId ?? i?.['permanentId'] ?? i?.['groupedWorkPermanentId'] ?? '').toString().trim();
+    const title = this.normalizeTitle((i?.title ?? '').toString()).toLowerCase();
+    const author = (i?.author ?? '').toString().trim().toLowerCase();
+    const format = (i?.format ?? '').toString().trim().toLowerCase();
+    const checkoutTs = this.pickUnixTimestampFromFields((i as any)?.checkout, (i as any)?.lastCheckout);
+    const checkinTs = this.pickUnixTimestampFromFields((i as any)?.checkin, (i as any)?.lastCheckin);
+
+    // Only collapse true duplicates from Aspen payload noise.
+    // Distinct transactions on the same day should remain distinct rows.
+    return [
+      workId || 'no-work-id',
+      title,
+      author,
+      format,
+      `co:${checkoutTs}`,
+      `ci:${checkinTs}`,
+    ].join('|');
+  }
+
+  private pickUnixTimestampFromFields(...values: any[]): number {
+    for (const c of values) {
+      const n = Number(c);
+      if (!Number.isFinite(n) || n <= 0) continue;
+      if (n > 1_000_000_000_000) return Math.floor(n / 1000);
+      return Math.floor(n);
+    }
     return 0;
   }
 }

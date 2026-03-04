@@ -22,6 +22,9 @@ const SECURE_PASSWORD_PREFIX = 'accounts:password:';   // + accountId
 
 @Injectable({ providedIn: 'root' })
 export class AccountStoreService {
+  private passwordCache = new Map<string, string | null>();
+  private passwordLoads = new Map<string, Promise<string | null>>();
+
   // ---------- Accounts index (Preferences) ----------
 
   async listAccounts(): Promise<StoredAccountMeta[]> {
@@ -94,15 +97,36 @@ export class AccountStoreService {
       key: SECURE_PASSWORD_PREFIX + accountId,
       value: password,
     });
+    this.passwordCache.set(accountId, password);
+    this.passwordLoads.delete(accountId);
   }
 
   async getPassword(accountId: string): Promise<string | null> {
-    try {
-      const res = await SecureStoragePlugin.get({ key: SECURE_PASSWORD_PREFIX + accountId });
-      return res?.value ?? null;
-    } catch {
-      return null;
+    if (!accountId) return null;
+
+    if (this.passwordCache.has(accountId)) {
+      return this.passwordCache.get(accountId) ?? null;
     }
+
+    const existingLoad = this.passwordLoads.get(accountId);
+    if (existingLoad) return existingLoad;
+
+    const load = (async () => {
+      try {
+        const res = await SecureStoragePlugin.get({ key: SECURE_PASSWORD_PREFIX + accountId });
+        const value = res?.value ?? null;
+        this.passwordCache.set(accountId, value);
+        return value;
+      } catch {
+        this.passwordCache.set(accountId, null);
+        return null;
+      } finally {
+        this.passwordLoads.delete(accountId);
+      }
+    })();
+
+    this.passwordLoads.set(accountId, load);
+    return load;
   }
 
   async deletePassword(accountId: string): Promise<void> {
@@ -111,6 +135,29 @@ export class AccountStoreService {
     } catch {
       // ignore
     }
+    this.passwordCache.delete(accountId);
+    this.passwordLoads.delete(accountId);
+  }
+
+  async prewarmPassword(accountId: string): Promise<void> {
+    if (!accountId) return;
+    await this.getPassword(accountId);
+  }
+
+  async prewarmActivePassword(): Promise<void> {
+    const activeId = await this.getActiveAccountId();
+    if (!activeId) return;
+    await this.prewarmPassword(activeId);
+  }
+
+  clearPasswordCache(accountId?: string): void {
+    if (accountId) {
+      this.passwordCache.delete(accountId);
+      this.passwordLoads.delete(accountId);
+      return;
+    }
+    this.passwordCache.clear();
+    this.passwordLoads.clear();
   }
 
   // ---------- Active account ----------
@@ -125,6 +172,7 @@ export class AccountStoreService {
       await Preferences.set({ key: PREF_ACTIVE_ACCOUNT_ID, value: accountId });
     } else {
       await Preferences.remove({ key: PREF_ACTIVE_ACCOUNT_ID });
+      this.clearPasswordCache();
     }
   }
 

@@ -10,6 +10,7 @@ import { Device } from '@capacitor/device';
 import { App } from '@capacitor/app';
 import { AppLauncher } from '@capacitor/app-launcher';
 import { Network } from '@capacitor/network';
+import { Preferences } from '@capacitor/preferences';
 import { format } from 'date-fns';
 
 export interface PickupLocationOption {
@@ -19,6 +20,9 @@ export interface PickupLocationOption {
 
 @Injectable({ providedIn: 'root' })
 export class Globals {
+  private readonly theme_pref_key = 'app:theme_mode';
+  private theme_initialized = false;
+
   constructor(
     private menuController: MenuController,
     private modalController: ModalController,
@@ -33,6 +37,7 @@ export class Globals {
 
   public device_info: any;
   public system_color: any = window.matchMedia('(prefers-color-scheme: dark)');
+  public theme_mode: 'light' | 'dark' = 'light';
 
   public system_short_name: string = 'TADL';
 
@@ -125,6 +130,51 @@ export class Globals {
   private nativeNetworkListenerHandle: { remove: () => Promise<void> } | null = null;
 
   // ---- helpers ----
+  async initThemePreference() {
+    if (this.theme_initialized) {
+      this.applyThemeClass(this.theme_mode);
+      return;
+    }
+
+    let preferred: 'light' | 'dark' | null = null;
+
+    try {
+      const { value } = await Preferences.get({ key: this.theme_pref_key });
+      if (value === 'light' || value === 'dark') preferred = value;
+    } catch {
+      // Fall back to the current system theme when local preferences are unavailable.
+    }
+
+    if (!preferred) {
+      preferred = this.system_color?.matches ? 'dark' : 'light';
+      try {
+        await Preferences.set({ key: this.theme_pref_key, value: preferred });
+      } catch {
+        // Non-fatal; theme still applies for this session.
+      }
+    }
+
+    this.theme_mode = preferred;
+    this.theme_initialized = true;
+    this.applyThemeClass(preferred);
+  }
+
+  isDarkTheme(): boolean {
+    return this.theme_mode === 'dark';
+  }
+
+  async setTheme(mode: 'light' | 'dark') {
+    this.theme_mode = mode === 'dark' ? 'dark' : 'light';
+    this.applyThemeClass(this.theme_mode);
+    this.theme_initialized = true;
+    await Preferences.set({ key: this.theme_pref_key, value: this.theme_mode });
+  }
+
+  private applyThemeClass(mode: 'light' | 'dark') {
+    const root = document.documentElement;
+    root.classList.toggle('ion-palette-dark', mode === 'dark');
+  }
+
   async open_page(url: string) {
     await Browser.open({ url });
   }

@@ -236,6 +236,16 @@ export class AccountMenuComponent implements OnInit {
   }
   goPrefs() { this.goAccountPage('/account-preferences'); }
 
+  themeMode(): 'light' | 'dark' {
+    return this.globals.theme_mode;
+  }
+
+  onThemeChange(ev: CustomEvent) {
+    const value = (ev.detail as { value?: string } | undefined)?.value;
+    if (value !== 'light' && value !== 'dark') return;
+    void this.globals.setTheme(value);
+  }
+
   private refreshMyListsCount() {
     const snap = this.auth.snapshot();
     if (!snap?.isLoggedIn || !snap?.activeAccountId) {

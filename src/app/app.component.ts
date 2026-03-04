@@ -54,6 +54,7 @@ export class AppComponent implements OnInit {
 
     this.platform.ready().then(async () => {
       await this.globals.getDeviceInfo();
+      await this.globals.initThemePreference();
       this.globals.initNetworkStatusTracking();
 
       App.addListener('backButton', ({ canGoBack }) => {

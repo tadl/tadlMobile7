@@ -141,4 +141,16 @@
       <ion-button expand="block" fill="clear" (click)="toggleSwitchUser()">Switch User</ion-button>
     </div>
   </ng-template>
+
+  <div class="theme-section">
+    <div class="theme-label">Theme</div>
+    <ion-segment [value]="themeMode()" (ionChange)="onThemeChange($event)">
+      <ion-segment-button value="light">
+        <ion-label>Light</ion-label>
+      </ion-segment-button>
+      <ion-segment-button value="dark">
+        <ion-label>Dark</ion-label>
+      </ion-segment-button>
+    </ion-segment>
+  </div>
 </ng-container>

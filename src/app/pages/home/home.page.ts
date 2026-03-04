@@ -21,7 +21,7 @@ export class HomePage {
   ) {}
 
   isDarkMode(): boolean {
-    return this.globals.system_color?.matches === true;
+    return this.globals.isDarkTheme();
   }
 
   loggedInUsername(s: AuthState): string {

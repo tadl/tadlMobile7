@@ -8,10 +8,6 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/home/home.page').then(m => m.HomePage),
   },
   {
-    path: 'account',
-    loadComponent: () => import('./pages/account/account.page').then(m => m.AccountPage),
-  },
-  {
     path: 'search',
     loadComponent: () => import('./pages/search/search.page').then(m => m.SearchPage),
   },

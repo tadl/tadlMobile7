@@ -1,5 +1,7 @@
 <ion-header>
   <ion-toolbar>
+    <ion-title>Event Detail</ion-title>
+
     <ion-buttons slot="start" *ngIf="dismissStyle === 'back'">
       <ion-button (click)="dismiss()">
         <ion-icon name="chevron-back-outline" slot="start"></ion-icon>
@@ -7,11 +9,9 @@
       </ion-button>
     </ion-buttons>
 
-    <ion-buttons slot="start" *ngIf="dismissStyle === 'close'">
+    <ion-buttons slot="end" *ngIf="dismissStyle === 'close'">
       <ion-button (click)="dismiss()">Close</ion-button>
     </ion-buttons>
-
-    <ion-title>Event Detail</ion-title>
   </ion-toolbar>
 </ion-header>
 

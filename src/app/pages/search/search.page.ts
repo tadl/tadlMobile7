@@ -84,11 +84,6 @@ export class SearchPage {
   ionViewDidEnter() {
     // allow deep link: /search?lookfor=...
     const q = (this.route.snapshot.queryParamMap.get('lookfor') ?? '').trim();
-    const advanced = this.route.snapshot.queryParamMap.get('advanced');
-    if (advanced === '1' || advanced === 'true') {
-      this.showAdvanced = true;
-    }
-
     if (q && q !== this.lookfor) {
       this.lookfor = q;
       this.runSearch(true);

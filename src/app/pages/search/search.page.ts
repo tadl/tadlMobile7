@@ -96,7 +96,11 @@ export class SearchPage {
 
   async searchMelcat() {
     const q = (this.lookfor ?? '').trim();
-    await this.globals.open_external_page(this.globals.melcatSearchUrl(q));
+    await this.globals.open_page(this.globals.melcatSearchUrl(q));
+  }
+
+  async suggestItem() {
+    await this.globals.open_page(this.globals.suggest_item_url);
   }
 
   clearSearch() {

@@ -55,12 +55,14 @@
         </ion-select>
       </ion-item>
 
-      <ion-item lines="none" class="melcat-row">
-        <ion-label>Search MeLCat</ion-label>
-        <ion-button slot="end" size="small" (click)="searchMelcat()">
+      <div class="advanced-actions">
+        <ion-button expand="block" size="small" (click)="searchMelcat()">
           Search MeLCat
         </ion-button>
-      </ion-item>
+        <ion-button expand="block" size="small" fill="outline" (click)="suggestItem()">
+          Suggest an Item
+        </ion-button>
+      </div>
 
       <ion-item lines="none" class="facet-toggle-row">
         <ion-label>Show search filters</ion-label>

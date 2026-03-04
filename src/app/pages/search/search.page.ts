@@ -94,6 +94,11 @@ export class SearchPage {
     this.runSearch(true);
   }
 
+  async searchMelcat() {
+    const q = (this.lookfor ?? '').trim();
+    await this.globals.open_external_page(this.globals.melcatSearchUrl(q));
+  }
+
   clearSearch() {
     this.lastExecutedQuery = '';
     this.hits = [];

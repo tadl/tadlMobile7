@@ -27,9 +27,9 @@ export class Globals {
   ) {}
 
   // ---- app identity / toggles ----
-  public app_version: string = '7.0.1';
-  public update_version: string = '20260302';
-  public build_num: string = '01';
+  public app_version: string = '7.0.2';
+  public update_version: string = '20260303';
+  public build_num: string = '00';
 
   public device_info: any;
   public system_color: any = window.matchMedia('(prefers-color-scheme: dark)');
@@ -73,6 +73,8 @@ export class Globals {
   // New locations host
   public locations_base: string = 'https://locations.tools.tadl.org';
   public fines_payment_url: string = 'https://pay.catalog.tadl.org/pay';
+  public melcat_base: string = 'https://search.mel.org';
+  public melcat_search_path: string = '/iii/encore/HomePage,queryComponent.searchFormComponent.sdirect';
 
   // Locations APIs
   public locations_group: string = 'tadl';
@@ -84,6 +86,24 @@ export class Globals {
     return `${this.locations_base}/locations.json?shortname=${encodeURIComponent(
       (shortname || '').trim(),
     )}`;
+  }
+
+  melcatSearchUrl(query: string): string {
+    const params = new URLSearchParams({
+      formids: 'If_5,searchString,If_7,If_9,searchImageSumbitComponent',
+      seedids: 'ZH4sIAAAAAAAAAIVUS27bMBB1geYmWUaAHTO2u3TVtDHgNIHtosuCooY2YYqjkrQL5Uy9Rhc5TO/QoSQgomyjK1HzhjPvzYe//w6uXgaD94PB4OrPjQN7VAKuhzcl34aPwKJEA8bXZ+O5MmDp7MA5hSacytb7u+VlCTbt3HA70LpryDCvuv+gk5nMJtl0Bsl4Ms4SNmOj5AMXkyRnU8mmIybZMBCRnIihWYHmnhJ3gxhcC6tK/wier0BacLsunCLuFbiNKuCFbE9SOvBppOuMwwM3uQbbRH6L8oxaieoreiVVrHUhrxkJxl/pwXksHoDnYBcyStRFDNXax7XBfcqtXyqzf7OPIvvcROW71w6ubyOPR2oMNeM0fMm9RbNB1K5rzpUrNa+ea/SpDLV1C3kbdZEfYbNTbg3cil2PQlC8JocGDAxizU3aOZXSu29lzj2cCVDDiyLwlmfILbnZHghcgwbhkWr3TH/nKtxmEwIPxi9xq8z/tfbmccKyDDI+Tm7leJYwmbEku2MsuZsymIpsOpzxMI9fgBZBiSD4xzC0vy54fWxIUHY8UAeMVLb4qFHsu4mKqiX5CXyvIC3LpmRzCzymuKtlt0O2eVx2MY9lnSm+QdYVGLp0wuLItcrrfbq39Ai8e7VoL+EEuc8xHB4EOrk2em+3fx7AVmtqGF3vSeT5kRsBeTM0MdsYCxMeqccCQvPTJnVK87RFW51z6e0e91zjNt0hUqN6fEQUjdY8Ejrq4VUzh5D3t9va4BT7ni7ihWCXlPbtdVmjBaoLRYyLjvUfbRVjC9cFAAA',
+      lang: 'eng',
+      suite: 'gold',
+      reservedids: 'inst,lang,suite',
+      submitmode: '',
+      submitname: '',
+      If_5: 'F',
+      If_7: 'F',
+      If_9: 'T',
+      searchString: (query ?? '').trim(),
+    });
+
+    return `${this.melcat_base}${this.melcat_search_path}?${params.toString()}`;
   }
 
   // Back-compat alias (so older code doesn’t explode if referenced anywhere)

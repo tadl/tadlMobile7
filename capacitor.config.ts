@@ -17,6 +17,7 @@ const config: CapacitorConfig = {
       launchAutoHide: false,
       // Keep native splash visible until app explicitly hides after first navigation.
       launchShowDuration: 0,
+      backgroundColor: '#efefef',
     },
   },
 };

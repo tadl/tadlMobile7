@@ -55,6 +55,12 @@ export class AppComponent implements OnInit {
     this.isLoading$ = this.loading.isLoading$();
 
     this.platform.ready().then(async () => {
+      // Ensure splash stays visible through cold-start initialization.
+      await SplashScreen.show({
+        autoHide: false,
+        showDuration: 0,
+      }).catch(() => {});
+
       await this.globals.getDeviceInfo();
       await this.globals.initThemePreference();
       this.globals.initNetworkStatusTracking();

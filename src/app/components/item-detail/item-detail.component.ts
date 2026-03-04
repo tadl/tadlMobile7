@@ -125,7 +125,6 @@ export class ItemDetailComponent implements OnInit {
     this.hold = this.extractHoldFromHit(this.hit);
     this.checkout = this.extractCheckoutFromHit(this.hit);
     this.seedKnownListMemberships();
-    this.refreshKnownListMembershipsFromServer();
 
     const key = (this.hit?.key ?? '').toString().trim();
     if (!key) return;
@@ -357,53 +356,25 @@ export class ItemDetailComponent implements OnInit {
   }
 
   private seedKnownListMemberships() {
+    const fromHit = (this.hit?.appearsOnLists ?? [])
+      .map((x) => {
+        const listId = (x?.id ?? '').toString().trim();
+        const listTitle = (x?.title ?? '').toString().trim() || 'List';
+        if (!listId) return null;
+        return { listId, listTitle } as KnownListMembership;
+      })
+      .filter((x): x is KnownListMembership => !!x);
+
+    if (fromHit.length) {
+      this.knownListMemberships = fromHit;
+      return;
+    }
+
     const listId = (this.listContext?.listId ?? '').toString().trim();
     if (!listId) return;
 
     const listTitle = (this.listContext?.listTitle ?? '').toString().trim() || 'This list';
     this.knownListMemberships = [{ listId, listTitle }];
-  }
-
-  private async refreshKnownListMembershipsFromServer() {
-    const recordId = this.listRecordId();
-    if (!recordId) return;
-
-    try {
-      const lists = await lastValueFrom(this.lists.fetchUserLists());
-      if (!lists?.length) return;
-
-      const candidates = lists.filter((l) => Number((l as any)?.numTitles ?? 0) > 0);
-      if (!candidates.length) {
-        if (!this.knownListMemberships.length) this.knownListMemberships = [];
-        return;
-      }
-
-      const checks = await Promise.all(
-        candidates.map(async (list) => {
-          const listId = (list?.id ?? '').toString().trim();
-          if (!listId) return null;
-          try {
-            const res = await lastValueFrom(this.lists.fetchListTitles(listId, 1, 500));
-            if (!res?.success || !Array.isArray(res?.titles)) return null;
-            const found = res.titles.some((t) => ((t?.id ?? t?.shortId ?? '') as any).toString().trim() === recordId);
-            if (!found) return null;
-            return {
-              listId,
-              listTitle: (list?.title ?? '').toString().trim() || 'List',
-            } as KnownListMembership;
-          } catch {
-            return null;
-          }
-        }),
-      );
-
-      const found = checks.filter((x): x is KnownListMembership => !!x);
-      if (found.length) {
-        this.knownListMemberships = found;
-      }
-    } catch {
-      // Keep local optimistic memberships if API probing fails.
-    }
   }
 
   private upsertKnownListMembership(listId: string, listTitle: string) {

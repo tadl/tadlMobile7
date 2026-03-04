@@ -4,6 +4,14 @@ import { FormsModule } from '@angular/forms';
 import { IonicModule, ModalController } from '@ionic/angular';
 import { ActivatedRoute } from '@angular/router';
 import { finalize } from 'rxjs';
+import {
+  CapacitorBarcodeScanner,
+  CapacitorBarcodeScannerAndroidScanningLibrary,
+  CapacitorBarcodeScannerCameraDirection,
+  CapacitorBarcodeScannerScanOrientation,
+  CapacitorBarcodeScannerTypeHint,
+} from '@capacitor/barcode-scanner';
+import { Capacitor } from '@capacitor/core';
 
 import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
@@ -72,6 +80,7 @@ export class SearchPage {
   pageSize = 25;
   totalPages = 1;
   infiniteDisabled = true;
+  scanningIsbn = false;
 
   constructor(
     public globals: Globals,
@@ -106,6 +115,54 @@ export class SearchPage {
 
   async suggestItem() {
     await this.globals.open_page(this.globals.suggest_item_url);
+  }
+
+  async scanIsbn() {
+    if (!Capacitor.isNativePlatform()) {
+      this.showAdvanced = true;
+      this.searchIndex = 'ISBN';
+      this.toast.presentToast('ISBN scanning is available in iOS/Android app builds.');
+      return;
+    }
+
+    if (this.scanningIsbn) return;
+    this.scanningIsbn = true;
+
+    try {
+      const res = await CapacitorBarcodeScanner.scanBarcode({
+        hint: CapacitorBarcodeScannerTypeHint.EAN_13,
+        scanInstructions: 'Scan the ISBN barcode',
+        scanButton: true,
+        scanText: 'Scan ISBN',
+        cameraDirection: CapacitorBarcodeScannerCameraDirection.BACK,
+        scanOrientation: CapacitorBarcodeScannerScanOrientation.ADAPTIVE,
+        android: { scanningLibrary: CapacitorBarcodeScannerAndroidScanningLibrary.MLKIT },
+      });
+
+      const raw = (res?.ScanResult ?? '').toString().trim();
+      if (!raw) return;
+
+      const isbn = this.normalizeScannedIsbn(raw);
+      if (!isbn) {
+        this.toast.presentToast('Scanned code was not a valid ISBN.');
+        return;
+      }
+
+      this.lookfor = isbn;
+      this.searchIndex = 'ISBN';
+      this.showAdvanced = true;
+      this.runSearch(true);
+    } catch (err: any) {
+      const msg = (err?.message ?? err ?? '').toString().toLowerCase();
+      const canceled =
+        msg.includes('cancel') ||
+        msg.includes('dismiss') ||
+        msg.includes('close') ||
+        msg.includes('back');
+      if (!canceled) this.toast.presentToast('Could not scan barcode.');
+    } finally {
+      this.scanningIsbn = false;
+    }
   }
 
   clearSearch() {
@@ -497,5 +554,12 @@ export class SearchPage {
     if (!options.some(o => o.value === this.sort)) {
       this.sort = options[0].value;
     }
+  }
+
+  private normalizeScannedIsbn(raw: string): string {
+    const cleaned = (raw ?? '').replace(/[^0-9Xx]/g, '').toUpperCase();
+    if (cleaned.length === 13) return cleaned;
+    if (cleaned.length === 10) return cleaned;
+    return '';
   }
 }

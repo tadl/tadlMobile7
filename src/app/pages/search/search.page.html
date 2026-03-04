@@ -54,6 +54,10 @@
       </ion-item>
 
       <div class="advanced-actions">
+        <ion-button expand="block" size="small" (click)="scanIsbn()" [disabled]="scanningIsbn">
+          <ion-icon name="barcode-outline" slot="start"></ion-icon>
+          {{ scanningIsbn ? 'Scanning...' : 'Scan ISBN' }}
+        </ion-button>
         <ion-button expand="block" size="small" (click)="searchMelcat()">
           Search MeLCat
         </ion-button>

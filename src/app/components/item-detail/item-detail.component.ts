@@ -14,7 +14,11 @@ import { lastValueFrom } from 'rxjs';
 
 import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
-import { ItemService, AspenGroupedWork, AspenFormatVariationsResult } from '../../services/item.service';
+import {
+  ItemService,
+  AspenGroupedWork,
+  AspenFormatVariationsResult,
+} from '../../services/item.service';
 import { AspenSearchHit } from '../../services/search.service';
 import { HoldsService } from '../../services/holds.service';
 import type { AspenHold } from '../../services/holds.service';
@@ -158,6 +162,21 @@ export class ItemDetailComponent implements OnInit {
 
   openCatalog() {
     if (this.hit?.catalogUrl) this.globals.open_page(this.hit.catalogUrl);
+  }
+
+  itemDisplayTitle(): string {
+    const title =
+      this.cleanTitlePart(this.work?.title) ||
+      this.cleanTitlePart(this.hit?.title) ||
+      'Untitled';
+
+    const subtitle =
+      this.cleanTitlePart((this.work as any)?.subtitle) ||
+      this.cleanTitlePart((this.hit as any)?.subtitle) ||
+      this.cleanTitlePart((this.hit?.raw as any)?.subtitle);
+
+    if (!subtitle) return title;
+    return `${title}: ${subtitle}`;
   }
 
   itemDescriptionText(): string {
@@ -1355,5 +1374,14 @@ export class ItemDetailComponent implements OnInit {
     }
 
     return out;
+  }
+
+  private cleanTitlePart(value: any): string {
+    const text = (value ?? '').toString().trim();
+    if (!text) return '';
+    return text
+      .replace(/\s*\/+\s*$/, '')
+      .replace(/\s+:\s+/g, ': ')
+      .trim();
   }
 }

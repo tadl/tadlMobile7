@@ -130,7 +130,12 @@ export class HoldsPage {
   holdTitle(h: AspenHold): string {
     const raw = (h?.title ?? '').toString().trim();
     if (!raw) return 'Untitled';
-    return raw.replace(/\s*\/+\s*$/, '').trim() || raw;
+    return (
+      raw
+        .replace(/\s*\/+\s*$/, '')
+        .replace(/\s+:\s+/g, ': ')
+        .trim() || raw
+    );
   }
 
   holdAuthor(h: AspenHold): string {

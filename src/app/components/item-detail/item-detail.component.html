@@ -15,7 +15,7 @@
     </div>
 
     <div class="header-text">
-      <h2 class="title">{{ (work?.title || hit.title || 'Untitled') }}</h2>
+      <h2 class="title">{{ itemDisplayTitle() }}</h2>
       <div class="meta" *ngIf="work?.author || hit.author">
         {{ work?.author || hit.author }}
       </div>

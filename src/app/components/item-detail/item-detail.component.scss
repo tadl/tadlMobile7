@@ -22,7 +22,7 @@
 }
 
 .cover img {
-  width: 92px;
+  width: clamp(112px, 32vw, 148px);
   height: auto;
   border-radius: 10px;
   display: block;

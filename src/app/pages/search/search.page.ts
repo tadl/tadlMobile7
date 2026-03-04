@@ -98,6 +98,12 @@ export class SearchPage {
     }
 
     const q = (this.route.snapshot.queryParamMap.get('lookfor') ?? '').trim();
+    if (!q) {
+      this.lookfor = '';
+      this.clearSearch();
+      return;
+    }
+
     if (q && q !== this.lookfor) {
       this.lookfor = q;
       this.runSearch(true);

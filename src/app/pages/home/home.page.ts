@@ -2,6 +2,8 @@ import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { IonicModule, ModalController, ActionSheetController } from '@ionic/angular';
 import { RouterModule } from '@angular/router';
+import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { Globals } from '../../globals';
 import { AuthState, AuthService } from '../../services/auth.service';
 import { PatronService } from '../../services/patron.service';
@@ -15,13 +17,16 @@ import { SwitchUserModalComponent } from '../../components/switch-user-modal/swi
   selector: 'app-home',
   templateUrl: './home.page.html',
   styleUrls: ['./home.page.scss'],
-  imports: [CommonModule, IonicModule, RouterModule],
+  imports: [CommonModule, IonicModule, RouterModule, FormsModule],
 })
 export class HomePage {
+  homeQuery = '';
+
   constructor(
     public globals: Globals,
     public auth: AuthService,
     public patron: PatronService,
+    private router: Router,
     private modal: ModalController,
     private actionSheet: ActionSheetController,
     private toast: ToastService,
@@ -131,5 +136,23 @@ export class HomePage {
     });
 
     await sheet.present();
+  }
+
+  submitSearch() {
+    const q = (this.homeQuery ?? '').toString().trim();
+    if (!q) {
+      this.router.navigate(['/search']);
+      return;
+    }
+    this.router.navigate(['/search'], { queryParams: { lookfor: q } });
+  }
+
+  openAdvancedSearch() {
+    const q = (this.homeQuery ?? '').toString().trim();
+    if (!q) {
+      this.router.navigate(['/search'], { queryParams: { advanced: 1 } });
+      return;
+    }
+    this.router.navigate(['/search'], { queryParams: { advanced: 1, lookfor: q } });
   }
 }

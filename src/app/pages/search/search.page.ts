@@ -132,8 +132,6 @@ export class SearchPage {
       const res = await CapacitorBarcodeScanner.scanBarcode({
         hint: CapacitorBarcodeScannerTypeHint.EAN_13,
         scanInstructions: 'Scan the ISBN barcode',
-        scanButton: true,
-        scanText: 'Scan ISBN',
         cameraDirection: CapacitorBarcodeScannerCameraDirection.BACK,
         scanOrientation: CapacitorBarcodeScannerScanOrientation.ADAPTIVE,
         android: { scanningLibrary: CapacitorBarcodeScannerAndroidScanningLibrary.MLKIT },

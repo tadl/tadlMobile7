@@ -84,8 +84,12 @@
           button
           (click)="goCheckouts()"
         >
-          <ion-label class="ion-text-wrap">
-            <div>Checkouts</div>
+          <ion-label
+            class="ion-text-wrap menu-row-label"
+            [class.menu-row-label--single]="overdueCount(s.profile) <= 0"
+            [class.menu-row-label--double]="overdueCount(s.profile) > 0"
+          >
+            <div class="menu-row-title">Checkouts</div>
             <ion-note *ngIf="overdueCount(s.profile) > 0" class="menu-subnote">
               {{ overdueCount(s.profile) }} overdue
             </ion-note>
@@ -102,8 +106,12 @@
           button
           (click)="goHolds()"
         >
-          <ion-label class="ion-text-wrap">
-            <div>Holds</div>
+          <ion-label
+            class="ion-text-wrap menu-row-label"
+            [class.menu-row-label--single]="b.ready <= 0"
+            [class.menu-row-label--double]="b.ready > 0"
+          >
+            <div class="menu-row-title">Holds</div>
             <ion-note *ngIf="b.ready > 0" class="menu-subnote">
               {{ b.ready }} ready for pickup
             </ion-note>
@@ -120,25 +128,33 @@
           button
           (click)="goFines()"
         >
-          <ion-label>Fines</ion-label>
+          <ion-label class="menu-row-label menu-row-label--single">
+            <div class="menu-row-title">Fines</div>
+          </ion-label>
           <ion-note slot="end" class="menu-value">
             {{ b.finesText || ('$' + (b.finesVal | number:'1.2-2')) }}
           </ion-note>
         </ion-item>
 
         <ion-item button (click)="goMyLists()">
-          <ion-label>My Lists</ion-label>
+          <ion-label class="menu-row-label menu-row-label--single">
+            <div class="menu-row-title">My Lists</div>
+          </ion-label>
           <ion-badge slot="end" [color]="myListsCount === 0 ? 'medium' : undefined">
             {{ myListsCount }}
           </ion-badge>
         </ion-item>
 
         <ion-item button (click)="goHistory()">
-          <ion-label>Checkout History</ion-label>
+          <ion-label class="menu-row-label menu-row-label--single">
+            <div class="menu-row-title">Checkout History</div>
+          </ion-label>
         </ion-item>
 
         <ion-item button (click)="goPrefs()">
-          <ion-label>Account Preferences</ion-label>
+          <ion-label class="menu-row-label menu-row-label--single">
+            <div class="menu-row-title">Account Preferences</div>
+          </ion-label>
         </ion-item>
       </ion-list>
     </ng-container>

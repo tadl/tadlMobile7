@@ -245,6 +245,11 @@ export class AccountMenuComponent implements OnInit {
     this.myListsCount = this.listCountFromProfile(this.auth.snapshot()?.profile);
   }
 
+  overdueCount(profile: any): number {
+    const n = Number(profile?.numOverdue ?? 0);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  }
+
   private goAccountPage(url: string) {
     this.globals.toggleMenu('account');
     this.router.navigateByUrl(url);

@@ -26,7 +26,17 @@
 }
 
 .contact {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
   margin-bottom: 14px;
+
+  .contact-main {
+    flex: 1 1 240px;
+    min-width: 0;
+  }
 
   .line {
     font-size: 16px;
@@ -40,6 +50,11 @@
     align-items: center;
     flex-wrap: wrap;
     gap: 0; // separator handles spacing
+  }
+
+  .navigate-button {
+    margin: 0;
+    flex: 0 0 auto;
   }
 
   .link {

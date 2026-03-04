@@ -42,6 +42,7 @@ import {
   createOutline,
   trashOutline,
   ellipsisVertical,
+  navigateOutline,
 } from 'ionicons/icons';
 
 import { routes } from './app/app.routes';
@@ -71,6 +72,7 @@ addIcons({
   'create-outline': createOutline,
   'trash-outline': trashOutline,
   'ellipsis-vertical': ellipsisVertical,
+  'navigate-outline': navigateOutline,
 });
 
 bootstrapApplication(AppComponent, {

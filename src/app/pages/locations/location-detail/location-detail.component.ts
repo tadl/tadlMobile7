@@ -4,6 +4,7 @@ import { IonicModule } from '@ionic/angular';
 import { Globals } from '../../../globals';
 import { ModalController } from '@ionic/angular/standalone';
 import { LocationsService, type AppLocation } from '../../../services/locations.service';
+import { Capacitor } from '@capacitor/core';
 
 type Location = AppLocation;
 
@@ -73,6 +74,28 @@ export class LocationDetailComponent {
     return `mailto:${(email || '').trim()}`;
   }
 
+  hasNavigationTarget(loc?: Location): boolean {
+    return this.navigationQuery(loc).length > 0;
+  }
+
+  async openNavigation(loc?: Location) {
+    const query = this.navigationQuery(loc);
+    if (!query) return;
+
+    const encoded = encodeURIComponent(query);
+    const platform = Capacitor.getPlatform();
+
+    // Use platform-native style deep links first, then rely on global external opener fallback behavior.
+    const targetUrl =
+      platform === 'ios'
+        ? `maps://?daddr=${encoded}&dirflg=d`
+        : platform === 'android'
+          ? `geo:0,0?q=${encoded}`
+          : `https://www.google.com/maps/dir/?api=1&destination=${encoded}&travelmode=driving`;
+
+    await this.globals.open_external_page(targetUrl);
+  }
+
   openTodayLine(loc: Location): string {
     const todayKey = this.todayKey();
     const raw = (loc as any)?.[todayKey];
@@ -133,5 +156,13 @@ export class LocationDetailComponent {
         const idx = new Date().getDay(); // 0 sunday
         return ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][idx];
     }
+  }
+
+  private navigationQuery(loc?: Location): string {
+    if (!loc) return '';
+    return [loc.fullname, loc.address, loc.citystatezip]
+      .map((v) => (v ?? '').toString().trim())
+      .filter(Boolean)
+      .join(', ');
   }
 }

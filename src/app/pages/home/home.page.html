@@ -1,15 +1,11 @@
 <ion-header>
   <ion-toolbar>
-    <ion-buttons slot="start">
-      <ion-menu-button menu="main"></ion-menu-button>
-    </ion-buttons>
+    <ion-buttons slot="start"></ion-buttons>
 
     <ion-title>TADL Mobile</ion-title>
 
     <ion-buttons slot="end">
-      <ion-button aria-label="Open account menu" (click)="globals.open_account_menu()">
-        <ion-icon name="person-circle" slot="icon-only"></ion-icon>
-      </ion-button>
+      <ion-menu-button menu="main"></ion-menu-button>
     </ion-buttons>
   </ion-toolbar>
 </ion-header>
@@ -75,9 +71,10 @@
   <ng-container *ngIf="auth.authState() | async as s">
     <ng-container *ngIf="patron.badgesFromProfile(s.profile) as b">
       <ion-card *ngIf="s.isLoggedIn && showAccountShortcuts(s.profile)" class="home-section-card">
-        <ion-card-header>
-          <ion-card-title>Your Account</ion-card-title>
-        </ion-card-header>
+        <div class="home-section-header">
+          <div class="home-section-title">Your Account</div>
+          <ion-button size="small" (click)="showCard()">View card</ion-button>
+        </div>
         <ion-list lines="full" class="home-account-list">
           <ion-item *ngIf="b.holds > 0" button routerLink="/holds">
             <ion-icon name="bookmark-outline" slot="start"></ion-icon>

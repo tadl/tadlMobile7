@@ -4,8 +4,8 @@
     <ion-progress-bar type="indeterminate"></ion-progress-bar>
   </div>
 
-  <!-- LEFT MENU (main navigation) -->
-  <ion-menu contentId="main-content" menuId="main" side="start">
+  <!-- RIGHT MENU (main navigation) -->
+  <ion-menu contentId="main-content" menuId="main" side="end">
     <ion-header>
       <ion-toolbar>
         <ion-title>Main Menu</ion-title>
@@ -21,24 +21,6 @@
           </ion-item>
         </ion-menu-toggle>
       </ion-list>
-    </ion-content>
-  </ion-menu>
-
-  <!-- RIGHT MENU (Account) -->
-  <ion-menu
-    contentId="main-content"
-    menuId="account"
-    side="end"
-    (ionDidOpen)="accountMenuDidOpen()"
-  >
-    <ion-header>
-      <ion-toolbar>
-        <ion-title>Account</ion-title>
-      </ion-toolbar>
-    </ion-header>
-
-    <ion-content>
-      <app-account-menu></app-account-menu>
     </ion-content>
   </ion-menu>
 

@@ -830,6 +830,22 @@ export class ItemDetailComponent implements OnInit {
     return this.providerActionsByFormat[k] ?? [];
   }
 
+  hasProviderDetails(formatLabel: string): boolean {
+    return this.hasProviderStatuses(formatLabel) || this.providerActionsForFormat(formatLabel).length > 0;
+  }
+
+  showBaseFormatMeta(formatLabel: string): boolean {
+    return !this.hasProviderDetails(formatLabel);
+  }
+
+  showBaseFormatSubMeta(formatLabel: string): boolean {
+    return !this.hasProviderDetails(formatLabel);
+  }
+
+  showShelfDetails(formatLabel: string): boolean {
+    return !this.hasProviderDetails(formatLabel);
+  }
+
   effectiveFormatActions(formatKey: string, actions: any[]): any[] {
     const base = this.visibleFormatActions(actions);
     const providerActions = this.providerActionsForFormat(formatKey);

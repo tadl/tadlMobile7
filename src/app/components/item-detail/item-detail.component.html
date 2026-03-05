@@ -104,14 +104,14 @@
               {{ $any(kv.value).label || ('' + kv.key) }}
             </div>
 
-            <div class="format-meta">
+            <div class="format-meta" *ngIf="showBaseFormatMeta(('' + kv.key))">
               <span *ngIf="$any(kv.value).category">{{ $any(kv.value).category }}</span>
               <span *ngIf="$any(kv.value).category" class="dot">•</span>
               <span>{{ $any(kv.value).isAvailable ? 'Available' : 'Not available' }}</span>
             </div>
 
             <ion-note
-              *ngIf="hit?.lastCheckOut || (formatHoldingsCount(('' + kv.key)) || 0) > 0"
+              *ngIf="showBaseFormatSubMeta(('' + kv.key)) && (hit?.lastCheckOut || (formatHoldingsCount(('' + kv.key)) || 0) > 0)"
               class="format-sub"
             >
               <span *ngIf="hit?.lastCheckOut">Last borrowed: {{ lastBorrowedText() }}</span>
@@ -125,7 +125,7 @@
               You have a hold on this format
             </ion-note>
 
-            <div class="shelf-details" *ngIf="hasFormatShelfDetails(('' + kv.key))">
+            <div class="shelf-details" *ngIf="showShelfDetails(('' + kv.key)) && hasFormatShelfDetails(('' + kv.key))">
               <div class="shelf-detail" *ngFor="let d of visibleFormatShelfDetails(('' + kv.key))">
                 {{ formatShelfDetailText(d) }}
               </div>
@@ -163,7 +163,7 @@
               size="small"
               fill="outline"
               class="copy-details-button"
-              *ngIf="formatShelfDetailsRemaining(('' + kv.key)) > 0"
+              *ngIf="showShelfDetails(('' + kv.key)) && formatShelfDetailsRemaining(('' + kv.key)) > 0"
               (click)="openCopyDetails(('' + kv.key), $event)"
             >
               Copy details

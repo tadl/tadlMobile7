@@ -51,6 +51,8 @@ import {
   cardOutline,
   callOutline,
   mailOutline,
+  eyeOutline,
+  eyeOffOutline,
 } from 'ionicons/icons';
 
 import { routes } from './app/app.routes';
@@ -89,6 +91,8 @@ addIcons({
   'card-outline': cardOutline,
   'call-outline': callOutline,
   'mail-outline': mailOutline,
+  'eye-outline': eyeOutline,
+  'eye-off-outline': eyeOffOutline,
 });
 
 bootstrapApplication(AppComponent, {

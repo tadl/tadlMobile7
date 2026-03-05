@@ -22,6 +22,7 @@ import { SwitchUserModalComponent } from '../../components/switch-user-modal/swi
 export class AccountPage implements OnInit {
   username = '';
   password = '';
+  showPassword = false;
   myListsCount = 0;
 
   storedAccounts: StoredAccountMeta[] = [];
@@ -105,11 +106,16 @@ export class AccountPage implements OnInit {
         this.refreshStoredAccounts();
       },
       error: (e) => {
+        this.password = '';
         const msg = e?.message ?? '';
         if (msg === 'invalid_login') this.toast.presentToast('Login failed. Check your username/password and try again.');
         else this.toast.presentToast('Login failed. Please try again.');
       },
     });
+  }
+
+  togglePasswordVisibility() {
+    this.showPassword = !this.showPassword;
   }
 
   tapStoredAccount(acct: StoredAccountMeta) {

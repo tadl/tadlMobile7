@@ -1086,7 +1086,7 @@ export class ItemDetailComponent implements OnInit {
         {
           name: 'password',
           type: 'password',
-          placeholder: 'PIN / password',
+          placeholder: 'Password',
           attributes: {
             autocapitalize: 'off',
             autocorrect: 'off',

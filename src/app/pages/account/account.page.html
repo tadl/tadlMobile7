@@ -36,34 +36,52 @@
       </ion-item>
     </ion-list>
 
-    <div class="section-header">
+    <div class="section-header login-header">
       <div class="section-title">Log in</div>
     </div>
 
-    <ion-list lines="full" class="full-list">
-      <ion-item>
-        <ion-label position="stacked">Library card / username</ion-label>
+    <div class="login-card">
+      <ion-item class="login-item" lines="none">
         <ion-input
+          class="login-input"
           [(ngModel)]="username"
+          label="Library card / username"
+          labelPlacement="floating"
+          fill="outline"
           autocomplete="off"
           autocapitalize="off"
           autocorrect="off"
           spellcheck="false"
+          placeholder="Enter card number or username"
         ></ion-input>
       </ion-item>
 
-      <ion-item>
-        <ion-label position="stacked">PIN / password</ion-label>
+      <ion-item class="login-item password-input-wrap" lines="none">
         <ion-input
+          class="login-input login-input--password"
           [(ngModel)]="password"
-          type="password"
+          [type]="showPassword ? 'text' : 'password'"
+          label="Password"
+          labelPlacement="floating"
+          fill="outline"
+          [clearOnEdit]="true"
           autocomplete="off"
           autocapitalize="off"
           autocorrect="off"
           spellcheck="false"
+          placeholder="Enter password"
         ></ion-input>
+        <ion-button
+          fill="clear"
+          size="small"
+          class="password-toggle-inline"
+          aria-label="Toggle password visibility"
+          (click)="togglePasswordVisibility()"
+        >
+          <ion-icon slot="icon-only" [name]="showPassword ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
+        </ion-button>
       </ion-item>
-    </ion-list>
+    </div>
 
     <div class="actions">
       <ion-button expand="block" (click)="submitLogin()">Log In</ion-button>

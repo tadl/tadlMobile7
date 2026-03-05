@@ -18,6 +18,7 @@ import { AccountStoreService, StoredAccountMeta } from '../../services/account-s
 export class SwitchUserModalComponent implements OnInit {
   username = '';
   password = '';
+  showPassword = false;
 
   storedAccounts: StoredAccountMeta[] = [];
   loadingAccounts = false;
@@ -100,10 +101,15 @@ export class SwitchUserModalComponent implements OnInit {
         this.close();
       },
       error: (e) => {
+        this.password = '';
         const msg = e?.message ?? '';
         if (msg === 'invalid_login') this.toast.presentToast('Login failed. Check your username/password and try again.');
         else this.toast.presentToast('Login failed. Please try again.');
       },
     });
+  }
+
+  togglePasswordVisibility() {
+    this.showPassword = !this.showPassword;
   }
 }

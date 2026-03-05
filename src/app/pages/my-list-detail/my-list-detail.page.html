@@ -22,7 +22,13 @@
   </ion-item>
 
   <ion-list *ngIf="titles.length > 0" lines="full" class="full-list">
-    <ion-item button *ngFor="let t of titles; trackBy: trackByTitle" (click)="openTitle(t)">
+    <ion-item
+      button
+      detail="false"
+      class="list-detail-row"
+      *ngFor="let t of titles; trackBy: trackByTitle"
+      (click)="openTitle(t)"
+    >
       <ion-thumbnail slot="start" *ngIf="coverUrl(t)">
         <img [src]="coverUrl(t)" alt="" (error)="$event.target.style.display='none'" />
       </ion-thumbnail>

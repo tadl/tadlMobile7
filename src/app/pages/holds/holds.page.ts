@@ -221,24 +221,36 @@ export class HoldsPage {
     if (this.isHoldActionBusy(h)) return;
 
     const frozen = this.holdIsFrozen(h);
-    const buttons: ActionSheetButton[] = [
+    const buttons: ActionSheetButton[] = [];
+
+    if (!this.holdIsReady(h)) {
+      buttons.push(
+        {
+          text: frozen ? 'Activate hold' : 'Suspend hold',
+          handler: () => this.toggleHoldFrozen(h),
+        },
+        {
+          text: 'Change pickup location',
+          handler: () => this.changePickupLocation(h),
+        },
+      );
+    }
+
+    buttons.push(
       {
-        text: frozen ? 'Activate hold' : 'Suspend hold',
-        handler: () => this.toggleHoldFrozen(h),
-      },
-      {
-        text: 'Change pickup location',
-        handler: () => this.changePickupLocation(h),
+        text: 'Cancel Hold',
+        role: 'destructive',
+        handler: () => this.cancelHoldNow(h),
       },
       {
         text: 'View details',
         handler: () => this.openHold(h),
       },
       {
-        text: 'Cancel',
+        text: 'Close',
         role: 'cancel',
       },
-    ];
+    );
 
     const sheet = await this.actionSheet.create({
       header: this.holdTitle(h),
@@ -250,6 +262,7 @@ export class HoldsPage {
 
   private toggleHoldFrozen(h: AspenHold) {
     if (this.isHoldActionBusy(h)) return;
+    if (this.holdIsReady(h)) return;
 
     const key = this.holdActionKey(h);
     if (!key) return;
@@ -276,6 +289,7 @@ export class HoldsPage {
 
   private async changePickupLocation(h: AspenHold) {
     if (this.isHoldActionBusy(h)) return;
+    if (this.holdIsReady(h)) return;
 
     const holdId = Number((h as any)?.cancelId ?? (h as any)?.id ?? 0) || 0;
     if (!holdId) {
@@ -289,7 +303,7 @@ export class HoldsPage {
       text: loc.code === currentCode ? `${loc.name} (Current)` : loc.name,
       handler: () => this.changePickupLocationNow(h, holdId, this.globals.pickupAspenNewLocation(loc)),
     }));
-    buttons.push({ text: 'Cancel', role: 'cancel' });
+    buttons.push({ text: 'Close', role: 'cancel' });
 
     const sheet = await this.actionSheet.create({
       header: 'Choose pickup location',
@@ -329,6 +343,37 @@ export class HoldsPage {
           void this.persistLocalHolds();
         },
         error: () => this.toast.presentToast('Could not change pickup location.'),
+      });
+  }
+
+  private cancelHoldNow(h: AspenHold) {
+    if (this.isHoldActionBusy(h)) return;
+
+    const key = this.holdActionKey(h);
+    if (!key) return;
+    this.holdActionBusyKeys.add(key);
+
+    this.holds
+      .cancelHold(h)
+      .pipe(finalize(() => this.holdActionBusyKeys.delete(key)))
+      .subscribe({
+        next: async (res) => {
+          if (!res?.success) {
+            this.toast.presentToast(res?.message || 'Could not cancel hold.');
+            return;
+          }
+
+          this.removeHoldFromLists(h);
+          this.toast.presentToast(res?.message || 'Hold cancelled.');
+
+          const snap = this.auth.snapshot();
+          if (snap.isLoggedIn && snap.activeAccountId) {
+            await this.persistLocalHolds();
+          }
+
+          this.auth.refreshActiveProfile().subscribe({ error: () => {} });
+        },
+        error: () => this.toast.presentToast('Could not cancel hold.'),
       });
   }
 
@@ -415,5 +460,9 @@ export class HoldsPage {
     }
 
     return 'active';
+  }
+
+  private holdIsReady(h: AspenHold): boolean {
+    return this.holdDisplayState(h) === 'ready';
   }
 }

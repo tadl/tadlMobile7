@@ -174,8 +174,7 @@ export class AccountPage implements OnInit {
           },
         },
         {
-          text: 'Cancel',
-          role: 'cancel',
+          text: 'Close', role: 'cancel',
         },
       ],
     });

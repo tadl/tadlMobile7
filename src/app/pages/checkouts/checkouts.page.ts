@@ -142,8 +142,7 @@ export class CheckoutsPage {
       handler: () => this.refresh(),
     });
     buttons.push({
-      text: 'Cancel',
-      role: 'cancel',
+      text: 'Close', role: 'cancel',
     });
 
     const sheet = await this.actionSheetCtrl.create({
@@ -175,8 +174,7 @@ export class CheckoutsPage {
           handler: () => this.openCheckout(c),
         },
         {
-          text: 'Cancel',
-          role: 'cancel',
+          text: 'Close', role: 'cancel',
         },
       ],
     });
@@ -200,7 +198,7 @@ export class CheckoutsPage {
           text: 'Renew all',
           handler: () => this.renewAll(),
         },
-        { text: 'Cancel', role: 'cancel' },
+        { text: 'Close', role: 'cancel' },
       ],
     });
     await sheet.present();

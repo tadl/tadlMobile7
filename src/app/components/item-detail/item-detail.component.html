@@ -82,9 +82,9 @@
       </div>
 
       <div class="hold-actions">
-        <ion-button expand="block" *ngIf="holdIsFrozen()" (click)="thawHold()">Activate</ion-button>
-        <ion-button expand="block" *ngIf="!holdIsFrozen()" (click)="freezeHold()">Suspend</ion-button>
-        <ion-button expand="block" fill="outline" (click)="changePickupLocation()">Change pickup location</ion-button>
+        <ion-button expand="block" *ngIf="!holdIsReady() && holdIsFrozen()" (click)="thawHold()">Activate</ion-button>
+        <ion-button expand="block" *ngIf="!holdIsReady() && !holdIsFrozen()" (click)="freezeHold()">Suspend</ion-button>
+        <ion-button expand="block" fill="outline" *ngIf="!holdIsReady()" (click)="changePickupLocation()">Change pickup location</ion-button>
         <ion-button expand="block" color="danger" (click)="confirmCancelHold()">Cancel</ion-button>
       </div>
     </ion-card-content>

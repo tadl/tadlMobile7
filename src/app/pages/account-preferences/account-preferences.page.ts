@@ -122,8 +122,7 @@ export class AccountPreferencesPage {
             handler: () => this.updateCircHistory(false),
           },
           {
-            text: 'Cancel',
-            role: 'cancel',
+            text: 'Close', role: 'cancel',
             handler: () => {
               this.ignoreCircHistoryChange = true;
               if (this.preferences) this.preferences.keep_circ_history = true;
@@ -172,7 +171,7 @@ export class AccountPreferencesPage {
         },
       ],
       buttons: [
-        { text: 'Cancel', role: 'cancel' },
+        { text: 'Close', role: 'cancel' },
         {
           text: 'Save',
           handler: (values) => {
@@ -223,7 +222,7 @@ export class AccountPreferencesPage {
         },
       ],
       buttons: [
-        { text: 'Cancel', role: 'cancel' },
+        { text: 'Close', role: 'cancel' },
         {
           text: 'Save',
           handler: (values) => {
@@ -273,7 +272,7 @@ export class AccountPreferencesPage {
         },
       ],
       buttons: [
-        { text: 'Cancel', role: 'cancel' },
+        { text: 'Close', role: 'cancel' },
         {
           text: 'Save',
           handler: (values) => {
@@ -329,7 +328,7 @@ export class AccountPreferencesPage {
         },
       ],
       buttons: [
-        { text: 'Cancel', role: 'cancel' },
+        { text: 'Close', role: 'cancel' },
         {
           text: 'Save',
           handler: (values) => {
@@ -384,7 +383,7 @@ export class AccountPreferencesPage {
         },
       ],
       buttons: [
-        { text: 'Cancel', role: 'cancel' },
+        { text: 'Close', role: 'cancel' },
         {
           text: 'Save',
           handler: (values) => {
@@ -433,7 +432,7 @@ export class AccountPreferencesPage {
         },
       ],
       buttons: [
-        { text: 'Cancel', role: 'cancel' },
+        { text: 'Close', role: 'cancel' },
         {
           text: 'Save',
           handler: (values) => {

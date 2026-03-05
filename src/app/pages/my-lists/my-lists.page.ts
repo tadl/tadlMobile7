@@ -139,8 +139,7 @@ export class MyListsPage {
           handler: () => this.confirmDeleteList(list),
         },
         {
-          text: 'Cancel',
-          role: 'cancel',
+          text: 'Close', role: 'cancel',
         },
       ],
     });

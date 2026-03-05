@@ -157,8 +157,7 @@ export class MyListDetailPage {
           handler: () => this.confirmRemoveFromList(t),
         },
         {
-          text: 'Cancel',
-          role: 'cancel',
+          text: 'Close', role: 'cancel',
         },
       ],
     });
@@ -188,8 +187,7 @@ export class MyListDetailPage {
           handler: () => this.removeFromListNow(t),
         },
         {
-          text: 'Cancel',
-          role: 'cancel',
+          text: 'Close', role: 'cancel',
         },
       ],
     });

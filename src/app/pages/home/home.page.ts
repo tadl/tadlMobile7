@@ -129,7 +129,7 @@ export class HomePage {
             });
           },
         },
-        { text: 'Cancel', role: 'cancel' },
+        { text: 'Close', role: 'cancel' },
       ],
     });
 

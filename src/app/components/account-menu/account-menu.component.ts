@@ -187,8 +187,7 @@ export class AccountMenuComponent implements OnInit {
           },
         },
         {
-          text: 'Cancel',
-          role: 'cancel',
+          text: 'Close', role: 'cancel',
         },
       ],
     });

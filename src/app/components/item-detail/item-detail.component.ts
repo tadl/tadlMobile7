@@ -254,7 +254,7 @@ export class ItemDetailComponent implements OnInit {
           text: this.actionListLabel(list),
           handler: () => this.addRecordToList(list, recordId),
         })),
-        { text: 'Cancel', role: 'cancel' },
+        { text: 'Close', role: 'cancel' },
       ],
     });
 
@@ -277,7 +277,7 @@ export class ItemDetailComponent implements OnInit {
           role: 'destructive',
           handler: () => this.confirmRemoveFromNamedList(list, recordId),
         })),
-        { text: 'Cancel', role: 'cancel' },
+        { text: 'Close', role: 'cancel' },
       ],
     });
 
@@ -353,7 +353,7 @@ export class ItemDetailComponent implements OnInit {
           role: 'destructive',
           handler: () => this.removeRecordFromList(listId, recordId),
         },
-        { text: 'Cancel', role: 'cancel' },
+        { text: 'Close', role: 'cancel' },
       ],
     });
 
@@ -460,7 +460,7 @@ export class ItemDetailComponent implements OnInit {
               this.listRecordId(),
             ),
         },
-        { text: 'Cancel', role: 'cancel' },
+        { text: 'Close', role: 'cancel' },
       ],
     });
 
@@ -544,6 +544,14 @@ export class ItemDetailComponent implements OnInit {
     return status.includes('frozen') || status.includes('suspend') || status.includes('suspended');
   }
 
+  holdIsReady(): boolean {
+    const h: any = this.hold;
+    if (!h) return false;
+    if (h?.available === true) return true;
+    const status = (h?.statusMessage ?? h?.status ?? '').toString().toLowerCase();
+    return status.includes('ready to pickup') || status.includes('ready for pickup') || status.includes('ready');
+  }
+
   holdStatusText(): string {
     const h: any = this.hold;
     if (!h) return '';
@@ -582,6 +590,7 @@ export class ItemDetailComponent implements OnInit {
 
   freezeHold() {
     if (!this.hold || this.holdActionBusy) return;
+    if (this.holdIsReady()) return;
 
     this.holdActionBusy = true;
     this.holds
@@ -611,6 +620,7 @@ export class ItemDetailComponent implements OnInit {
 
   thawHold() {
     if (!this.hold || this.holdActionBusy) return;
+    if (this.holdIsReady()) return;
 
     this.holdActionBusy = true;
     this.holds
@@ -683,6 +693,7 @@ export class ItemDetailComponent implements OnInit {
 
   async changePickupLocation() {
     if (!this.hold || this.holdActionBusy) return;
+    if (this.holdIsReady()) return;
 
     const holdId = Number((this.hold as any)?.cancelId ?? (this.hold as any)?.id ?? 0) || 0;
     if (!holdId) {
@@ -697,7 +708,7 @@ export class ItemDetailComponent implements OnInit {
       handler: () => this.changePickupLocationNow(holdId, this.globals.pickupAspenNewLocation(loc)),
     }));
 
-    buttons.push({ text: 'Cancel', role: 'cancel' });
+    buttons.push({ text: 'Close', role: 'cancel' });
 
     const sheet = await this.actionSheet.create({
       header: 'Choose pickup location',
@@ -989,7 +1000,7 @@ export class ItemDetailComponent implements OnInit {
       text: loc.name,
       handler: () => this.placeHoldNow(recordId, loc.code),
     }));
-    buttons.push({ text: 'Cancel', role: 'cancel' });
+    buttons.push({ text: 'Close', role: 'cancel' });
 
     const sheet = await this.actionSheet.create({
       header: 'Pick up where?',

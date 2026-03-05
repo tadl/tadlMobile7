@@ -4,6 +4,8 @@ import { IonicModule, ModalController, ActionSheetController } from '@ionic/angu
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { Capacitor } from '@capacitor/core';
+import { Keyboard } from '@capacitor/keyboard';
 import { Globals } from '../../globals';
 import { AuthState, AuthService } from '../../services/auth.service';
 import { PatronService } from '../../services/patron.service';
@@ -134,7 +136,8 @@ export class HomePage {
     await sheet.present();
   }
 
-  submitSearch() {
+  async submitSearch() {
+    await this.dismissKeyboard();
     const q = (this.homeQuery ?? '').toString().trim();
     if (!q) {
       this.router.navigate(['/search']);
@@ -150,5 +153,14 @@ export class HomePage {
       return;
     }
     this.router.navigate(['/search'], { queryParams: { advanced: 1, lookfor: q } });
+  }
+
+  private async dismissKeyboard() {
+    if (!Capacitor.isNativePlatform()) return;
+    try {
+      await Keyboard.hide();
+    } catch {
+      // Ignore keyboard plugin errors and proceed with navigation.
+    }
   }
 }

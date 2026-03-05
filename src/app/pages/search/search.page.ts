@@ -12,6 +12,7 @@ import {
   CapacitorBarcodeScannerTypeHint,
 } from '@capacitor/barcode-scanner';
 import { Capacitor } from '@capacitor/core';
+import { Keyboard } from '@capacitor/keyboard';
 
 import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
@@ -110,7 +111,8 @@ export class SearchPage {
     }
   }
 
-  onSubmit() {
+  async onSubmit() {
+    await this.dismissKeyboard();
     this.runSearch(true);
   }
 
@@ -121,6 +123,15 @@ export class SearchPage {
 
   async suggestItem() {
     await this.globals.open_page(this.globals.suggest_item_url);
+  }
+
+  private async dismissKeyboard() {
+    if (!Capacitor.isNativePlatform()) return;
+    try {
+      await Keyboard.hide();
+    } catch {
+      // Ignore keyboard plugin errors and proceed with search.
+    }
   }
 
   async scanIsbn() {

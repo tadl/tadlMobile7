@@ -12,22 +12,24 @@
   </ion-toolbar>
 </ion-header>
 
-<ion-content class="ion-padding">
+<ion-content #content class="ion-padding">
   <ion-refresher slot="fixed" (ionRefresh)="refresh(selectedTab, $event)">
     <ion-refresher-content></ion-refresher-content>
   </ion-refresher>
 
-  <ion-segment [value]="selectedTab" (ionChange)="onTabChanged($event)">
-    <ion-segment-button value="books">
-      <ion-label>Books</ion-label>
-    </ion-segment-button>
-    <ion-segment-button value="video">
-      <ion-label>Video</ion-label>
-    </ion-segment-button>
-    <ion-segment-button value="music">
-      <ion-label>Music</ion-label>
-    </ion-segment-button>
-  </ion-segment>
+  <div class="sticky-segment-wrap">
+    <ion-segment [value]="selectedTab" (ionChange)="onTabChanged($event)">
+      <ion-segment-button value="books">
+        <ion-label>Books</ion-label>
+      </ion-segment-button>
+      <ion-segment-button value="video">
+        <ion-label>Video</ion-label>
+      </ion-segment-button>
+      <ion-segment-button value="music">
+        <ion-label>Music</ion-label>
+      </ion-segment-button>
+    </ion-segment>
+  </div>
 
   <div class="refreshing-note" *ngIf="isTabLoading(selectedTab) && tilesByTab[selectedTab].length > 0">
     Refreshing featured items...
@@ -69,7 +71,6 @@
               (error)="$event.target.style.visibility='hidden'"
             />
           </div>
-          <div class="view-all">View all</div>
         </ion-card-content>
       </ion-card>
     </ion-item-group>

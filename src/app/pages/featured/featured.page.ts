@@ -1,6 +1,6 @@
-import { Component } from '@angular/core';
+import { Component, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { IonicModule } from '@ionic/angular';
+import { IonicModule, IonContent } from '@ionic/angular';
 import { Router } from '@angular/router';
 import { finalize } from 'rxjs';
 import { Globals } from '../../globals';
@@ -22,6 +22,8 @@ interface FeaturedTile {
   imports: [CommonModule, IonicModule],
 })
 export class FeaturedPage {
+  @ViewChild('content', { static: false }) content?: IonContent;
+
   selectedTab: FeaturedTabKey = 'books';
   private loadingTabs = new Set<FeaturedTabKey>();
   private loadedTabs = new Set<FeaturedTabKey>();
@@ -113,10 +115,11 @@ export class FeaturedPage {
     }
   }
 
-  onTabChanged(ev: CustomEvent) {
+  async onTabChanged(ev: CustomEvent) {
     const tab = ((ev?.detail?.value ?? 'books').toString().toLowerCase()) as FeaturedTabKey;
     if (tab !== 'books' && tab !== 'video' && tab !== 'music') return;
     this.selectedTab = tab;
+    await this.content?.scrollToTop(200);
     if (!this.loadedTabs.has(tab)) {
       this.refresh(tab);
     }

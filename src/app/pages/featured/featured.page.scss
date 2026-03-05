@@ -2,8 +2,21 @@
   margin: 10px 0;
 }
 
+.sticky-segment-wrap {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  margin: 0 -16px 12px -16px;
+  padding: 8px 16px 10px 16px;
+  background: var(--ion-background-color);
+}
+
 ion-segment {
   margin-bottom: 12px;
+}
+
+.sticky-segment-wrap ion-segment {
+  margin-bottom: 0;
 }
 
 .refreshing-note {
@@ -40,12 +53,6 @@ ion-segment {
 
 .cover-skeleton.square-cover {
   aspect-ratio: 1 / 1;
-}
-
-.view-all {
-  margin-top: 10px;
-  font-size: 15px;
-  opacity: 0.9;
 }
 
 .error-actions {

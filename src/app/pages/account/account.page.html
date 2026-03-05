@@ -74,8 +74,13 @@
   <!-- LOGGED IN NORMAL MENU -->
   <ng-template #loggedInMenu>
     <div class="section-header logged-in-header">
-      <div class="logged-in-as">Logged in as</div>
-      <div class="logged-in-name">{{ loggedInNameUpper(s.profile) }}</div>
+      <div class="logged-in-header-row">
+        <div>
+          <div class="logged-in-as">Logged in as</div>
+          <div class="logged-in-name">{{ loggedInNameUpper(s.profile) }}</div>
+        </div>
+        <ion-button size="small" class="section-action" (click)="showCard()">View Card</ion-button>
+      </div>
     </div>
 
     <ng-container *ngIf="patron.badgesFromProfile(s.profile) as b">
@@ -160,7 +165,6 @@
     </ng-container>
 
     <div class="actions">
-      <ion-button expand="block" (click)="showCard()">Your Library Card</ion-button>
       <ion-button expand="block" color="medium" (click)="showLogoutActions()">Logout</ion-button>
       <ion-button expand="block" fill="clear" (click)="openSwitchUserModal()">Switch User</ion-button>
     </div>

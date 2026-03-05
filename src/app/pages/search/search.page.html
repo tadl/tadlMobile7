@@ -21,7 +21,7 @@
         aria-label="Search the catalog"
         placeholder="Search the catalog"
         (ionClear)="clearSearch()"
-        (ionSubmit)="onSubmit()"
+        (keyup.enter)="onSubmit()"
       ></ion-searchbar>
       <ion-button size="small" class="search-go" (click)="onSubmit()">
         Search

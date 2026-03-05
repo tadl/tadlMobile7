@@ -21,7 +21,13 @@
   </ion-refresher>
 
   <ion-list *ngIf="lists.length > 0" lines="full" class="full-list">
-    <ion-item button *ngFor="let list of lists; trackBy: trackByList" (click)="openList(list)">
+    <ion-item
+      button
+      detail="false"
+      class="list-row"
+      *ngFor="let list of lists; trackBy: trackByList"
+      (click)="openList(list)"
+    >
       <ion-thumbnail slot="start" *ngIf="list.cover">
         <img [src]="list.cover" alt="" />
       </ion-thumbnail>

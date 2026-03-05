@@ -26,13 +26,27 @@
 .checkout-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  margin-inline-start: 8px;
 }
 
-.checkout-actions ion-button {
-  --padding-start: 4px;
-  --padding-end: 4px;
+.checkout-row {
+  --padding-start: 14px;
+  --inner-padding-end: 10px;
+  --min-height: 76px;
+}
+
+.checkout-actions-btn {
+  --padding-start: 10px;
+  --padding-end: 10px;
+  min-width: 40px;
+  min-height: 40px;
+  border-radius: 10px;
+  background: rgba(var(--ion-text-color-rgb), 0.08);
   margin: 0;
+}
+
+.checkout-actions-btn ion-icon {
+  font-size: 20px;
 }
 
 .checkouts-summary-item {

@@ -25,7 +25,13 @@
     </div>
 
     <ion-list lines="full" class="full-list">
-      <ion-item button *ngFor="let h of ilsReady; trackBy: trackByHold" (click)="openHold(h)">
+      <ion-item
+        button
+        detail="false"
+        class="hold-row"
+        *ngFor="let h of ilsReady; trackBy: trackByHold"
+        (click)="openHold(h)"
+      >
         <ion-thumbnail slot="start" *ngIf="h.coverUrl">
           <img [src]="h.coverUrl" alt="" />
         </ion-thumbnail>
@@ -41,6 +47,7 @@
           <ion-button
             fill="clear"
             size="small"
+            class="hold-actions-btn"
             [disabled]="isHoldActionBusy(h)"
             (click)="openHoldActions(h, $event)"
             aria-label="Hold actions"
@@ -59,7 +66,13 @@
     </div>
 
     <ion-list lines="full" class="full-list">
-      <ion-item button *ngFor="let h of ilsNotReady; trackBy: trackByHold" (click)="openHold(h)">
+      <ion-item
+        button
+        detail="false"
+        class="hold-row"
+        *ngFor="let h of ilsNotReady; trackBy: trackByHold"
+        (click)="openHold(h)"
+      >
         <ion-thumbnail slot="start" *ngIf="h.coverUrl">
           <img [src]="h.coverUrl" alt="" />
         </ion-thumbnail>
@@ -75,6 +88,7 @@
           <ion-button
             fill="clear"
             size="small"
+            class="hold-actions-btn"
             [disabled]="isHoldActionBusy(h)"
             (click)="openHoldActions(h, $event)"
             aria-label="Hold actions"

@@ -37,6 +37,8 @@
 
     <ion-item
       button
+      detail="false"
+      class="checkout-row"
       *ngFor="let c of ilsCheckouts; trackBy: trackByCheckout"
       (click)="openCheckout(c)"
     >
@@ -62,6 +64,7 @@
         <ion-button
           fill="clear"
           size="small"
+          class="checkout-actions-btn"
           [disabled]="renewAllBusy || isRenewing(c)"
           (click)="openCheckoutActions(c, $event)"
           aria-label="Checkout actions"

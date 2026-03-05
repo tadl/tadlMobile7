@@ -169,6 +169,9 @@
   <div class="theme-section">
     <div class="theme-label">Theme</div>
     <ion-segment [value]="themeMode()" (ionChange)="onThemeChange($event)">
+      <ion-segment-button value="system">
+        <ion-label>System</ion-label>
+      </ion-segment-button>
       <ion-segment-button value="light">
         <ion-label>Light</ion-label>
       </ion-segment-button>

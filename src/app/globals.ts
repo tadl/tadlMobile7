@@ -18,6 +18,8 @@ export interface PickupLocationOption {
   name: string; // e.g. "Woodmere (Main) Branch Library"
 }
 
+type ThemeMode = 'light' | 'dark' | 'system';
+
 @Injectable({ providedIn: 'root' })
 export class Globals {
   private readonly theme_pref_key = 'app:theme_mode';
@@ -32,12 +34,12 @@ export class Globals {
 
   // ---- app identity / toggles ----
   public app_version: string = '7.0.3';
-  public update_version: string = '20260304';
-  public build_num: string = '03';
+  public update_version: string = '20260305';
+  public build_num: string = '00';
 
   public device_info: any;
   public system_color: any = window.matchMedia('(prefers-color-scheme: dark)');
-  public theme_mode: 'light' | 'dark' = 'light';
+  public theme_mode: ThemeMode = 'system';
 
   public system_short_name: string = 'TADL';
 
@@ -128,6 +130,9 @@ export class Globals {
   private browserOnlineHandler = () => this.updateNetworkFromEnvironment();
   private browserOfflineHandler = () => this.updateNetworkFromEnvironment();
   private nativeNetworkListenerHandle: { remove: () => Promise<void> } | null = null;
+  private readonly systemThemeChangeHandler = () => {
+    if (this.theme_mode === 'system') this.applyThemeClass('system');
+  };
 
   // ---- helpers ----
   async initThemePreference() {
@@ -136,43 +141,55 @@ export class Globals {
       return;
     }
 
-    let preferred: 'light' | 'dark' | null = null;
+    let preferred: ThemeMode = 'system';
 
     try {
       const { value } = await Preferences.get({ key: this.theme_pref_key });
-      if (value === 'light' || value === 'dark') preferred = value;
+      if (value === 'light' || value === 'dark' || value === 'system') preferred = value;
     } catch {
-      // Fall back to the current system theme when local preferences are unavailable.
-    }
-
-    if (!preferred) {
-      preferred = this.system_color?.matches ? 'dark' : 'light';
-      try {
-        await Preferences.set({ key: this.theme_pref_key, value: preferred });
-      } catch {
-        // Non-fatal; theme still applies for this session.
-      }
+      // Fall back to system theme preference when local preferences are unavailable.
     }
 
     this.theme_mode = preferred;
     this.theme_initialized = true;
     this.applyThemeClass(preferred);
+    this.attachSystemThemeListener();
   }
 
   isDarkTheme(): boolean {
-    return this.theme_mode === 'dark';
+    if (this.theme_mode === 'dark') return true;
+    if (this.theme_mode === 'light') return false;
+    return !!this.system_color?.matches;
   }
 
-  async setTheme(mode: 'light' | 'dark') {
-    this.theme_mode = mode === 'dark' ? 'dark' : 'light';
+  async setTheme(mode: ThemeMode) {
+    this.theme_mode = mode === 'dark' || mode === 'light' || mode === 'system' ? mode : 'system';
     this.applyThemeClass(this.theme_mode);
     this.theme_initialized = true;
     await Preferences.set({ key: this.theme_pref_key, value: this.theme_mode });
+    this.attachSystemThemeListener();
   }
 
-  private applyThemeClass(mode: 'light' | 'dark') {
+  private applyThemeClass(mode: ThemeMode) {
+    const dark = mode === 'system' ? !!this.system_color?.matches : mode === 'dark';
     const root = document.documentElement;
-    root.classList.toggle('ion-palette-dark', mode === 'dark');
+    root.classList.toggle('ion-palette-dark', dark);
+  }
+
+  private attachSystemThemeListener() {
+    if (!this.system_color) return;
+
+    const anyMedia = this.system_color as any;
+    if (typeof anyMedia.addEventListener === 'function') {
+      anyMedia.removeEventListener('change', this.systemThemeChangeHandler);
+      anyMedia.addEventListener('change', this.systemThemeChangeHandler);
+      return;
+    }
+
+    if (typeof anyMedia.addListener === 'function') {
+      anyMedia.removeListener?.(this.systemThemeChangeHandler);
+      anyMedia.addListener(this.systemThemeChangeHandler);
+    }
   }
 
   async open_page(url: string) {

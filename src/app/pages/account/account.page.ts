@@ -226,13 +226,13 @@ export class AccountPage implements OnInit {
   }
   goPrefs() { this.goAccountPage('/account-preferences'); }
 
-  themeMode(): 'light' | 'dark' {
+  themeMode(): 'light' | 'dark' | 'system' {
     return this.globals.theme_mode;
   }
 
   onThemeChange(ev: CustomEvent) {
     const value = (ev.detail as { value?: string } | undefined)?.value;
-    if (value !== 'light' && value !== 'dark') return;
+    if (value !== 'light' && value !== 'dark' && value !== 'system') return;
     void this.globals.setTheme(value);
   }
 

@@ -14,14 +14,28 @@
     </div>
 
     <div class="content">
-      <h2 class="title">{{ location.fullname }}</h2>
+      <div class="details-card">
+        <h2 class="title">{{ location.fullname }}</h2>
 
-      <p class="today" *ngIf="openTodayLine(location)">{{ openTodayLine(location) }}</p>
+        <p class="today-pill" *ngIf="openTodayLine(location)">{{ openTodayLine(location) }}</p>
 
-      <div class="contact">
-        <div class="contact-main">
-          <div class="line" *ngIf="location.address">{{ location.address }}</div>
-          <div class="line" *ngIf="location.citystatezip">{{ location.citystatezip }}</div>
+        <div class="contact">
+          <div class="contact-top">
+            <div class="contact-main">
+              <div class="line" *ngIf="location.address">{{ location.address }}</div>
+              <div class="line" *ngIf="location.citystatezip">{{ location.citystatezip }}</div>
+            </div>
+
+            <ion-button
+              *ngIf="hasNavigationTarget(location)"
+              size="small"
+              class="navigate-button"
+              (click)="openNavigation(location)"
+            >
+              <ion-icon name="navigate-outline" slot="start"></ion-icon>
+              Navigate
+            </ion-button>
+          </div>
 
           <div class="contact-links" *ngIf="location.phone || location.email">
             <ion-button
@@ -47,21 +61,12 @@
             </ion-button>
           </div>
         </div>
-
-        <ion-button
-          *ngIf="hasNavigationTarget(location)"
-          size="small"
-          class="navigate-button"
-          (click)="openNavigation(location)"
-        >
-          <ion-icon name="navigate-outline" slot="start"></ion-icon>
-          Navigate
-        </ion-button>
       </div>
 
       <ion-card class="hours-card">
         <ion-card-header>
           <ion-card-title>Hours</ion-card-title>
+          <div class="hours-subtitle">Weekly schedule</div>
         </ion-card-header>
 
         <ion-card-content>

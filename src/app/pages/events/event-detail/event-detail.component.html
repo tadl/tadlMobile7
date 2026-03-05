@@ -108,9 +108,7 @@
       *ngIf="externalUrl"
       class="open-button"
       expand="block"
-      [href]="externalUrl"
-      target="_blank"
-      rel="noopener"
+      (click)="openExternalUrl()"
     >
       View full details
     </ion-button>

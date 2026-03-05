@@ -16,6 +16,7 @@ import { ActivatedRoute } from '@angular/router';
 import { Subscription, isObservable, lastValueFrom } from 'rxjs';
 
 import { EventsService } from '../../../services/events.service';
+import { Globals } from '../../../globals';
 
 type EventLike = {
   id?: string | number;
@@ -86,6 +87,7 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
     private route: ActivatedRoute,
     private eventsService: EventsService,
     private modalController: ModalController,
+    private globals: Globals,
   ) {}
 
   ngOnInit(): void {
@@ -122,6 +124,11 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
     } catch {
       this.back.emit();
     }
+  }
+
+  async openExternalUrl() {
+    if (!this.externalUrl) return;
+    await this.globals.open_page(this.externalUrl);
   }
 
   get title(): string {

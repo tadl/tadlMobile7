@@ -18,6 +18,7 @@
       <ion-searchbar
         class="search-input"
         [(ngModel)]="lookfor"
+        aria-label="Search the catalog"
         placeholder="Search the catalog"
         (ionClear)="clearSearch()"
         (keyup.enter)="onSubmit()"

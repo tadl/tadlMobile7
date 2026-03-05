@@ -70,10 +70,6 @@ export class HomePage {
     return Number.isFinite(n) && n > 0 ? n : 0;
   }
 
-  showAccountShortcuts(profile: any): boolean {
-    return !!this.auth.snapshot()?.isLoggedIn;
-  }
-
   async showCard() {
     const snap = this.auth.snapshot();
     const barcode = (snap?.profile?.ils_barcode ?? '').toString().trim();

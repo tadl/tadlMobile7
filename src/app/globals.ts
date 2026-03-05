@@ -33,7 +33,7 @@ export class Globals {
   // ---- app identity / toggles ----
   public app_version: string = '7.0.3';
   public update_version: string = '20260304';
-  public build_num: string = '00';
+  public build_num: string = '03';
 
   public device_info: any;
   public system_color: any = window.matchMedia('(prefers-color-scheme: dark)');
@@ -199,26 +199,12 @@ export class Globals {
 
   async open_account_menu() {
     await this.menuController.enable(true, 'account');
-
-    const m = await this.menuController.get('account');
-    console.log('[Globals] account menu found?', !!m, m);
-
-    const opened = await this.menuController.open('account');
-    console.log('[Globals] account menu opened?', opened);
-
-    return opened;
+    return this.menuController.open('account');
   }
 
   async toggleMenu(menu: string) {
     await this.menuController.enable(true, menu);
-
-    const m = await this.menuController.get(menu);
-    console.log(`[Globals] ${menu} menu found?`, !!m, m);
-
-    const toggled = await this.menuController.toggle(menu);
-    console.log(`[Globals] ${menu} menu toggled?`, toggled);
-
-    return toggled;
+    return this.menuController.toggle(menu);
   }
 
   async close_modal() {

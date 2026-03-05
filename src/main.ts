@@ -35,6 +35,7 @@ import {
   calendarOutline,
   close,
   closeCircle,
+  chevronBackOutline,
   chevronForward,
   chevronDown,
   chevronUp,
@@ -46,6 +47,8 @@ import {
   personCircleOutline,
   bookmarkOutline,
   albumsOutline,
+  barcodeOutline,
+  cardOutline,
 } from 'ionicons/icons';
 
 import { routes } from './app/app.routes';
@@ -69,6 +72,7 @@ addIcons({
   'person-circle': personCircle,
   close,
   'close-circle': closeCircle,
+  'chevron-back-outline': chevronBackOutline,
   add,
   'chevron-down': chevronDown,
   'chevron-up': chevronUp,
@@ -79,6 +83,8 @@ addIcons({
   'person-circle-outline': personCircleOutline,
   'bookmark-outline': bookmarkOutline,
   'albums-outline': albumsOutline,
+  'barcode-outline': barcodeOutline,
+  'card-outline': cardOutline,
 });
 
 bootstrapApplication(AppComponent, {

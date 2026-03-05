@@ -61,6 +61,42 @@ npx cap open ios
 npx cap open android
 ```
 
+## Android release artifacts
+
+After running `prep:android`, build signed release artifacts from Gradle:
+
+```bash
+cd android
+./gradlew clean
+./gradlew assembleRelease   # APK
+./gradlew bundleRelease     # AAB (Play Console)
+```
+
+Output paths:
+
+- APK: `android/app/build/outputs/apk/release/app-release.apk`
+- AAB: `android/app/build/outputs/bundle/release/app-release.aab`
+
+## iOS archive + export
+
+After running `prep:ios`:
+
+1. Open Xcode:
+   - `npx cap open ios`
+2. In Xcode select:
+   - target: `App`
+   - scheme: `App`
+   - destination: `Any iOS Device (arm64)` (or generic iOS device)
+3. Create archive:
+   - `Product` -> `Archive`
+4. In Organizer:
+   - select the new archive
+   - click `Distribute App`
+5. Choose distribution:
+   - `App Store Connect` for TestFlight/App Store
+   - `Ad Hoc` / `Development` for local device distribution
+6. Follow signing prompts and export/upload.
+
 ## Notes
 
 - iOS native version fields are patched in `ios/App/App.xcodeproj/project.pbxproj`:

@@ -70,7 +70,8 @@ export class EventsPage implements OnInit, OnDestroy {
   venueLabel(v: VenueOption): string {
     const code = (v as any)?.code?.toString?.() ?? '';
     if (code === 'all') return 'All Locations';
-    return (v as any)?.name ?? '';
+    const name = ((v as any)?.name ?? '').toString().trim();
+    return name === 'Traverse City' ? 'Woodmere' : name;
   }
 
   venueValue(v: VenueOption): string {

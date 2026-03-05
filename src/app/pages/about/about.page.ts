@@ -22,7 +22,7 @@ export class AboutPage implements OnInit {
     public globals: Globals,
     private platform: Platform,
   ) {
-    this.platforms = this.platform.platforms().join('/');
+    this.platforms = this.platform.platforms().join(', ');
     this.updateScreenSize();
   }
 

@@ -3,6 +3,22 @@
   line-height: 1.2;
 }
 
+.lists-header-card {
+  margin-bottom: 10px;
+}
+
+.lists-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.lists-header-note {
+  margin-top: 8px;
+  display: block;
+}
+
 .sub {
   opacity: 0.8;
   margin-top: 2px;

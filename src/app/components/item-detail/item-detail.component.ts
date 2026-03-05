@@ -27,6 +27,7 @@ import type { AspenCheckout } from '../../services/checkouts.service';
 import { ListsService, type AspenUserList } from '../../services/lists.service';
 import { AuthService } from '../../services/auth.service';
 import { CopyDetailsPopoverComponent } from '../copy-details-popover/copy-details-popover.component';
+import { ListMembershipIndexService } from '../../services/list-membership-index.service';
 
 interface ItemDetailListContext {
   listId: string;
@@ -118,6 +119,7 @@ export class ItemDetailComponent implements OnInit {
     private holds: HoldsService,
     private checkouts: CheckoutsService,
     private lists: ListsService,
+    private membershipIndex: ListMembershipIndexService,
     private router: Router,
     private modalCtrl: ModalController, // ✅ renamed from "modal"
     private actionSheet: ActionSheetController,
@@ -128,7 +130,7 @@ export class ItemDetailComponent implements OnInit {
     // If opened from Holds/Checkouts pages, we already have the object in hit.raw
     this.hold = this.extractHoldFromHit(this.hit);
     this.checkout = this.extractCheckoutFromHit(this.hit);
-    this.seedKnownListMemberships();
+    void this.seedKnownListMemberships();
 
     const key = (this.hit?.key ?? '').toString().trim();
     if (!key) return;
@@ -325,6 +327,9 @@ export class ItemDetailComponent implements OnInit {
             return;
           }
           this.upsertKnownListMembership(listId, (list?.title ?? '').toString().trim() || 'Untitled list');
+          this.membershipIndex
+            .upsertMembership(recordId, listId, (list?.title ?? '').toString().trim() || 'Untitled list')
+            .catch(() => {});
           this.needsListRefresh = true;
           this.toast.presentToast(res?.message || 'Added to list.');
         },
@@ -368,13 +373,14 @@ export class ItemDetailComponent implements OnInit {
 
           this.needsListRefresh = true;
           this.removeKnownListMembership(listId);
+          this.membershipIndex.removeMembership(recordId, listId).catch(() => {});
           this.toast.presentToast(res?.message || 'Removed from list.');
         },
         error: () => this.toast.presentToast('Could not remove from list.'),
       });
   }
 
-  private seedKnownListMemberships() {
+  private async seedKnownListMemberships() {
     const fromHit = (this.hit?.appearsOnLists ?? [])
       .map((x) => {
         const listId = (x?.id ?? '').toString().trim();
@@ -390,10 +396,27 @@ export class ItemDetailComponent implements OnInit {
     }
 
     const listId = (this.listContext?.listId ?? '').toString().trim();
-    if (!listId) return;
+    if (listId) {
+      const listTitle = (this.listContext?.listTitle ?? '').toString().trim() || 'This list';
+      this.knownListMemberships = [{ listId, listTitle }];
+      return;
+    }
 
-    const listTitle = (this.listContext?.listTitle ?? '').toString().trim() || 'This list';
-    this.knownListMemberships = [{ listId, listTitle }];
+    try {
+      const recordId = this.listRecordId();
+      if (!recordId) return;
+      const indexed = await this.membershipIndex.membershipsForRecord(recordId);
+      if (indexed.length) {
+        this.knownListMemberships = indexed
+          .map((x) => ({
+            listId: (x?.listId ?? '').toString().trim(),
+            listTitle: (x?.listTitle ?? '').toString().trim() || 'List',
+          }))
+          .filter((x) => !!x.listId);
+      }
+    } catch {
+      // Keep UI stable if index read fails/unavailable.
+    }
   }
 
   private upsertKnownListMembership(listId: string, listTitle: string) {

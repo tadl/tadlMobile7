@@ -179,12 +179,11 @@
       <ion-card-title>Lists</ion-card-title>
     </ion-card-header>
     <ion-card-content>
-      <div class="list-line">
-        {{ listMembershipLabel() }}
-      </div>
       <ion-list lines="none" class="list-memberships">
         <ion-item
           button
+          detail="false"
+          class="list-membership-row"
           *ngFor="let m of knownListMemberships"
           (click)="openKnownList(m.listId, m.listTitle)"
         >
@@ -193,6 +192,7 @@
             slot="end"
             fill="clear"
             size="small"
+            class="list-membership-actions-btn"
             aria-label="List actions"
             (click)="openListMembershipActions(m, $event)"
           >

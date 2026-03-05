@@ -9,6 +9,7 @@ import { ToastService } from '../../services/toast.service';
 import { ListsService, type AspenListTitle } from '../../services/lists.service';
 import { ItemDetailComponent } from '../../components/item-detail/item-detail.component';
 import { AspenSearchHit } from '../../services/search.service';
+import { ListMembershipIndexService } from '../../services/list-membership-index.service';
 
 @Component({
   standalone: true,
@@ -32,6 +33,7 @@ export class MyListDetailPage {
     private toast: ToastService,
     private modalController: ModalController,
     private actionSheetCtrl: ActionSheetController,
+    private membershipIndex: ListMembershipIndexService,
   ) {}
 
   ionViewWillEnter() {
@@ -221,6 +223,7 @@ export class MyListDetailPage {
           }
 
           this.titles = this.titles.filter(x => this.recordIdForEntry(x) !== recordId);
+          this.membershipIndex.removeMembership(recordId, this.listId).catch(() => {});
           this.toast.presentToast(res?.message || 'Removed from list.');
         },
         error: () => this.toast.presentToast('Could not remove title from list.'),

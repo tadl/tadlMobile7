@@ -18,6 +18,10 @@ export interface PickupLocationOption {
   name: string; // e.g. "Woodmere (Main) Branch Library"
 }
 
+export interface AspenPickupLocationOption extends PickupLocationOption {
+  id: number;
+}
+
 type ThemeMode = 'light' | 'dark' | 'system';
 
 @Injectable({ providedIn: 'root' })
@@ -58,19 +62,47 @@ export class Globals {
 
   // Pickup locations (Aspen LocationID + PickupBranch code)
   // NOTE: Aspen expects newLocation formatted as "<locationId>_<pickupBranchCode>"
-  public pickupLocations: Array<{ id: number; code: string; name: string }> = [
-    { id: 7, code: 'TADL-WOOD', name: 'Woodmere (Main) Branch Library' },
-    { id: 2, code: 'TADL-EBB', name: 'East Bay Branch Library' },
-    { id: 3, code: 'TADL-FLPL', name: 'Fife Lake Public Library' },
-    { id: 4, code: 'TADL-IPL', name: 'Interlochen Public Library' },
-    { id: 5, code: 'TADL-KBL', name: 'Kingsley Branch Library' },
-    { id: 6, code: 'TADL-PCL', name: 'Peninsula Community Library' },
+  public pickupLocations: AspenPickupLocationOption[] = [
+    { id: 7, code: 'TADL-WOOD', name: 'Woodmere' },
+    { id: 2, code: 'TADL-EBB', name: 'East Bay' },
+    { id: 3, code: 'TADL-FLPL', name: 'Fife Lake' },
+    { id: 4, code: 'TADL-IPL', name: 'Interlochen' },
+    { id: 5, code: 'TADL-KBL', name: 'Kingsley' },
+    { id: 6, code: 'TADL-PCL', name: 'Peninsula' },
   ];
+
+  // Legacy Preferences pickup_library ids -> Aspen location ids.
+  // Legacy:
+  // 23 Traverse City, 24 Interlochen, 25 Kingsley, 26 Peninsula, 27 Fife Lake, 28 East Bay
+  // Aspen:
+  // 7 Woodmere, 4 Interlochen, 5 Kingsley, 6 Peninsula, 3 Fife Lake, 2 East Bay
+  public legacyPickupLibraryToAspenLocationId: Record<string, number> = {
+    '23': 7,
+    '24': 4,
+    '25': 5,
+    '26': 6,
+    '27': 3,
+    '28': 2,
+  };
 
   pickupNameForCode(code: string): string | null {
     const c = (code ?? '').trim();
     const loc = this.pickupLocations.find(x => x.code === c);
     return loc ? loc.name : null;
+  }
+
+  pickupLocationByAspenId(id: string | number): AspenPickupLocationOption | null {
+    const n = Number(id);
+    if (!Number.isFinite(n)) return null;
+    return this.pickupLocations.find((x) => x.id === n) ?? null;
+  }
+
+  pickupLocationFromLegacyPreferencesCode(legacyCode: string | number): AspenPickupLocationOption | null {
+    const code = (legacyCode ?? '').toString().trim();
+    if (!code) return null;
+    const aspenId = this.legacyPickupLibraryToAspenLocationId[code];
+    if (!aspenId) return null;
+    return this.pickupLocationByAspenId(aspenId);
   }
 
   pickupAspenNewLocation(loc: { id: number; code: string }): string {

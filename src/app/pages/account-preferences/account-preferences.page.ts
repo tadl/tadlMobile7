@@ -42,7 +42,7 @@ export class AccountPreferencesPage {
   private ignoreCircHistoryChange = false;
 
   readonly pickupOptions: SelectOption[] = [
-    { name: 'Traverse City', code: '23' },
+    { name: 'Woodmere', code: '23' },
     { name: 'Interlochen', code: '24' },
     { name: 'Kingsley', code: '25' },
     { name: 'Peninsula', code: '26' },

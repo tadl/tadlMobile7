@@ -28,6 +28,7 @@ import { ListsService, type AspenUserList } from '../../services/lists.service';
 import { AuthService } from '../../services/auth.service';
 import { CopyDetailsPopoverComponent } from '../copy-details-popover/copy-details-popover.component';
 import { ListMembershipIndexService } from '../../services/list-membership-index.service';
+import { AccountPreferencesService } from '../../services/account-preferences.service';
 
 interface ItemDetailListContext {
   listId: string;
@@ -120,6 +121,7 @@ export class ItemDetailComponent implements OnInit {
     private checkouts: CheckoutsService,
     private lists: ListsService,
     private membershipIndex: ListMembershipIndexService,
+    private accountPreferences: AccountPreferencesService,
     private router: Router,
     private modalCtrl: ModalController, // ✅ renamed from "modal"
     private actionSheet: ActionSheetController,
@@ -976,6 +978,13 @@ export class ItemDetailComponent implements OnInit {
     const loggedIn = await this.ensureLoggedInForInteractiveAction('Log in to place hold');
     if (!loggedIn) return;
 
+    const defaultPickupBranch = await this.defaultPickupBranchCode();
+    if (defaultPickupBranch) {
+      this.placeHoldNow(recordId, defaultPickupBranch);
+      return;
+    }
+
+    // Fallback to picker only if no default preference is available.
     const buttons: ActionSheetButton[] = this.globals.pickupLocations.map((loc) => ({
       text: loc.name,
       handler: () => this.placeHoldNow(recordId, loc.code),
@@ -1025,6 +1034,22 @@ export class ItemDetailComponent implements OnInit {
     const ok = await this.ensureLoggedInForInteractiveAction('Log in to place hold');
     if (!ok) return;
     this.placeHoldNow(recordId, pickupBranch);
+  }
+
+  private async defaultPickupBranchCode(): Promise<string | null> {
+    const activeId = (this.auth.snapshot()?.activeAccountId ?? '').toString().trim();
+    if (!activeId) return null;
+
+    try {
+      const prefs = await this.accountPreferences.getCachedPreferences(activeId);
+      const legacyCode = (prefs?.pickup_library ?? '').toString().trim();
+      if (!legacyCode) return null;
+
+      const loc = this.globals.pickupLocationFromLegacyPreferencesCode(legacyCode);
+      return loc?.code ?? null;
+    } catch {
+      return null;
+    }
   }
 
   private async ensureLoggedInForInteractiveAction(header: string): Promise<boolean> {

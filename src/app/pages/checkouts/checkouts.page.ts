@@ -63,11 +63,7 @@ export class CheckoutsPage {
       )
       .subscribe({
         next: (list) => {
-          this.ilsCheckouts = (list ?? []).slice().sort((a, b) => {
-            const da = Number(a?.dueDate ?? 0);
-            const db = Number(b?.dueDate ?? 0);
-            return da - db;
-          });
+          this.ilsCheckouts = this.sortCheckouts((list ?? []).slice());
         },
         error: () => this.toast.presentToast('Could not refresh checkouts.'),
       });
@@ -326,5 +322,25 @@ export class CheckoutsPage {
   private checkoutKey(c: AspenCheckout): string {
     const raw = (c as any)?.id ?? (c as any)?.itemId ?? (c as any)?.barcode ?? (c as any)?.recordId ?? '';
     return String(raw).trim();
+  }
+
+  private sortCheckouts(list: AspenCheckout[]): AspenCheckout[] {
+    return list.sort((a, b) => {
+      const aOverdue = !!a?.overdue;
+      const bOverdue = !!b?.overdue;
+      if (aOverdue !== bOverdue) return aOverdue ? -1 : 1;
+
+      const aDue = this.dueDateSortValue(a);
+      const bDue = this.dueDateSortValue(b);
+      if (aDue !== bDue) return aDue - bDue;
+
+      return this.checkoutTitle(a).localeCompare(this.checkoutTitle(b));
+    });
+  }
+
+  private dueDateSortValue(c: AspenCheckout): number {
+    const due = Number(c?.dueDate ?? 0);
+    if (!Number.isFinite(due) || due <= 0) return Number.MAX_SAFE_INTEGER;
+    return due;
   }
 }

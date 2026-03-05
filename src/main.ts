@@ -49,6 +49,8 @@ import {
   albumsOutline,
   barcodeOutline,
   cardOutline,
+  callOutline,
+  mailOutline,
 } from 'ionicons/icons';
 
 import { routes } from './app/app.routes';
@@ -85,6 +87,8 @@ addIcons({
   'albums-outline': albumsOutline,
   'barcode-outline': barcodeOutline,
   'card-outline': cardOutline,
+  'call-outline': callOutline,
+  'mail-outline': mailOutline,
 });
 
 bootstrapApplication(AppComponent, {

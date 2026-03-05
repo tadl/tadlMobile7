@@ -52,6 +52,20 @@
     gap: 0; // separator handles spacing
   }
 
+  .contact-links {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 2px;
+  }
+
+  .contact-link-btn {
+    margin: 0;
+    --padding-start: 10px;
+    --padding-end: 10px;
+  }
+
   .navigate-button {
     margin: 0;
     flex: 0 0 auto;
@@ -86,11 +100,11 @@
   align-items: center;
 
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(0, 0, 0, 0.05);
 
   .day {
     font-size: 15px;
-    opacity: 0.85;
+    opacity: 0.96;
     line-height: 1;
     padding-right: 12px;
     white-space: nowrap;
@@ -98,7 +112,7 @@
 
   .hours {
     font-size: 15px;
-    opacity: 0.95;
+    opacity: 1;
     line-height: 1;
 
     text-align: right;
@@ -108,11 +122,29 @@
   }
 
   &.today {
-    background: rgba(56, 128, 255, 0.14);
+    background: rgba(56, 128, 255, 0.2);
 
     .day,
     .hours {
       opacity: 1;
+    }
+  }
+}
+
+:host-context(.ion-palette-dark) {
+  .hours-row {
+    background: rgba(255, 255, 255, 0.04);
+
+    .day {
+      opacity: 0.88;
+    }
+
+    .hours {
+      opacity: 0.95;
+    }
+
+    &.today {
+      background: rgba(56, 128, 255, 0.14);
     }
   }
 }

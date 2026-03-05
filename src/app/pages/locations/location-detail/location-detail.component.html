@@ -23,16 +23,28 @@
           <div class="line" *ngIf="location.address">{{ location.address }}</div>
           <div class="line" *ngIf="location.citystatezip">{{ location.citystatezip }}</div>
 
-          <div class="line links" *ngIf="location.phone || location.email">
-            <a class="link" *ngIf="location.phone" [href]="telHref(location.phone)">
+          <div class="contact-links" *ngIf="location.phone || location.email">
+            <ion-button
+              *ngIf="location.phone"
+              size="small"
+              fill="outline"
+              class="contact-link-btn"
+              [href]="telHref(location.phone)"
+            >
+              <ion-icon name="call-outline" slot="start"></ion-icon>
               {{ location.phone }}
-            </a>
+            </ion-button>
 
-            <span class="sep" *ngIf="location.phone && location.email">•</span>
-
-            <a class="link" *ngIf="location.email" [href]="mailtoHref(location.email)">
+            <ion-button
+              *ngIf="location.email"
+              size="small"
+              fill="outline"
+              class="contact-link-btn"
+              [href]="mailtoHref(location.email)"
+            >
+              <ion-icon name="mail-outline" slot="start"></ion-icon>
               {{ location.email }}
-            </a>
+            </ion-button>
           </div>
         </div>
 

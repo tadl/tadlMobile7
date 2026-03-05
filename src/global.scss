@@ -78,3 +78,14 @@ ion-content.ion-padding {
 ion-card {
   margin-inline: 6px;
 }
+
+/* Slightly increase muted-text contrast in dark mode. */
+.ion-palette-dark {
+  ion-note {
+    color: rgba(235, 240, 250, 0.82);
+  }
+
+  .muted {
+    opacity: 0.9;
+  }
+}

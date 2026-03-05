@@ -118,6 +118,14 @@ ion-item.selected {
   --color: var(--ion-color-primary);
 }
 
-.app-root {
-  height: 100%;
+ion-split-pane {
+  --side-width: 300px;
+  --side-max-width: 340px;
+}
+
+/* Keep the persistent split-pane menu on the right for desktop widths. */
+@media (min-width: 992px) {
+  ion-split-pane.split-pane-visible {
+    flex-direction: row-reverse;
+  }
 }

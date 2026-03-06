@@ -36,7 +36,7 @@ android {
         applicationId "org.TADL.TADLMobile"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 70005
+        versionCode 70006
         versionName "7.0.5"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {

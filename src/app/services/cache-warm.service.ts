@@ -4,6 +4,7 @@ import { lastValueFrom } from 'rxjs';
 import { AuthService } from './auth.service';
 import { AccountStoreService } from './account-store.service';
 import { ListsService } from './lists.service';
+import { AccountPreferencesService } from './account-preferences.service';
 
 @Injectable({ providedIn: 'root' })
 export class CacheWarmService {
@@ -11,6 +12,7 @@ export class CacheWarmService {
     private auth: AuthService,
     private accounts: AccountStoreService,
     private lists: ListsService,
+    private preferences: AccountPreferencesService,
   ) {}
 
   warmForActiveAccount(): void {
@@ -20,6 +22,7 @@ export class CacheWarmService {
       await this.accounts.prewarmActivePassword();
       await lastValueFrom(this.auth.refreshActiveProfile());
       await lastValueFrom(this.lists.fetchUserLists());
+      await this.warmPreferencesForActiveAccount();
     });
   }
 
@@ -29,5 +32,19 @@ export class CacheWarmService {
     } catch {
       // warm-up is best-effort by design.
     }
+  }
+
+  private async warmPreferencesForActiveAccount(): Promise<void> {
+    const snap = this.auth.snapshot();
+    const accountId = (snap?.activeAccountId ?? '').toString().trim();
+    const username = (snap?.activeAccountMeta?.username ?? '').toString().trim();
+    if (!accountId || !username) return;
+
+    const password = await this.accounts.getPassword(accountId);
+    if (!password) return;
+
+    await lastValueFrom(
+      this.preferences.fetchForAccount(accountId, username, password),
+    );
   }
 }

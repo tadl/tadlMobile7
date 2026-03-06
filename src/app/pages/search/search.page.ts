@@ -740,12 +740,19 @@ export class SearchPage {
       return;
     }
 
-    const heldFormatKeys = await this.heldFormatKeysForGroupedWork(hit);
-    const availableTargets = holdTargets.filter(
-      (x) => !heldFormatKeys.has(this.normalizeFormatKey(x.formatLabel)),
-    );
+    const heldRecordIds = await this.heldRecordIdsForGroupedWork(hit);
+    let availableTargets = holdTargets.filter((x) => !heldRecordIds.has(x.recordId));
+
+    // Fallback when hold entries do not expose recordId reliably.
+    if (!availableTargets.length && heldRecordIds.size === 0) {
+      const heldFormatKeys = await this.heldFormatKeysForGroupedWork(hit);
+      availableTargets = holdTargets.filter(
+        (x) => !heldFormatKeys.has(this.normalizeFormatKey(x.formatLabel)),
+      );
+    }
+
     if (!availableTargets.length) {
-      this.toast.presentToast('You already have this format on hold.');
+      this.toast.presentToast('You already have all holdable formats on hold.');
       return;
     }
 
@@ -886,6 +893,28 @@ export class SearchPage {
       }
 
       return keys;
+    } catch {
+      return new Set<string>();
+    }
+  }
+
+  private async heldRecordIdsForGroupedWork(hit: AspenSearchHit): Promise<Set<string>> {
+    const groupedKey = (hit?.key ?? '').toString().trim().toLowerCase();
+    if (!groupedKey) return new Set<string>();
+
+    try {
+      const holds = await lastValueFrom(this.holds.fetchActiveHolds());
+      const ids = new Set<string>();
+
+      for (const hold of holds ?? []) {
+        const holdGrouped = (hold?.groupedWorkId ?? '').toString().trim().toLowerCase();
+        if (!holdGrouped || holdGrouped !== groupedKey) continue;
+
+        const rid = (hold?.recordId ?? '').toString().trim();
+        if (rid) ids.add(rid);
+      }
+
+      return ids;
     } catch {
       return new Set<string>();
     }

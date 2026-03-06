@@ -66,30 +66,6 @@
     </ion-card-content>
   </ion-card>
 
-  <!-- YOU HAVE THIS ON HOLD (only when provided by component.ts) -->
-  <ion-card *ngIf="hold" class="hold-card">
-    <ion-card-header>
-      <ion-card-title>You have this item on hold</ion-card-title>
-    </ion-card-header>
-    <ion-card-content>
-      <div class="hold-line" *ngIf="holdPositionText()">{{ holdPositionText() }}</div>
-      <div class="hold-line" *ngIf="holdPickupText()">{{ holdPickupText() }}</div>
-      <div class="hold-line" *ngIf="holdStatusText()">
-        Status:
-        <span class="hold-status" [ngClass]="holdStatusClass()">
-          {{ holdStatusText() }}
-        </span>
-      </div>
-
-      <div class="hold-actions">
-        <ion-button expand="block" *ngIf="!holdIsReady() && holdIsFrozen()" (click)="thawHold()">Activate</ion-button>
-        <ion-button expand="block" *ngIf="!holdIsReady() && !holdIsFrozen()" (click)="freezeHold()">Suspend</ion-button>
-        <ion-button expand="block" fill="outline" *ngIf="!holdIsReady()" (click)="changePickupLocation()">Change pickup location</ion-button>
-        <ion-button expand="block" color="danger" (click)="confirmCancelHold()">Cancel</ion-button>
-      </div>
-    </ion-card-content>
-  </ion-card>
-
   <!-- Formats -->
   <ion-card *ngIf="work?.formats as fmts">
     <ion-card-header>
@@ -155,7 +131,7 @@
                 [disabled]="holdActionBusy || (hasHoldForFormat(('' + kv.key)) && isIlsHoldAction(a))"
                 (click)="handleFormatAction(a, ('' + kv.key))"
               >
-                {{ a.title || 'Action' }}
+                {{ (hasHoldForFormat(('' + kv.key)) && isIlsHoldAction(a)) ? 'On Hold' : (a.title || 'Action') }}
               </ion-button>
             </div>
 
@@ -171,6 +147,43 @@
           </div>
         </ion-item>
       </ion-list>
+    </ion-card-content>
+  </ion-card>
+
+  <!-- YOU HAVE THIS ON HOLD -->
+  <ion-card *ngIf="hasAnyHoldForItem()" class="hold-card">
+    <ion-card-header>
+      <ion-card-title>{{ holdCardTitle() }}</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <div *ngIf="hasMultipleHoldsForItem(); else singleHoldBlock" class="hold-multi-list">
+        <div class="hold-entry" *ngFor="let h of holdsForItem">
+          <div class="hold-entry-format">{{ holdFormatText(h) }}</div>
+          <div class="hold-line" *ngIf="holdPositionText(h)">{{ holdPositionText(h) }}</div>
+          <div class="hold-line" *ngIf="holdPickupText(h)">{{ holdPickupText(h) }}</div>
+          <div class="hold-line" *ngIf="holdStatusText(h)">
+            Status:
+            <span class="hold-status" [ngClass]="holdStatusClass(h)">
+              {{ holdStatusText(h) }}
+            </span>
+          </div>
+        </div>
+      </div>
+      <ng-template #singleHoldBlock>
+        <div class="hold-line hold-entry-format">{{ holdFormatText() }}</div>
+        <div class="hold-line" *ngIf="holdPositionText()">{{ holdPositionText() }}</div>
+        <div class="hold-line" *ngIf="holdPickupText()">{{ holdPickupText() }}</div>
+        <div class="hold-line" *ngIf="holdStatusText()">
+          Status:
+          <span class="hold-status" [ngClass]="holdStatusClass()">
+            {{ holdStatusText() }}
+          </span>
+        </div>
+      </ng-template>
+
+      <div class="hold-actions">
+        <ion-button expand="block" fill="outline" (click)="openHoldManager()">Manage hold{{ hasMultipleHoldsForItem() ? 's' : '' }}</ion-button>
+      </div>
     </ion-card-content>
   </ion-card>
 

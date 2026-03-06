@@ -111,6 +111,22 @@
   opacity: 0.95;
 }
 
+.hold-multi-list {
+  display: grid;
+  gap: 10px;
+}
+
+.hold-entry {
+  padding: 8px 10px;
+  border: 1px solid rgba(var(--ion-text-color-rgb), 0.12);
+  border-radius: 10px;
+}
+
+.hold-entry-format {
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
 .hold-status {
   font-weight: 600;
 }

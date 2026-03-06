@@ -78,6 +78,7 @@ export class ItemDetailComponent implements OnInit {
 
   /** if we got here from HoldsPage, it passes the hold as hit.raw */
   hold: AspenHold | null = null;
+  holdsForItem: AspenHold[] = [];
 
   /** if we got here from CheckoutsPage, it passes the checkout as hit.raw */
   checkout: AspenCheckout | null = null;
@@ -133,6 +134,7 @@ export class ItemDetailComponent implements OnInit {
   ngOnInit() {
     // If opened from Holds/Checkouts pages, we already have the object in hit.raw
     this.hold = this.extractHoldFromHit(this.hit);
+    this.holdsForItem = this.hold ? [this.hold] : [];
     this.checkout = this.extractCheckoutFromHit(this.hit);
     void this.refreshOwnedListIds();
     void this.seedKnownListMemberships();
@@ -567,46 +569,72 @@ export class ItemDetailComponent implements OnInit {
   // Hold card helpers
   // ----------------------------
 
-  holdIsFrozen(): boolean {
-    const h: any = this.hold;
+  hasAnyHoldForItem(): boolean {
+    return this.holdsForItem.length > 0;
+  }
+
+  hasMultipleHoldsForItem(): boolean {
+    return this.holdsForItem.length > 1;
+  }
+
+  holdCardTitle(): string {
+    if (this.holdsForItem.length > 1) {
+      return `You have ${this.holdsForItem.length} holds on this item`;
+    }
+    return 'You have this item on hold';
+  }
+
+  holdFormatText(hold?: AspenHold | null): string {
+    const h: any = hold ?? this.hold;
+    if (!h) return 'Format';
+    const f = h?.format;
+    if (Array.isArray(f) && f.length) {
+      return f.map((x: any) => (x ?? '').toString().trim()).filter(Boolean).join(', ');
+    }
+    if (typeof f === 'string' && f.trim()) return f.trim();
+    return 'Format';
+  }
+
+  holdIsFrozen(hold?: AspenHold | null): boolean {
+    const h: any = hold ?? this.hold;
     if (!h) return false;
     if (h?.frozen === true) return true;
     const status = (h?.statusMessage ?? h?.status ?? '').toString().toLowerCase();
     return status.includes('frozen') || status.includes('suspend') || status.includes('suspended');
   }
 
-  holdIsReady(): boolean {
-    const h: any = this.hold;
+  holdIsReady(hold?: AspenHold | null): boolean {
+    const h: any = hold ?? this.hold;
     if (!h) return false;
     if (h?.available === true) return true;
     const status = (h?.statusMessage ?? h?.status ?? '').toString().toLowerCase();
     return status.includes('ready to pickup') || status.includes('ready for pickup') || status.includes('ready');
   }
 
-  holdStatusText(): string {
-    const h: any = this.hold;
+  holdStatusText(hold?: AspenHold | null): string {
+    const h: any = hold ?? this.hold;
     if (!h) return '';
     const raw = (h?.statusMessage ?? h?.status ?? '').toString().trim();
     if (raw && /ready/i.test(raw)) return raw;
-    return this.holdIsFrozen() ? 'Suspended' : 'Active';
+    return this.holdIsFrozen(h) ? 'Suspended' : 'Active';
   }
 
-  holdStatusClass(): string {
-    const txt = this.holdStatusText().toLowerCase();
+  holdStatusClass(hold?: AspenHold | null): string {
+    const txt = this.holdStatusText(hold).toLowerCase();
     if (txt.includes('ready')) return 'status-ready';
     if (txt.includes('suspend')) return 'status-suspended';
     return 'status-active';
   }
 
-  holdPickupText(): string {
-    const h: any = this.hold;
+  holdPickupText(hold?: AspenHold | null): string {
+    const h: any = hold ?? this.hold;
     if (!h) return '';
     const name = (h?.pickupLocationName ?? h?.currentPickupName ?? '').toString().trim();
     return name ? `Pickup: ${name}` : '';
   }
 
-  holdPositionText(): string {
-    const h: any = this.hold;
+  holdPositionText(hold?: AspenHold | null): string {
+    const h: any = hold ?? this.hold;
     if (!h) return '';
     const pos = Number(h?.position);
     const q = Number(h?.holdQueueLength);
@@ -643,7 +671,7 @@ export class ItemDetailComponent implements OnInit {
           this.toast.presentToast('Hold suspended.');
 
           // authoritative refresh (ensures pickup/status/etc stays correct)
-          this.refreshHoldForThisItem();
+          this.refreshHoldForThisItem(true);
         },
         error: () => this.toast.presentToast('Could not suspend hold.'),
       });
@@ -673,7 +701,7 @@ export class ItemDetailComponent implements OnInit {
           this.toast.presentToast('Hold activated.');
 
           // authoritative refresh
-          this.refreshHoldForThisItem();
+          this.refreshHoldForThisItem(true);
         },
         error: () => this.toast.presentToast('Could not activate hold.'),
       });
@@ -700,6 +728,10 @@ export class ItemDetailComponent implements OnInit {
   private cancelHoldNow() {
     if (!this.hold || this.holdActionBusy) return;
 
+    const selected = this.hold;
+    const canceledHoldId = Number((selected as any)?.cancelId ?? (selected as any)?.id ?? 0) || 0;
+    const canceledRecordId = ((selected as any)?.recordId ?? '').toString().trim();
+
     this.holdActionBusy = true;
     this.holds
       .cancelHold(this.hold)
@@ -714,9 +746,18 @@ export class ItemDetailComponent implements OnInit {
           this.needsHoldsRefresh = true;
 
           this.toast.presentToast(res?.message || 'Hold cancelled.');
-          const canceledId = Number(this.hold?.cancelId ?? this.hold?.id ?? 0) || null;
-          this.modalCtrl.dismiss({ refreshHolds: true, canceledHoldId: canceledId });
-          this.globals.modal_open = false;
+
+          // Keep modal open and update local state without re-fetching.
+          this.holdsForItem = this.holdsForItem.filter((h) => {
+            const id = Number((h as any)?.cancelId ?? (h as any)?.id ?? 0) || 0;
+            if (canceledHoldId && id === canceledHoldId) return false;
+            if (!canceledHoldId && canceledRecordId) {
+              const rid = ((h as any)?.recordId ?? '').toString().trim();
+              if (rid && rid === canceledRecordId) return false;
+            }
+            return true;
+          });
+          this.hold = this.holdsForItem[0] ?? null;
         },
         error: () => this.toast.presentToast('Could not cancel hold.'),
       });
@@ -781,10 +822,60 @@ export class ItemDetailComponent implements OnInit {
           this.toast.presentToast(res?.message || 'Pickup location updated.');
 
           // authoritative refresh so the UI reflects server truth
-          this.refreshHoldForThisItem();
+          this.refreshHoldForThisItem(true);
         },
         error: () => this.toast.presentToast('Could not change pickup location.'),
       });
+  }
+
+  async openHoldManager() {
+    if (!this.holdsForItem.length || this.holdActionBusy) return;
+
+    if (this.holdsForItem.length === 1) {
+      this.hold = this.holdsForItem[0];
+      await this.openActionsForCurrentHold();
+      return;
+    }
+
+    const picker = await this.actionSheet.create({
+      header: 'Choose hold to manage',
+      buttons: [
+        ...this.holdsForItem.map((h): ActionSheetButton => ({
+          text: `${this.holdFormatText(h)} • ${this.holdStatusText(h)}`,
+          handler: () => {
+            this.hold = h;
+            void this.openActionsForCurrentHold();
+          },
+        })),
+        { text: 'Close', role: 'cancel' },
+      ],
+    });
+    await picker.present();
+  }
+
+  private async openActionsForCurrentHold() {
+    if (!this.hold) return;
+    const isReady = this.holdIsReady(this.hold);
+    const isFrozen = this.holdIsFrozen(this.hold);
+
+    const buttons: ActionSheetButton[] = [];
+    if (!isReady && isFrozen) {
+      buttons.push({ text: 'Activate', handler: () => this.thawHold() });
+    }
+    if (!isReady && !isFrozen) {
+      buttons.push({ text: 'Suspend', handler: () => this.freezeHold() });
+    }
+    if (!isReady) {
+      buttons.push({ text: 'Change pickup location', handler: () => this.changePickupLocation() });
+    }
+    buttons.push({ text: 'Cancel Hold', role: 'destructive', handler: () => this.confirmCancelHold() });
+    buttons.push({ text: 'Close', role: 'cancel' });
+
+    const actions = await this.actionSheet.create({
+      header: this.holdFormatText(this.hold),
+      buttons,
+    });
+    await actions.present();
   }
 
   private parseAspenNewLocation(s: string): { id: string; code: string } | null {
@@ -939,21 +1030,52 @@ export class ItemDetailComponent implements OnInit {
   }
 
   hasHoldForFormat(formatKey: string): boolean {
-    const h: any = this.hold;
-    if (!h) return false;
+    const wanted = (formatKey ?? '').toString().trim();
+    if (!wanted || !this.holdsForItem.length) return false;
 
-    const f = h?.['format'];
-    const wanted = (formatKey ?? '').toString().trim().toLowerCase();
-    if (!wanted) return false;
-
-    if (Array.isArray(f)) {
-      return f.some((x: any) => (x ?? '').toString().trim().toLowerCase() === wanted);
+    const idsForFormat = this.holdableRecordIdsForFormat(wanted);
+    if (idsForFormat.length) {
+      const heldIds = new Set(
+        this.holdsForItem
+          .map((h) => (h?.recordId ?? '').toString().trim())
+          .filter((id) => !!id),
+      );
+      if (idsForFormat.some((id) => heldIds.has(id))) return true;
     }
-    if (typeof f === 'string') {
-      return f.trim().toLowerCase() === wanted;
-    }
 
-    return false;
+    const wantedNorm = this.normalizeFormatValue(wanted);
+    if (!wantedNorm) return false;
+    return this.holdsForItem.some((h: any) => {
+      const f = h?.format;
+      if (Array.isArray(f)) {
+        return f.some((x: any) => this.normalizeFormatValue((x ?? '').toString()) === wantedNorm);
+      }
+      if (typeof f === 'string') {
+        return this.normalizeFormatValue(f) === wantedNorm;
+      }
+      return false;
+    });
+  }
+
+  private holdableRecordIdsForFormat(formatKey: string): string[] {
+    const fmt = (this.work?.formats as any)?.[formatKey];
+    const actions = Array.isArray(fmt?.actions) ? fmt.actions : [];
+    const ids = new Set<string>();
+    for (const action of actions) {
+      if (!this.isIlsHoldAction(action)) continue;
+      const recordId = this.items.extractIlsIdFromOnclick((action?.onclick ?? '').toString());
+      if (!recordId) continue;
+      ids.add(recordId);
+    }
+    return Array.from(ids);
+  }
+
+  private normalizeFormatValue(value: string): string {
+    return (value ?? '')
+      .toString()
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, ' ');
   }
 
   isIlsHoldAction(action: any): boolean {
@@ -1059,7 +1181,7 @@ export class ItemDetailComponent implements OnInit {
           this.toast.presentToast(res?.message || 'Hold placed.');
 
           // fetch holds and attach the hold for this grouped work so the card appears
-          this.refreshHoldForThisItem();
+          this.refreshHoldForThisItem(true);
         },
         error: (err) => {
           const msg = (err?.message ?? '').toString().trim();
@@ -1377,11 +1499,14 @@ export class ItemDetailComponent implements OnInit {
     return out;
   }
 
-  private refreshHoldForThisItem() {
+  private refreshHoldForThisItem(force = false) {
     const key = (this.hit?.key ?? '').toString().trim();
     if (!key) return;
 
-    if (this.hold && String((this.hold as any)?.groupedWorkId ?? '').trim() === key) return;
+    if (!force && (
+      this.holdsForItem.length > 0 &&
+      this.holdsForItem.every((h) => String((h as any)?.groupedWorkId ?? '').trim() === key)
+    )) return;
 
     if (this.holdRefreshBusy) return;
     this.holdRefreshBusy = true;
@@ -1390,9 +1515,21 @@ export class ItemDetailComponent implements OnInit {
       .pipe(finalize(() => (this.holdRefreshBusy = false)))
       .subscribe({
         next: (list) => {
-          const found =
-            (list ?? []).find(h => String((h as any)?.groupedWorkId ?? '').trim() === key) ?? null;
-          if (found) this.hold = found;
+          const matches = (list ?? []).filter(
+            (h) => String((h as any)?.groupedWorkId ?? '').trim() === key,
+          );
+          this.holdsForItem = matches;
+
+          if (!matches.length) {
+            this.hold = null;
+            return;
+          }
+
+          const currentId = Number((this.hold as any)?.id ?? 0) || 0;
+          const keepCurrent = currentId
+            ? matches.find((h) => (Number((h as any)?.id ?? 0) || 0) === currentId) ?? null
+            : null;
+          this.hold = keepCurrent ?? matches[0];
         },
         error: () => {},
       });

@@ -200,12 +200,16 @@ export class ItemService {
    * Extract ILS record id from Aspen "Place Hold" onclick strings.
    * Example:
    * return AspenDiscovery.Record.showPlaceHold('Record', 'ils', '48283600', '', '243863');
+   * return AspenDiscovery.Record.showPlaceHoldEditions('Record', 'ils', '48021521', '', '9549');
    */
   extractIlsIdFromOnclick(onclick?: string): string | null {
     if (!onclick) return null;
 
-    const m = onclick.match(/showPlaceHold\([^)]*'ils'\s*,\s*'(\d+)'/i);
-    if (m?.[1]) return m[1];
+    const m = onclick.match(
+      /showPlaceHold(?:Editions)?\s*\([^)]*['"]ils['"]\s*,\s*['"]([^'"]+)['"]/i,
+    );
+    const id = (m?.[1] ?? '').toString().trim();
+    if (id) return id;
 
     return null;
   }

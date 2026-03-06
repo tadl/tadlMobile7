@@ -141,6 +141,10 @@ export class SearchPage {
 
   async searchMelcat() {
     const q = (this.lookfor ?? '').trim();
+    if (!q) {
+      this.toast.presentToast('To search MeLCat, please provide a search query.');
+      return;
+    }
     await this.globals.open_page(this.globals.melcatSearchUrl(q));
   }
 

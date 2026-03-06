@@ -54,6 +54,9 @@ import {
   eyeOutline,
   eyeOffOutline,
   helpCircleOutline,
+  bookOutline,
+  discOutline,
+  videocamOutline,
 } from 'ionicons/icons';
 
 import { routes } from './app/app.routes';
@@ -95,6 +98,9 @@ addIcons({
   'eye-outline': eyeOutline,
   'eye-off-outline': eyeOffOutline,
   'help-circle-outline': helpCircleOutline,
+  'book-outline': bookOutline,
+  'disc-outline': discOutline,
+  'videocam-outline': videocamOutline,
 });
 
 bootstrapApplication(AppComponent, {

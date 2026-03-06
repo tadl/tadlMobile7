@@ -1,9 +1,10 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { IonicModule, ModalController } from '@ionic/angular';
+import { IonicModule, ModalController, ActionSheetController, type ActionSheetButton } from '@ionic/angular';
 import { ActivatedRoute } from '@angular/router';
 import { finalize } from 'rxjs';
+import { lastValueFrom } from 'rxjs';
 import {
   CapacitorBarcodeScanner,
   CapacitorBarcodeScannerAndroidScanningLibrary,
@@ -18,6 +19,13 @@ import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
 import { SearchService, AspenSearchHit, AspenSearchIndex, AspenSearchSort } from '../../services/search.service';
 import { ItemDetailComponent } from '../../components/item-detail/item-detail.component';
+import { FormatFamilyService } from '../../services/format-family.service';
+import { ListsService, AspenUserList } from '../../services/lists.service';
+import { ListMembershipIndexService } from '../../services/list-membership-index.service';
+import { ItemService } from '../../services/item.service';
+import { HoldsService } from '../../services/holds.service';
+import { AccountPreferencesService } from '../../services/account-preferences.service';
+import { AuthService } from '../../services/auth.service';
 
 interface SearchFacetOption {
   filter: string;
@@ -39,6 +47,12 @@ interface SearchFacetGroup {
 interface SearchSortOption {
   value: AspenSearchSort;
   label: string;
+}
+
+interface HoldTargetOption {
+  recordId: string;
+  label: string;
+  formatLabel: string;
 }
 
 @Component({
@@ -82,12 +96,21 @@ export class SearchPage {
   totalPages = 1;
   infiniteDisabled = true;
   scanningIsbn = false;
+  actionBusyByKey: Record<string, boolean> = {};
 
   constructor(
     public globals: Globals,
     public toast: ToastService,
     private searchService: SearchService,
     private modalController: ModalController,
+    private actionSheetController: ActionSheetController,
+    private formatFamily: FormatFamilyService,
+    private listsService: ListsService,
+    private membershipIndex: ListMembershipIndexService,
+    private itemService: ItemService,
+    private holds: HoldsService,
+    private accountPreferences: AccountPreferencesService,
+    private auth: AuthService,
     private route: ActivatedRoute,
   ) {}
 
@@ -413,8 +436,58 @@ export class SearchPage {
     return await modal.present();
   }
 
+  async openHitActions(hit: AspenSearchHit, ev?: Event) {
+    ev?.stopPropagation();
+
+    const buttons: ActionSheetButton[] = [];
+    if (this.canPlaceHoldFromHit(hit)) {
+      buttons.push({
+        text: 'Place Hold',
+        handler: () => this.placeHoldFromHit(hit),
+      });
+    }
+    buttons.push(
+      {
+        text: 'Add to List',
+        handler: () => this.addHitToList(hit),
+      },
+      {
+        text: 'View Details',
+        handler: () => this.openDetail(hit),
+      },
+      { text: 'Close', role: 'cancel' },
+    );
+
+    const sheet = await this.actionSheetController.create({
+      header: hit.title || 'Search Result',
+      buttons,
+    });
+    await sheet.present();
+  }
+
   trackById(_idx: number, h: AspenSearchHit) {
     return h.key;
+  }
+
+  mediaFamilySummary(hit: AspenSearchHit): string {
+    return this.formatFamily.familySummaryForHit(hit);
+  }
+
+  mediaIconName(hit: AspenSearchHit): string {
+    const family = this.formatFamily.primaryFamilyForHit(hit);
+    if (family === 'book') return 'book-outline';
+    if (family === 'music') return 'disc-outline';
+    if (family === 'video') return 'videocam-outline';
+    return 'albums-outline';
+  }
+
+  canPlaceHoldFromHit(hit: AspenSearchHit): boolean {
+    return this.formatFamily.hasPhysicalHoldableFormat(hit);
+  }
+
+  rowActionBusy(hit: AspenSearchHit): boolean {
+    const key = (hit?.key ?? '').toString().trim();
+    return !!(key && this.actionBusyByKey[key]);
   }
 
   trackFacetGroup(_idx: number, g: SearchFacetGroup) {
@@ -576,5 +649,273 @@ export class SearchPage {
     if (cleaned.length === 13) return cleaned;
     if (cleaned.length === 10) return cleaned;
     return '';
+  }
+
+  private async addHitToList(hit: AspenSearchHit): Promise<void> {
+    const recordId = (hit?.key ?? '').toString().trim();
+    if (!recordId) {
+      this.toast.presentToast('This record is missing an id.');
+      return;
+    }
+
+    if (!this.auth.snapshot()?.isLoggedIn) {
+      this.toast.presentToast('Log in to add items to lists.');
+      return;
+    }
+
+    let lists: AspenUserList[] = [];
+    try {
+      lists = await lastValueFrom(this.listsService.fetchUserLists());
+    } catch {
+      this.toast.presentToast('Could not load your lists.');
+      return;
+    }
+
+    if (!lists.length) {
+      this.toast.presentToast('You do not have any lists yet.');
+      return;
+    }
+
+    const sheet = await this.actionSheetController.create({
+      header: 'Add to which list?',
+      buttons: [
+        ...lists.map((list): ActionSheetButton => ({
+          text: this.actionListLabel(list),
+          handler: () => this.addRecordToNamedList(list, hit),
+        })),
+        { text: 'Close', role: 'cancel' },
+      ],
+    });
+    await sheet.present();
+  }
+
+  private actionListLabel(list: AspenUserList): string {
+    const title = (list?.title ?? '').toString().trim() || 'Untitled list';
+    const n = Number((list as any)?.numTitles ?? 0);
+    if (Number.isFinite(n) && n > 0) return `${title} (${n})`;
+    return title;
+  }
+
+  private addRecordToNamedList(list: AspenUserList, hit: AspenSearchHit): void {
+    const listId = (list?.id ?? '').toString().trim();
+    const recordId = (hit?.key ?? '').toString().trim();
+    if (!listId || !recordId) return;
+    if (this.rowActionBusy(hit)) return;
+
+    this.setRowBusy(hit, true);
+    this.listsService.addTitlesToList(listId, [recordId])
+      .pipe(finalize(() => this.setRowBusy(hit, false)))
+      .subscribe({
+        next: (res) => {
+          if (!res?.success) {
+            this.toast.presentToast(res?.message || 'Could not add to list.');
+            return;
+          }
+          const listTitle = (list?.title ?? '').toString().trim() || 'Untitled list';
+          this.membershipIndex.upsertMembership(recordId, listId, listTitle).catch(() => {});
+          this.toast.presentToast(res?.message || 'Added to list.');
+        },
+        error: () => this.toast.presentToast('Could not add to list.'),
+      });
+  }
+
+  private async placeHoldFromHit(hit: AspenSearchHit): Promise<void> {
+    if (!this.auth.snapshot()?.isLoggedIn) {
+      this.toast.presentToast('Log in to place holds.');
+      return;
+    }
+    if (!this.canPlaceHoldFromHit(hit)) {
+      this.toast.presentToast('No physical holdable format found for this result.');
+      return;
+    }
+    if (this.rowActionBusy(hit)) return;
+
+    const holdTargets = await this.resolveIlsHoldTargets(hit);
+    if (!holdTargets.length) {
+      this.toast.presentToast('Could not determine holdable record id. Open details to place hold.');
+      return;
+    }
+
+    const heldFormatKeys = await this.heldFormatKeysForGroupedWork(hit);
+    const availableTargets = holdTargets.filter(
+      (x) => !heldFormatKeys.has(this.normalizeFormatKey(x.formatLabel)),
+    );
+    if (!availableTargets.length) {
+      this.toast.presentToast('You already have this format on hold.');
+      return;
+    }
+
+    let selectedTarget = availableTargets[0];
+    if (availableTargets.length > 1) {
+      const picked = await this.pickHoldTarget(availableTargets);
+      if (!picked) return;
+      selectedTarget = picked;
+    }
+
+    const defaultPickup = await this.defaultPickupBranchCode();
+    if (defaultPickup) {
+      this.placeHoldNow(hit, selectedTarget.recordId, defaultPickup, selectedTarget.label);
+      return;
+    }
+
+    const buttons: ActionSheetButton[] = this.globals.pickupLocations.map((loc) => ({
+      text: loc.name,
+      handler: () => this.placeHoldNow(hit, selectedTarget.recordId, loc.code, selectedTarget.label),
+    }));
+    buttons.push({ text: 'Close', role: 'cancel' });
+
+    const sheet = await this.actionSheetController.create({
+      header: 'Pick up where?',
+      buttons,
+    });
+    await sheet.present();
+  }
+
+  private placeHoldNow(
+    hit: AspenSearchHit,
+    recordId: string,
+    pickupBranch: string,
+    selectedFormatLabel?: string,
+  ): void {
+    if (this.rowActionBusy(hit)) return;
+    this.setRowBusy(hit, true);
+    this.holds.placeHold(recordId, pickupBranch, null)
+      .pipe(finalize(() => this.setRowBusy(hit, false)))
+      .subscribe({
+        next: (res) => {
+          if (!res?.success) {
+            this.toast.presentToast(res?.message || 'Could not place hold.');
+            return;
+          }
+          if (selectedFormatLabel) {
+            this.toast.presentToast(`Hold placed on format ${selectedFormatLabel}.`);
+            return;
+          }
+          this.toast.presentToast(res?.message || 'Hold placed.');
+        },
+        error: () => this.toast.presentToast('Could not place hold.'),
+      });
+  }
+
+  private async resolveIlsHoldTargets(hit: AspenSearchHit): Promise<HoldTargetOption[]> {
+    const groupedKey = (hit?.key ?? '').toString().trim();
+    if (!groupedKey) return [];
+
+    try {
+      const work = await lastValueFrom(this.itemService.getGroupedWork(groupedKey));
+      const physicalById = new Map<string, HoldTargetOption>();
+      const anyById = new Map<string, HoldTargetOption>();
+
+      for (const [formatKey, fmt] of Object.entries(work?.formats ?? {})) {
+        const cls = this.formatFamily.classifyFormatLabel(formatKey);
+        const formatLabel =
+          (fmt?.label ?? '').toString().trim() ||
+          (formatKey ?? '').toString().trim() ||
+          'Format';
+
+        for (const action of fmt?.actions ?? []) {
+          const id = this.itemService.extractIlsIdFromOnclick((action as any)?.onclick);
+          if (!id) continue;
+          const actionTitle = ((action as any)?.title ?? '').toString().trim();
+          const isRedundantPlaceHold = actionTitle.toLowerCase() === 'place hold';
+          const label = actionTitle && !isRedundantPlaceHold ? `${formatLabel} (${actionTitle})` : formatLabel;
+          const target: HoldTargetOption = { recordId: id, label, formatLabel };
+          if (!anyById.has(id)) anyById.set(id, target);
+          if (cls.physical && !physicalById.has(id)) physicalById.set(id, target);
+        }
+      }
+
+      const physical = Array.from(physicalById.values());
+      if (physical.length) return physical;
+
+      return Array.from(anyById.values());
+    } catch {
+      return [];
+    }
+  }
+
+  private async pickHoldTarget(options: HoldTargetOption[]): Promise<HoldTargetOption | null> {
+    return new Promise(async (resolve) => {
+      const sheet = await this.actionSheetController.create({
+        header: 'Place hold on which format?',
+        buttons: [
+          ...options.map((opt): ActionSheetButton => ({
+            text: opt.label,
+            handler: () => resolve(opt),
+          })),
+          {
+            text: 'Close',
+            role: 'cancel',
+            handler: () => resolve(null),
+          },
+        ],
+      });
+
+      await sheet.present();
+      await sheet.onDidDismiss();
+      resolve(null);
+    });
+  }
+
+  private async heldFormatKeysForGroupedWork(hit: AspenSearchHit): Promise<Set<string>> {
+    const groupedKey = (hit?.key ?? '').toString().trim().toLowerCase();
+    if (!groupedKey) return new Set<string>();
+
+    try {
+      const holds = await lastValueFrom(this.holds.fetchActiveHolds());
+      const keys = new Set<string>();
+
+      for (const hold of holds ?? []) {
+        const holdGrouped = (hold?.groupedWorkId ?? '').toString().trim().toLowerCase();
+        if (!holdGrouped || holdGrouped !== groupedKey) continue;
+
+        const f = (hold as any)?.format;
+        if (Array.isArray(f)) {
+          for (const x of f) {
+            const key = this.normalizeFormatKey((x ?? '').toString());
+            if (key) keys.add(key);
+          }
+        } else if (typeof f === 'string') {
+          const key = this.normalizeFormatKey(f);
+          if (key) keys.add(key);
+        }
+      }
+
+      return keys;
+    } catch {
+      return new Set<string>();
+    }
+  }
+
+  private normalizeFormatKey(value: string): string {
+    return (value ?? '')
+      .toString()
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, ' ');
+  }
+
+  private async defaultPickupBranchCode(): Promise<string | null> {
+    const activeId = (this.auth.snapshot()?.activeAccountId ?? '').toString().trim();
+    if (!activeId) return null;
+
+    try {
+      const prefs = await this.accountPreferences.getCachedPreferences(activeId);
+      const legacyCode = (prefs?.pickup_library ?? '').toString().trim();
+      if (!legacyCode) return null;
+      const loc = this.globals.pickupLocationFromLegacyPreferencesCode(legacyCode);
+      return loc?.code ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  private setRowBusy(hit: AspenSearchHit, busy: boolean) {
+    const key = (hit?.key ?? '').toString().trim();
+    if (!key) return;
+    this.actionBusyByKey = {
+      ...this.actionBusyByKey,
+      [key]: busy,
+    };
   }
 }

@@ -120,15 +120,17 @@
   </ion-refresher>
 
   <ion-list *ngIf="hits.length > 0">
-    <ion-item button *ngFor="let h of hits; trackBy: trackById" (click)="openDetail(h)">
+    <ion-item button detail="false" *ngFor="let h of hits; trackBy: trackById" (click)="openDetail(h)">
       <ion-thumbnail slot="start" *ngIf="h.coverUrl">
         <img [src]="h.coverUrl" alt="" />
       </ion-thumbnail>
 
       <ion-label>
-        <h2>{{ h.title || 'Untitled' }}</h2>
+        <h2 class="result-title">
+          <ion-icon [name]="mediaIconName(h)" aria-hidden="true"></ion-icon>
+          <span>{{ h.title || 'Untitled' }}</span>
+        </h2>
         <p *ngIf="h.author">{{ h.author }}</p>
-        <p *ngIf="h.format">{{ h.format }}</p>
         <p *ngIf="h.lastCheckOut">
           Last checked out: {{ formatLastCheckOut(h.lastCheckOut) }}
         </p>
@@ -136,6 +138,18 @@
           {{ listCountLabel(h) }}: {{ listTitles(h) }}
         </p>
       </ion-label>
+
+      <ion-button
+        slot="end"
+        fill="clear"
+        size="small"
+        class="row-action"
+        aria-label="Search result actions"
+        [disabled]="rowActionBusy(h)"
+        (click)="openHitActions(h, $event)"
+      >
+        <ion-icon name="ellipsis-vertical" slot="icon-only"></ion-icon>
+      </ion-button>
     </ion-item>
   </ion-list>
 

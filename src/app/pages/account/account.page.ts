@@ -74,6 +74,10 @@ export class AccountPage implements OnInit {
     return this.loggedInName(profile).toUpperCase();
   }
 
+  loggedInIlsUsername(profile: any): string {
+    return (profile?.ils_username ?? '').toString().trim();
+  }
+
   overdueCount(profile: any): number {
     const n = Number(profile?.numOverdue ?? 0);
     return Number.isFinite(n) && n > 0 ? n : 0;

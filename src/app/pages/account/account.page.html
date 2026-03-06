@@ -94,8 +94,8 @@
     <div class="section-header logged-in-header">
       <div class="logged-in-header-row">
         <div>
-          <div class="logged-in-as">Logged in as</div>
-          <div class="logged-in-name">{{ loggedInNameUpper(s.profile) }}</div>
+          <div class="logged-in-name">{{ loggedInName(s.profile) }}</div>
+          <div class="logged-in-as" *ngIf="loggedInIlsUsername(s.profile) as ils">({{ ils }})</div>
         </div>
         <ion-button size="small" class="section-action" (click)="showCard()">View Card</ion-button>
       </div>

@@ -196,7 +196,9 @@ export class ListsService {
     const params: Record<string, string> = { id };
     if (updates?.title !== undefined) params['title'] = (updates.title ?? '').toString().trim();
     if (updates?.description !== undefined) params['description'] = (updates.description ?? '').toString().trim();
-    if (updates?.isPublic !== undefined) params['public'] = updates.isPublic ? '1' : '0';
+    // Backend quirk: docs/api/ListAPI.php editList() does not treat string "0" as false.
+    // Send explicit booleans-as-strings for editList only.
+    if (updates?.isPublic !== undefined) params['public'] = updates.isPublic ? 'true' : 'false';
 
     return this.callListApi('editList', params).pipe(
       map((r: any) => this.mapMutationResult(r)),

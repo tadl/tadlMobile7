@@ -1,66 +1,153 @@
-# TADL Mobile 7.0.4 — Internal Technical Changelog
+# TADL Mobile
 
-## Platform / Architecture
-- Migrated app behavior to Aspen Discovery-backed APIs (search/account/holds/checkouts/lists/fines flows).
-- Continued modernization on Ionic + Angular + Capacitor stack.
-- Updated native project metadata and release tooling flow alignment.
+TADL Mobile is the Traverse Area District Library mobile app, built with Ionic + Angular + Capacitor and backed by Aspen Discovery APIs.
 
-## Navigation / IA
-- Reworked access patterns to surface account-critical actions directly on Home.
-- Preserved global menu consistency while improving back/close behavior patterns.
-- Reduced reliance on hidden account-side-menu navigation for core patron tasks.
+This README is focused on product capabilities, app behavior, and developer usage.
 
-## Search
-- Improved home -> search handoff behavior and advanced-search routing.
-- Added ISBN scanner integration via `@capacitor/barcode-scanner`.
-- Added MeLCat and Suggest-an-Item actions from search tools.
-- Improved enter-key and keyboard-dismiss behavior on native devices.
+## Core Features
 
-## Holds
-- Standardized user-facing status language and color treatment.
-- Added clearer segmentation for Ready-for-Pickup vs not-ready holds.
-- Improved post-action local updates to reduce avoidable full refetches.
-- Updated item-detail hold placement to use default pickup preference first.
-- Added legacy pickup id mapping support (`23 -> 7`, etc.) to bridge old preferences codes to Aspen location ids.
+### Account
+- Multi-account sign-in and account switching.
+- Home/account status badges for checkouts, holds, holds ready, and fines.
+- Account preferences management.
+- Library card display and account actions from the account page.
 
-## Checkouts
-- Adjusted sorting: overdue first, then due date ascending.
-- Improved overdue visual emphasis.
-- Standardized row action controls and larger touch targets.
+### Search
+- Catalog search with advanced options and Aspen facets/sorting.
+- ISBN search support with native barcode scanning in iOS/Android builds.
+- Search result actions via kebab menu:
+  - Place hold
+  - Add to list
+  - View details
+- MeLCat handoff and suggestion link actions.
 
-## Fines
-- Enabled fines page navigation and list rendering with itemization.
-- Corrected total owed calculation behavior when upstream total value is unreliable.
-- Added conditional payment CTA and centralized URL configuration.
+### Item Detail
+- Format-level holdings display for physical formats.
+- Provider-level availability/actions for digital formats.
+- List membership display and list actions.
+- Hold management from item detail, including multi-format/multi-hold scenarios:
+  - Per-format `On Hold` state
+  - Manage hold(s) flow for suspend/activate/change pickup/cancel
 
-## Lists
-- Added local list-membership index service using `@ionic/storage-angular`.
-- Implemented explicit "Sync memberships" flow in My Lists.
-- Added top-level My Lists actions (`Sync memberships`, `+ New list`).
-- Hooked incremental index updates into add/remove list mutations.
-- Item detail now reads membership from local index defensively (no crash if unsynced/missing).
+### Holds / Checkouts / Fines
+- Holds list with action menu and state-aware restrictions.
+- Checkouts sorted with overdue priority.
+- Fines summary.
 
-## Item Detail
-- Improved digital format availability rendering.
-  - Suppresses generic availability lines once provider-level (Hoopla/Libby) statuses/actions are available.
-- UI refinements for list-membership block and action controls.
+### Lists
+- Create/edit/delete lists.
+- Add/remove titles from lists from search and item detail.
+- Local list-membership index with explicit sync workflow for fast in-app membership lookups.
 
-## Events / News
-- Event detail now supports room and age-group display logic.
-- Excluded all-day placeholder events (`00:00:00` start/end) from list ingestion.
-- Improved event/news detail styling and readability.
-- Refined external link policy:
-  - In-app browser for regular web flows.
-  - External launch path for app-interceptable e-resource links.
+### Locations / Events / News / Featured
+- Library locations with hours and navigation links.
+- Events and news feeds from `feeds.tools.tadl.org`.
+- Featured browse categories with tabbed format switching.
 
-## Theme / Visual System
-- Added 3-way theme preference model:
-  - `system`, `light`, `dark`
-- Implemented live system-theme following in `system` mode.
-- Increased dark-mode muted-text contrast globally.
-- Standardized kebab action affordances across holds/checkouts/lists/list-detail/item-detail list rows.
+### Theme and Accessibility
+- Theme modes: `System`, `Light`, `Dark`.
+- Improved muted-text contrast in both light and dark themes.
+- Touch-target and action affordance improvements across list-heavy pages.
 
-## Native / UX Polish
-- Splash screen configuration/assets updated for both platforms.
-- Added map/navigation launch support from location details.
-- Addressed spacing/alignment/typography consistency issues across pages.
+## Tech Stack
+
+- `@ionic/angular` + Angular standalone components
+- Capacitor native runtime and plugins
+- Aspen Discovery API proxy endpoints (search/account/circulation/lists/item availability)
+- Local persistence:
+  - Capacitor Preferences
+  - secure storage plugin for credentials
+  - `@ionic/storage-angular` for larger local index data (list membership)
+
+## API Integration Notes
+
+- Primary proxy base is configured in `src/app/globals.ts` (`aspen_api_base`).
+- Common APIs used:
+  - `UserAPI` for profile/holds/checkouts/fines/preferences actions
+  - `SearchAPI` for catalog search and facets
+  - `ItemAPI` for grouped work + variation/availability details
+  - `ListAPI` for list management
+  - `CacheWarm` for bundled startup/account warm-up
+- Cache warm path:
+  - Prefers bundled `POST /API/CacheWarm`
+  - Falls back to separate profile/lists/preferences warm calls if needed
+
+## Local Development
+
+### Prerequisites
+- Node.js (project uses npm + Angular CLI)
+- Ionic/Angular toolchain dependencies from `package.json`
+- Xcode (for iOS)
+- Android Studio + SDK (for Android)
+
+### Install
+```bash
+npm install
+```
+
+### Run in browser
+```bash
+npm run start
+```
+
+Direct Ionic CLI option:
+```bash
+ionic serve
+```
+
+### Build web assets
+```bash
+npm run build
+```
+
+## Native Build / Sync
+
+### Sync web assets to native projects
+```bash
+npx cap sync
+```
+
+Or per platform:
+```bash
+npx cap sync ios
+npx cap sync android
+```
+
+### Open native projects
+```bash
+npx cap open ios
+npx cap open android
+```
+
+## Release Prep Workflow
+
+Project release prep scripts handle:
+- app version metadata updates
+- web build
+- Capacitor sync
+- native metadata patching
+- asset generation
+
+Examples:
+```bash
+npm run prep:ios -- --version 7.0.10 --build 70010 --update-date 20260306 --build-num 00
+npm run prep:android -- --version 7.0.10 --build 70010 --update-date 20260306 --build-num 00
+```
+
+After prep:
+- Build/archive in Xcode for TestFlight
+- Build AAB/APK in Android Studio or Gradle for Play beta
+
+## Known Operational Notes
+
+- Some Angular budget warnings are currently tolerated in beta workflows and are non-blocking for build completion.
+- Aspen API behavior can vary by deployment; this app includes defensive fallbacks for several endpoints.
+
+## Project Structure (high level)
+
+- `src/app/pages` — top-level screens
+- `src/app/components` — reusable UI blocks and modals
+- `src/app/services` — API, caching, auth, and domain logic
+- `scripts` — release prep automation
+- `resources` — source app icons/splash assets
+- `ios`, `android` — native Capacitor projects

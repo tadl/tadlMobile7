@@ -214,6 +214,22 @@ export class MyListsPage {
     await alert.present();
   }
 
+  async showMembershipHelp() {
+    const alert = await this.alertCtrl.create({
+      header: 'What is list membership sync?',
+      message: [
+        'List membership shows which of your lists an item belongs to when you open item details.',
+        '',
+        'Sync memberships builds a local index from your lists so that information appears quickly without checking every list during browsing.',
+        '',
+        'Run sync after large list changes (adding/removing many items) if membership labels seem out of date.',
+      ].join('\n'),
+      buttons: [{ text: 'Close', role: 'cancel' }],
+    });
+
+    await alert.present();
+  }
+
   private deleteList(list: AspenUserList) {
     const listId = (list?.id ?? '').toString().trim();
     if (!listId) {

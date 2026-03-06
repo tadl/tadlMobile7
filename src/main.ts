@@ -53,6 +53,7 @@ import {
   mailOutline,
   eyeOutline,
   eyeOffOutline,
+  helpCircleOutline,
 } from 'ionicons/icons';
 
 import { routes } from './app/app.routes';
@@ -93,6 +94,7 @@ addIcons({
   'mail-outline': mailOutline,
   'eye-outline': eyeOutline,
   'eye-off-outline': eyeOffOutline,
+  'help-circle-outline': helpCircleOutline,
 });
 
 bootstrapApplication(AppComponent, {

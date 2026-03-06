@@ -34,6 +34,16 @@ export class AuthService {
     return this.state$.value;
   }
 
+  applyActiveProfile(profile: any): void {
+    const snap = this.state$.value;
+    if (!snap.activeAccountId || !snap.activeAccountMeta) return;
+    this.state$.next({
+      ...snap,
+      isLoggedIn: true,
+      profile,
+    });
+  }
+
   /**
    * Call on app startup (e.g., AppComponent) to restore:
    * - active account id

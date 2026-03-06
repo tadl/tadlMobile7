@@ -3,12 +3,14 @@ import { lastValueFrom } from 'rxjs';
 
 import { AuthService } from './auth.service';
 import { AccountStoreService } from './account-store.service';
+import { ListsService } from './lists.service';
 
 @Injectable({ providedIn: 'root' })
 export class CacheWarmService {
   constructor(
     private auth: AuthService,
     private accounts: AccountStoreService,
+    private lists: ListsService,
   ) {}
 
   warmForActiveAccount(): void {
@@ -17,6 +19,7 @@ export class CacheWarmService {
     void this.safeRun(async () => {
       await this.accounts.prewarmActivePassword();
       await lastValueFrom(this.auth.refreshActiveProfile());
+      await lastValueFrom(this.lists.fetchUserLists());
     });
   }
 

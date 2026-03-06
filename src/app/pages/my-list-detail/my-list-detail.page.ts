@@ -1,8 +1,10 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Router } from '@angular/router';
 import { ActivatedRoute } from '@angular/router';
-import { IonicModule, ModalController, ActionSheetController } from '@ionic/angular';
+import { IonicModule, ModalController, ActionSheetController, AlertController, type ActionSheetButton } from '@ionic/angular';
 import { finalize } from 'rxjs';
+import { lastValueFrom } from 'rxjs';
 
 import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
@@ -25,6 +27,8 @@ export class MyListDetailPage {
   listDescription = '';
   titles: AspenListTitle[] = [];
   removingRecordId = '';
+  canEditList = false;
+  mutatingList = false;
 
   constructor(
     public globals: Globals,
@@ -33,6 +37,8 @@ export class MyListDetailPage {
     private toast: ToastService,
     private modalController: ModalController,
     private actionSheetCtrl: ActionSheetController,
+    private alertCtrl: AlertController,
+    private router: Router,
     private membershipIndex: ListMembershipIndexService,
   ) {}
 
@@ -40,6 +46,7 @@ export class MyListDetailPage {
     this.listId = (this.route.snapshot.paramMap.get('id') ?? '').trim();
     const hint = (this.route.snapshot.queryParamMap.get('title') ?? '').trim();
     if (hint) this.listTitle = hint;
+    void this.refreshOwnership();
     this.refresh();
   }
 
@@ -131,6 +138,7 @@ export class MyListDetailPage {
           listId: this.listId,
           listTitle: this.listTitle,
           recordId: key,
+          canEdit: this.canEditList,
         },
       },
     });
@@ -144,22 +152,24 @@ export class MyListDetailPage {
   async openTitleActions(t: AspenListTitle, ev?: Event) {
     ev?.stopPropagation();
 
+    const buttons: ActionSheetButton[] = [
+      {
+        text: 'Open Details',
+        handler: () => this.openTitle(t),
+      },
+    ];
+    if (this.canEditList) {
+      buttons.push({
+        text: 'Remove from List',
+        role: 'destructive',
+        handler: () => this.confirmRemoveFromList(t),
+      });
+    }
+    buttons.push({ text: 'Close', role: 'cancel' });
+
     const sheet = await this.actionSheetCtrl.create({
       header: this.titleText(t),
-      buttons: [
-        {
-          text: 'Open Details',
-          handler: () => this.openTitle(t),
-        },
-        {
-          text: 'Remove from List',
-          role: 'destructive',
-          handler: () => this.confirmRemoveFromList(t),
-        },
-        {
-          text: 'Close', role: 'cancel',
-        },
-      ],
+      buttons,
     });
 
     await sheet.present();
@@ -175,6 +185,10 @@ export class MyListDetailPage {
   }
 
   private async confirmRemoveFromList(t: AspenListTitle) {
+    if (!this.canEditList) {
+      this.toast.presentToast('You can only edit lists that you own.');
+      return;
+    }
     if (this.mutatingBlockedForRemove(t)) return;
 
     const confirmSheet = await this.actionSheetCtrl.create({
@@ -200,6 +214,10 @@ export class MyListDetailPage {
   }
 
   private removeFromListNow(t: AspenListTitle) {
+    if (!this.canEditList) {
+      this.toast.presentToast('You can only edit lists that you own.');
+      return;
+    }
     const recordId = this.recordIdForEntry(t);
     if (!recordId) {
       this.toast.presentToast('This title cannot be removed (missing record id).');
@@ -231,5 +249,144 @@ export class MyListDetailPage {
   trackByTitle(_idx: number, t: AspenListTitle): string {
     const id = (t?.id ?? '').toString().trim();
     return id || `${_idx}`;
+  }
+
+  async editListMeta() {
+    if (!this.canEditList || this.mutatingList || !this.listId) return;
+
+    const alert = await this.alertCtrl.create({
+      header: 'Edit List',
+      inputs: [
+        {
+          name: 'title',
+          type: 'text',
+          placeholder: 'List name',
+          value: this.listTitle,
+          attributes: {
+            autocapitalize: 'sentences',
+            autocorrect: 'on',
+            autocomplete: 'off',
+            maxlength: 120,
+          },
+        },
+        {
+          name: 'description',
+          type: 'textarea',
+          placeholder: 'Description (optional)',
+          value: this.listDescription,
+          attributes: {
+            autocapitalize: 'sentences',
+            autocorrect: 'on',
+            autocomplete: 'off',
+            maxlength: 1000,
+          },
+        },
+      ],
+      buttons: [
+        { text: 'Close', role: 'cancel' },
+        {
+          text: 'Save',
+          role: 'confirm',
+          handler: (v) => {
+            const title = (v?.title ?? '').toString().trim();
+            const description = (v?.description ?? '').toString().trim();
+            if (!title) {
+              this.toast.presentToast('List name is required.');
+              return false;
+            }
+            this.saveListMeta(title, description);
+            return true;
+          },
+        },
+      ],
+    });
+
+    await alert.present();
+  }
+
+  async confirmDeleteList() {
+    if (!this.canEditList || this.mutatingList || !this.listId) return;
+
+    const count = this.titles.length;
+    const itemText = `${count} item${count === 1 ? '' : 's'}`;
+    const alert = await this.alertCtrl.create({
+      header: 'Delete list?',
+      subHeader: this.listTitle || 'List',
+      message: count > 0
+        ? `THIS LIST HAS ${itemText.toUpperCase()} IN IT. ARE YOU SURE?\n\nThis cannot be undone.`
+        : 'This cannot be undone.',
+      buttons: [
+        { text: 'Close', role: 'cancel' },
+        {
+          text: 'Delete List',
+          role: 'destructive',
+          handler: () => this.deleteListNow(),
+        },
+      ],
+    });
+
+    await alert.present();
+  }
+
+  private saveListMeta(title: string, description: string) {
+    if (!this.listId || this.mutatingList) return;
+
+    this.mutatingList = true;
+    this.listsService.editList(this.listId, { title, description })
+      .pipe(finalize(() => { this.mutatingList = false; }))
+      .subscribe({
+        next: (res) => {
+          if (!res?.success) {
+            this.toast.presentToast(res?.message || 'Could not update list.');
+            return;
+          }
+
+          this.listTitle = title;
+          this.listDescription = description;
+          this.toast.presentToast(res?.message || 'List updated.');
+        },
+        error: () => this.toast.presentToast('Could not update list.'),
+      });
+  }
+
+  private deleteListNow() {
+    if (!this.listId || this.mutatingList) return;
+
+    const listId = this.listId;
+    this.mutatingList = true;
+    this.listsService.deleteList(listId)
+      .pipe(finalize(() => { this.mutatingList = false; }))
+      .subscribe({
+        next: (res) => {
+          if (!res?.success) {
+            this.toast.presentToast(res?.message || 'Could not delete list.');
+            return;
+          }
+
+          this.membershipIndex.removeList(listId).catch(() => {});
+          this.toast.presentToast(res?.message || 'List deleted.');
+          this.router.navigate(['/my-lists']);
+        },
+        error: () => this.toast.presentToast('Could not delete list.'),
+      });
+  }
+
+  private async refreshOwnership(): Promise<void> {
+    if (!this.listId) {
+      this.canEditList = false;
+      return;
+    }
+
+    try {
+      const userLists = await lastValueFrom(this.listsService.fetchUserLists());
+      const ownedIds = new Set(
+        (userLists ?? [])
+          .map((x) => (x?.id ?? '').toString().trim())
+          .filter((x) => !!x),
+      );
+      this.canEditList = ownedIds.has(this.listId);
+    } catch {
+      this.canEditList = false;
+    }
   }
 }

@@ -34,6 +34,7 @@ interface ItemDetailListContext {
   listId: string;
   listTitle?: string;
   recordId?: string;
+  canEdit?: boolean;
 }
 
 interface KnownListMembership {
@@ -97,6 +98,7 @@ export class ItemDetailComponent implements OnInit {
   holdActionBusy = false;
   checkoutActionBusy = false;
   listActionBusy = false;
+  private ownedListIds = new Set<string>();
 
   /** set to true when we mutate holds so HoldsPage can refresh on dismiss */
   private needsHoldsRefresh = false;
@@ -132,6 +134,7 @@ export class ItemDetailComponent implements OnInit {
     // If opened from Holds/Checkouts pages, we already have the object in hit.raw
     this.hold = this.extractHoldFromHit(this.hit);
     this.checkout = this.extractCheckoutFromHit(this.hit);
+    void this.refreshOwnedListIds();
     void this.seedKnownListMemberships();
 
     const key = (this.hit?.key ?? '').toString().trim();
@@ -444,27 +447,55 @@ export class ItemDetailComponent implements OnInit {
     ev?.stopPropagation?.();
     if (!m?.listId) return;
 
+    const canEdit = this.canEditKnownListMembership(m.listId);
+    const buttons: ActionSheetButton[] = [
+      {
+        text: 'View list',
+        handler: () => this.openKnownList(m.listId, m.listTitle),
+      },
+    ];
+    if (canEdit) {
+      buttons.push({
+        text: 'Remove from this list',
+        role: 'destructive',
+        handler: () =>
+          this.confirmRemoveFromNamedList(
+            { id: m.listId, title: m.listTitle } as AspenUserList,
+            this.listRecordId(),
+          ),
+      });
+    }
+    buttons.push({ text: 'Close', role: 'cancel' });
+
     const sheet = await this.actionSheet.create({
       header: m.listTitle || 'List actions',
-      buttons: [
-        {
-          text: 'View list',
-          handler: () => this.openKnownList(m.listId, m.listTitle),
-        },
-        {
-          text: 'Remove from this list',
-          role: 'destructive',
-          handler: () =>
-            this.confirmRemoveFromNamedList(
-              { id: m.listId, title: m.listTitle } as AspenUserList,
-              this.listRecordId(),
-            ),
-        },
-        { text: 'Close', role: 'cancel' },
-      ],
+      buttons,
     });
 
     await sheet.present();
+  }
+
+  private canEditKnownListMembership(listId: string): boolean {
+    const id = (listId ?? '').toString().trim();
+    if (!id) return false;
+    const contextListId = (this.listContext?.listId ?? '').toString().trim();
+    if (contextListId && contextListId === id) {
+      return this.listContext?.canEdit !== false;
+    }
+    return this.ownedListIds.has(id);
+  }
+
+  private async refreshOwnedListIds(): Promise<void> {
+    try {
+      const lists = await lastValueFrom(this.lists.fetchUserLists());
+      this.ownedListIds = new Set(
+        (lists ?? [])
+          .map((x) => (x?.id ?? '').toString().trim())
+          .filter((x) => !!x),
+      );
+    } catch {
+      this.ownedListIds = new Set<string>();
+    }
   }
 
   // ----------------------------

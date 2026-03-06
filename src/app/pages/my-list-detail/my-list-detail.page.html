@@ -17,9 +17,33 @@
     <ion-refresher-content></ion-refresher-content>
   </ion-refresher>
 
-  <ion-item lines="none" *ngIf="listDescription">
-    <ion-label class="ion-text-wrap desc">{{ listDescription }}</ion-label>
-  </ion-item>
+  <ion-card *ngIf="listDescription" class="list-description-card">
+    <ion-card-content>
+      <div class="list-description-text">{{ listDescription }}</div>
+    </ion-card-content>
+  </ion-card>
+
+  <div class="list-owner-actions" *ngIf="canEditList">
+    <ion-button
+      fill="outline"
+      size="small"
+      class="owner-action-btn"
+      [disabled]="mutatingList"
+      (click)="editListMeta()"
+    >
+      Edit List
+    </ion-button>
+    <ion-button
+      fill="outline"
+      color="danger"
+      size="small"
+      class="owner-action-btn"
+      [disabled]="mutatingList"
+      (click)="confirmDeleteList()"
+    >
+      Delete List
+    </ion-button>
+  </div>
 
   <ion-list *ngIf="titles.length > 0" lines="full" class="full-list">
     <ion-item
@@ -39,6 +63,7 @@
       </ion-label>
 
       <ion-button
+        *ngIf="canEditList"
         slot="end"
         fill="clear"
         size="small"

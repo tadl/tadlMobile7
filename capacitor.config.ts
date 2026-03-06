@@ -18,7 +18,7 @@ const config: CapacitorConfig = {
       // Keep native splash visible until app explicitly hides after first navigation.
       launchShowDuration: 0,
       backgroundColor: '#07153A',
-      androidScaleType: 'CENTER_INSIDE',
+      androidScaleType: 'CENTER_CROP',
     },
   },
 };

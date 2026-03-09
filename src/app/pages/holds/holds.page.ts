@@ -200,9 +200,15 @@ export class HoldsPage {
     m.onDidDismiss().then((res) => {
       const data = res?.data;
       if (data?.refreshHolds) {
-        // refresh list + cache (your refresh() already writes cache)
-        this.hydratedFromCache = true; // prevents spinner-jank
-        this.refresh();
+        const groupedWorkId = (data?.groupedWorkId ?? '').toString().trim();
+        const updatedHoldsForItem = Array.isArray(data?.holdsForItem) ? (data.holdsForItem as AspenHold[]) : null;
+
+        if (groupedWorkId && updatedHoldsForItem) {
+          this.applyItemHoldMutation(groupedWorkId, updatedHoldsForItem);
+        } else {
+          this.partitionIlsHolds([...this.ilsReady, ...this.ilsNotReady]);
+        }
+        void this.persistLocalHolds();
 
         // refresh badges/counts in the account menu
         this.auth.refreshActiveProfile().subscribe({
@@ -464,5 +470,20 @@ export class HoldsPage {
 
   private holdIsReady(h: AspenHold): boolean {
     return this.holdDisplayState(h) === 'ready';
+  }
+
+  private applyItemHoldMutation(groupedWorkId: string, nextForItem: AspenHold[]) {
+    const key = (groupedWorkId ?? '').toString().trim();
+    if (!key) return;
+
+    const existing = [...this.ilsReady, ...this.ilsNotReady].filter(
+      (h) => String((h as any)?.groupedWorkId ?? '').toString().trim() !== key,
+    );
+
+    const incomingIls = (nextForItem ?? []).filter(
+      (h) => h?.type === 'ils' || h?.source === 'ils',
+    );
+
+    this.partitionIlsHolds([...existing, ...incomingIls]);
   }
 }

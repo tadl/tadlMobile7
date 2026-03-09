@@ -218,8 +218,8 @@ export class CheckoutsPage {
             this.toast.presentToast(res?.message || 'Could not renew.');
             return;
           }
+          this.applyRenewMutationToCheckout(c, res?.raw);
           this.toast.presentToast(res?.message || 'Renewed.');
-          this.refresh();
           this.auth.refreshActiveProfile().subscribe({ error: () => {} });
         },
         error: () => this.toast.presentToast('Could not renew.'),
@@ -239,11 +239,13 @@ export class CheckoutsPage {
           timer(idx === 0 ? 0 : CheckoutsPage.BULK_ACTION_DELAY_MS).pipe(
             switchMap(() => this.checkouts.renewCheckout(checkout)),
             map((res) => ({
+              checkout,
               success: !!res?.success,
               message: (res?.message ?? '').toString().trim(),
+              raw: res?.raw,
               rateLimited: false,
             })),
-            catchError((err) => of({ success: false, message: '', rateLimited: err?.status === 429 })),
+            catchError((err) => of({ checkout, success: false, message: '', raw: null, rateLimited: err?.status === 429 })),
           ),
         ),
         toArray(),
@@ -254,6 +256,12 @@ export class CheckoutsPage {
       )
       .subscribe({
         next: (results) => {
+          for (const r of results) {
+            if (r.success && r.checkout) {
+              this.applyRenewMutationToCheckout(r.checkout, r.raw);
+            }
+          }
+
           const ok = results.filter((r) => r.success).length;
           const failed = results.length - ok;
           const rateLimited = results.some((r) => r.rateLimited);
@@ -266,7 +274,6 @@ export class CheckoutsPage {
           } else {
             this.toast.presentToast(`Renewed ${ok} item${ok === 1 ? '' : 's'}; ${failed} failed.`);
           }
-          this.refresh();
         },
         error: () => {
           this.toast.presentToast('Could not complete renew all.');
@@ -301,7 +308,7 @@ export class CheckoutsPage {
     m.onDidDismiss().then((res) => {
       const data = res?.data;
       if (data?.refreshCheckouts) {
-        this.refresh();
+        this.ilsCheckouts = this.sortCheckouts([...(this.ilsCheckouts ?? [])]);
         this.auth.refreshActiveProfile().subscribe({ error: () => {} });
       }
     });
@@ -340,5 +347,48 @@ export class CheckoutsPage {
     const due = Number(c?.dueDate ?? 0);
     if (!Number.isFinite(due) || due <= 0) return Number.MAX_SAFE_INTEGER;
     return due;
+  }
+
+  private applyRenewMutationToCheckout(checkout: AspenCheckout, raw: any): void {
+    if (!checkout) return;
+
+    const parseEpochSeconds = (v: any): number | null => {
+      const n = Number(v);
+      if (!Number.isFinite(n) || n <= 0) return null;
+      return n > 1e12 ? Math.floor(n / 1000) : Math.floor(n);
+    };
+
+    const rawDue =
+      raw?.dueDate ??
+      raw?.due_date ??
+      raw?.newDueDate ??
+      raw?.new_due_date ??
+      raw?.dueDateTs ??
+      raw?.duedate;
+
+    const rawRenewalDate =
+      raw?.renewalDate ??
+      raw?.renewal_date ??
+      raw?.newRenewalDate ??
+      raw?.new_renewal_date;
+
+    const dueEpoch = parseEpochSeconds(rawDue);
+    if (dueEpoch) {
+      checkout.dueDate = dueEpoch;
+      checkout.overdue = false;
+    }
+
+    if (rawRenewalDate != null) {
+      checkout.renewalDate = String(rawRenewalDate);
+    }
+
+    const currentRenewCount = Number(checkout.renewCount ?? 0);
+    checkout.renewCount = Number.isFinite(currentRenewCount) ? currentRenewCount + 1 : 1;
+
+    if (Number.isFinite(Number(checkout.maxRenewals))) {
+      checkout.canRenew = Number(checkout.renewCount ?? 0) < Number(checkout.maxRenewals ?? 0);
+    }
+
+    this.ilsCheckouts = this.sortCheckouts([...this.ilsCheckouts]);
   }
 }

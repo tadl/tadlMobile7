@@ -161,7 +161,11 @@ export class ItemDetailComponent implements OnInit {
   close() {
     this.copyDetailsModalOpen = false;
     const payload: any = {};
-    if (this.needsHoldsRefresh) payload.refreshHolds = true;
+    if (this.needsHoldsRefresh) {
+      payload.refreshHolds = true;
+      payload.groupedWorkId = (this.hit?.key ?? '').toString().trim();
+      payload.holdsForItem = [...(this.holdsForItem ?? [])];
+    }
     if (this.needsCheckoutsRefresh) payload.refreshCheckouts = true;
     if (this.needsListRefresh) payload.refreshList = true;
 
@@ -557,9 +561,7 @@ export class ItemDetailComponent implements OnInit {
 
           this.needsCheckoutsRefresh = true;
           this.toast.presentToast(res?.message || 'Renewed.');
-
-          // Authoritative refresh so due date / canRenew updates
-          this.refreshCheckoutForThisItem(true);
+          this.applyRenewMutationToCheckout(this.checkout, res?.raw);
         },
         error: () => this.toast.presentToast('Could not renew.'),
       });
@@ -667,11 +669,9 @@ export class ItemDetailComponent implements OnInit {
           // optimistic UI update
           (this.hold as any).frozen = true;
           (this.hold as any).statusMessage = 'Suspended';
+          this.syncHoldAcrossItemState(this.hold);
 
           this.toast.presentToast('Hold suspended.');
-
-          // authoritative refresh (ensures pickup/status/etc stays correct)
-          this.refreshHoldForThisItem(true);
         },
         error: () => this.toast.presentToast('Could not suspend hold.'),
       });
@@ -697,11 +697,9 @@ export class ItemDetailComponent implements OnInit {
           // optimistic UI update
           (this.hold as any).frozen = false;
           (this.hold as any).statusMessage = 'Active';
+          this.syncHoldAcrossItemState(this.hold);
 
           this.toast.presentToast('Hold activated.');
-
-          // authoritative refresh
-          this.refreshHoldForThisItem(true);
         },
         error: () => this.toast.presentToast('Could not activate hold.'),
       });
@@ -818,11 +816,9 @@ export class ItemDetailComponent implements OnInit {
             (this.hold as any).pickupLocationName =
               this.globals.pickupNameForCode(parsed.code) ?? (this.hold as any).pickupLocationName;
           }
+          this.syncHoldAcrossItemState(this.hold);
 
           this.toast.presentToast(res?.message || 'Pickup location updated.');
-
-          // authoritative refresh so the UI reflects server truth
-          this.refreshHoldForThisItem(true);
         },
         error: () => this.toast.presentToast('Could not change pickup location.'),
       });
@@ -1078,6 +1074,74 @@ export class ItemDetailComponent implements OnInit {
       .replace(/\s+/g, ' ');
   }
 
+  private syncHoldAcrossItemState(hold: AspenHold | null) {
+    if (!hold) return;
+    const holdId = Number((hold as any)?.cancelId ?? (hold as any)?.id ?? 0) || 0;
+    const recordId = ((hold as any)?.recordId ?? '').toString().trim();
+
+    this.holdsForItem = (this.holdsForItem ?? []).map((h) => {
+      const hId = Number((h as any)?.cancelId ?? (h as any)?.id ?? 0) || 0;
+      const hRecordId = ((h as any)?.recordId ?? '').toString().trim();
+      if (holdId && hId === holdId) return { ...(h as any), ...(hold as any) } as AspenHold;
+      if (!holdId && recordId && hRecordId === recordId) return { ...(h as any), ...(hold as any) } as AspenHold;
+      return h;
+    });
+
+    if (this.hold) {
+      const currentId = Number((this.hold as any)?.cancelId ?? (this.hold as any)?.id ?? 0) || 0;
+      const currentRecordId = ((this.hold as any)?.recordId ?? '').toString().trim();
+      if ((holdId && currentId === holdId) || (!holdId && recordId && currentRecordId === recordId)) {
+        this.hold = { ...(this.hold as any), ...(hold as any) } as AspenHold;
+      }
+    }
+  }
+
+  private insertOptimisticPlacedHold(recordId: string, pickupBranch: string) {
+    const groupedWorkId = (this.hit?.key ?? '').toString().trim();
+    if (!groupedWorkId) return;
+
+    const pickupName = this.globals.pickupNameForCode(pickupBranch) ?? '';
+    const optimistic: AspenHold = {
+      id: -Date.now(),
+      type: 'ils',
+      source: 'ils',
+      groupedWorkId,
+      recordId: Number(recordId),
+      format: this.selectedFormatForRecordId(recordId),
+      statusMessage: 'Active',
+      status: 'Pending',
+      available: false,
+      currentPickupId: pickupBranch,
+      currentPickupName: pickupName,
+      pickupLocationName: pickupName,
+      title: this.itemDisplayTitle(),
+      author: this.work?.author ?? this.hit?.author,
+      coverUrl: this.work?.cover ?? this.hit?.coverUrl,
+      position: 0,
+      holdQueueLength: 0,
+    } as AspenHold;
+
+    this.holdsForItem = [optimistic, ...(this.holdsForItem ?? [])];
+    this.hold = optimistic;
+  }
+
+  private selectedFormatForRecordId(recordId: string): string {
+    const recId = (recordId ?? '').toString().trim();
+    if (!recId || !this.work?.formats) return '';
+
+    for (const [formatKey, fmt] of Object.entries(this.work.formats)) {
+      const actions = Array.isArray((fmt as any)?.actions) ? (fmt as any).actions : [];
+      for (const action of actions) {
+        if (!this.isIlsHoldAction(action)) continue;
+        const actionRecId = this.items.extractIlsIdFromOnclick((action?.onclick ?? '').toString());
+        if (actionRecId !== recId) continue;
+        return (fmt as any)?.label?.toString?.().trim?.() || formatKey;
+      }
+    }
+
+    return '';
+  }
+
   isIlsHoldAction(action: any): boolean {
     const t = (action?.type ?? '').toString().toLowerCase();
     if (t === 'ils_hold') return true;
@@ -1179,9 +1243,7 @@ export class ItemDetailComponent implements OnInit {
 
           this.needsHoldsRefresh = true;
           this.toast.presentToast(res?.message || 'Hold placed.');
-
-          // fetch holds and attach the hold for this grouped work so the card appears
-          this.refreshHoldForThisItem(true);
+          this.insertOptimisticPlacedHold(recordId, pickupBranch);
         },
         error: (err) => {
           const msg = (err?.message ?? '').toString().trim();
@@ -1556,6 +1618,50 @@ export class ItemDetailComponent implements OnInit {
         },
         error: () => {},
       });
+  }
+
+  private applyRenewMutationToCheckout(checkout: AspenCheckout | null, raw: any) {
+    if (!checkout) return;
+
+    const parseEpochSeconds = (v: any): number | null => {
+      const n = Number(v);
+      if (!Number.isFinite(n) || n <= 0) return null;
+      return n > 1e12 ? Math.floor(n / 1000) : Math.floor(n);
+    };
+
+    const rawDue =
+      raw?.dueDate ??
+      raw?.due_date ??
+      raw?.newDueDate ??
+      raw?.new_due_date ??
+      raw?.dueDateTs ??
+      raw?.duedate;
+
+    const rawRenewalDate =
+      raw?.renewalDate ??
+      raw?.renewal_date ??
+      raw?.newRenewalDate ??
+      raw?.new_renewal_date;
+
+    const dueEpoch = parseEpochSeconds(rawDue);
+    if (dueEpoch) {
+      (checkout as any).dueDate = dueEpoch;
+      (checkout as any).overdue = false;
+    }
+
+    if (rawRenewalDate != null) {
+      (checkout as any).renewalDate = String(rawRenewalDate);
+    }
+
+    const used = Number((checkout as any)?.renewCount ?? 0);
+    (checkout as any).renewCount = Number.isFinite(used) ? used + 1 : 1;
+
+    const max = Number((checkout as any)?.maxRenewals);
+    if (Number.isFinite(max) && max >= 0) {
+      (checkout as any).canRenew = Number((checkout as any).renewCount ?? 0) < max;
+    }
+
+    this.checkout = { ...(checkout as any) } as AspenCheckout;
   }
 
   private extractHoldFromHit(hit: AspenSearchHit | null | undefined): AspenHold | null {

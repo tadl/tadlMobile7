@@ -49,6 +49,11 @@ export class EventsPage implements OnInit, OnDestroy {
     this.destroyed$.complete();
   }
 
+  refresh(event: CustomEvent): void {
+    const refresher = event.target as HTMLIonRefresherElement | null;
+    this.load(this.toVenueSelection(this.selectedVenueCode), refresher ?? undefined);
+  }
+
   onVenueChange(value: any): void {
     const code = (value ?? 'all').toString();
     this.selectedVenueCode = (code === 'all' ? 'all' : code);
@@ -98,7 +103,7 @@ export class EventsPage implements OnInit, OnDestroy {
     return Number.isFinite(n) ? n : 'all';
   }
 
-  private load(venue: VenueSelection): void {
+  private load(venue: VenueSelection, refresher?: HTMLIonRefresherElement): void {
     this.loading = true;
     this.error = null;
 
@@ -128,11 +133,13 @@ export class EventsPage implements OnInit, OnDestroy {
           });
 
           this.loading = false;
+          refresher?.complete();
         },
         error: (err) => {
           console.error(err);
           this.error = 'Could not load events. Please try again.';
           this.loading = false;
+          refresher?.complete();
         },
       });
   }

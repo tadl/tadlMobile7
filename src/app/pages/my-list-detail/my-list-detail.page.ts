@@ -22,10 +22,15 @@ import { ListMembershipIndexService } from '../../services/list-membership-index
 })
 export class MyListDetailPage {
   loading = false;
+  loadingMore = false;
   listId = '';
   listTitle = 'List';
   listDescription = '';
   titles: AspenListTitle[] = [];
+  page = 1;
+  pageSize = 50;
+  totalPages = 1;
+  infiniteDisabled = true;
   removingRecordId = '';
   canEditList = false;
   mutatingList = false;
@@ -51,7 +56,7 @@ export class MyListDetailPage {
   }
 
   refresh(ev?: any) {
-    if (this.loading) {
+    if (this.loading || this.loadingMore) {
       ev?.target?.complete?.();
       return;
     }
@@ -61,8 +66,11 @@ export class MyListDetailPage {
       return;
     }
 
+    this.page = 1;
+    this.totalPages = 1;
+    this.infiniteDisabled = true;
     this.loading = true;
-    this.listsService.fetchListTitles(this.listId, 1, 100).pipe(
+    this.listsService.fetchListTitles(this.listId, this.page, this.pageSize).pipe(
       finalize(() => {
         this.loading = false;
         ev?.target?.complete?.();
@@ -78,11 +86,65 @@ export class MyListDetailPage {
         this.listTitle = (res?.listTitle ?? '').toString().trim() || this.listTitle;
         this.listDescription = (res?.listDescription ?? '').toString().trim();
         this.titles = Array.isArray(res?.titles) ? res.titles : [];
+        this.page = Number(res?.page_current ?? 1) || 1;
+        this.totalPages = Number(res?.page_total ?? 1) || 1;
+        this.infiniteDisabled = !(this.page < this.totalPages);
       },
       error: () => {
         this.titles = [];
+        this.infiniteDisabled = true;
         this.toast.presentToast('Could not load this list.');
       },
+    });
+  }
+
+  loadMore(ev: any) {
+    if (this.loading || this.loadingMore || this.infiniteDisabled) {
+      ev?.target?.complete?.();
+      return;
+    }
+    if (!this.listId) {
+      this.infiniteDisabled = true;
+      ev?.target?.complete?.();
+      return;
+    }
+    if (this.page >= this.totalPages) {
+      this.infiniteDisabled = true;
+      ev?.target?.complete?.();
+      return;
+    }
+
+    const nextPage = this.page + 1;
+    this.loadingMore = true;
+    this.listsService.fetchListTitles(this.listId, nextPage, this.pageSize).pipe(
+      finalize(() => {
+        this.loadingMore = false;
+        ev?.target?.complete?.();
+      }),
+    ).subscribe({
+      next: (res) => {
+        if (!res?.success) {
+          this.toast.presentToast(res?.message || 'Could not load more list titles.');
+          return;
+        }
+
+        const nextTitles = Array.isArray(res?.titles) ? res.titles : [];
+        if (nextTitles.length) {
+          const seen = new Set(this.titles.map((x) => this.recordIdForEntry(x)));
+          const deduped = nextTitles.filter((x) => {
+            const id = this.recordIdForEntry(x);
+            if (!id || seen.has(id)) return false;
+            seen.add(id);
+            return true;
+          });
+          this.titles = [...this.titles, ...deduped];
+        }
+
+        this.page = Number(res?.page_current ?? nextPage) || nextPage;
+        this.totalPages = Number(res?.page_total ?? this.totalPages) || this.totalPages;
+        this.infiniteDisabled = !(this.page < this.totalPages);
+      },
+      error: () => this.toast.presentToast('Could not load more list titles.'),
     });
   }
 

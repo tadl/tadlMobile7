@@ -81,3 +81,5 @@ Thumbs.db
 /ios/**/*.xccheckout
 /ios/**/DerivedData/
 /ios/**/.DS_Store
+
+/.creds

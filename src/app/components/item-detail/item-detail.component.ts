@@ -1179,7 +1179,8 @@ export class ItemDetailComponent implements OnInit {
   async handleFormatAction(action: any, formatKey: string) {
     const url = (action?.url ?? '').toString().trim();
     if (url) {
-      await this.globals.open_external_page(url);
+      const preferredUrl = this.preferredExternalUrlForAction(action, url);
+      await this.globals.open_external_page(preferredUrl);
       return;
     }
 
@@ -1205,6 +1206,44 @@ export class ItemDetailComponent implements OnInit {
     }
 
     this.toast.presentToast('Action not supported yet.');
+  }
+
+  private preferredExternalUrlForAction(action: any, url: string): string {
+    const type = (action?.type ?? '').toString().toLowerCase();
+    const title = (action?.title ?? '').toString().toLowerCase();
+    const lowerUrl = (url ?? '').toString().toLowerCase();
+
+    const isLibbyLike =
+      type.includes('overdrive') ||
+      title.includes('libby') ||
+      lowerUrl.includes('overdrive.com');
+
+    if (!isLibbyLike) return url;
+
+    return this.libbyUniversalUrlForOverdrive(url) ?? url;
+  }
+
+  private libbyUniversalUrlForOverdrive(rawUrl: string): string | null {
+    try {
+      const parsed = new URL(rawUrl);
+      const host = parsed.hostname.toLowerCase();
+      if (!host.endsWith('overdrive.com')) return null;
+
+      // Typical Aspen OverDrive access links are:
+      //   https://{library}.overdrive.com/media/{mediaId}
+      // Libby universal link equivalent:
+      //   https://libbyapp.com/library/{library}/media/{mediaId}
+      const mediaMatch = parsed.pathname.match(/^\/media\/([^/?#]+)/i);
+      if (!mediaMatch?.[1]) return null;
+
+      const library = host.split('.')[0]?.trim();
+      const mediaId = mediaMatch[1].trim();
+      if (!library || !mediaId) return null;
+
+      return `https://libbyapp.com/library/${encodeURIComponent(library)}/media/${encodeURIComponent(mediaId)}`;
+    } catch {
+      return null;
+    }
   }
 
   private async promptAndPlaceHold(recordId: string) {

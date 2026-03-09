@@ -63,13 +63,12 @@
       </ion-label>
 
       <ion-button
-        *ngIf="canEditList"
         slot="end"
         fill="clear"
         size="small"
         class="row-action"
         aria-label="List item actions"
-        [disabled]="removeBusyFor(t)"
+        [disabled]="rowActionBusyFor(t)"
         (click)="openTitleActions(t, $event)"
       >
         <ion-icon name="ellipsis-vertical" slot="icon-only"></ion-icon>

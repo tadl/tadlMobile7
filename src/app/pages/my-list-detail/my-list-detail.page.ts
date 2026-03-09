@@ -12,6 +12,16 @@ import { ListsService, type AspenListTitle } from '../../services/lists.service'
 import { ItemDetailComponent } from '../../components/item-detail/item-detail.component';
 import { AspenSearchHit } from '../../services/search.service';
 import { ListMembershipIndexService } from '../../services/list-membership-index.service';
+import { AuthService } from '../../services/auth.service';
+import { ItemService } from '../../services/item.service';
+import { HoldsService } from '../../services/holds.service';
+import { AccountPreferencesService } from '../../services/account-preferences.service';
+
+interface HoldTargetOption {
+  recordId: string;
+  label: string;
+  formatLabel: string;
+}
 
 @Component({
   standalone: true,
@@ -32,6 +42,7 @@ export class MyListDetailPage {
   totalPages = 1;
   infiniteDisabled = true;
   removingRecordId = '';
+  actionRecordId = '';
   canEditList = false;
   mutatingList = false;
 
@@ -45,6 +56,10 @@ export class MyListDetailPage {
     private alertCtrl: AlertController,
     private router: Router,
     private membershipIndex: ListMembershipIndexService,
+    private auth: AuthService,
+    private itemService: ItemService,
+    private holds: HoldsService,
+    private accountPreferences: AccountPreferencesService,
   ) {}
 
   ionViewWillEnter() {
@@ -214,12 +229,17 @@ export class MyListDetailPage {
   async openTitleActions(t: AspenListTitle, ev?: Event) {
     ev?.stopPropagation();
 
-    const buttons: ActionSheetButton[] = [
-      {
-        text: 'Open Details',
-        handler: () => this.openTitle(t),
-      },
-    ];
+    const buttons: ActionSheetButton[] = [];
+    if (this.canPlaceHoldFromTitle(t)) {
+      buttons.push({
+        text: 'Place Hold',
+        handler: () => this.placeHoldFromTitle(t),
+      });
+    }
+    buttons.push({
+      text: 'Open Details',
+      handler: () => this.openTitle(t),
+    });
     if (this.canEditList) {
       buttons.push({
         text: 'Remove from List',
@@ -241,9 +261,239 @@ export class MyListDetailPage {
     return this.removingRecordId !== '' && this.removingRecordId === this.recordIdForEntry(t);
   }
 
+  rowActionBusyFor(t: AspenListTitle): boolean {
+    const id = this.recordIdForEntry(t);
+    if (!id) return false;
+    return this.removingRecordId === id || this.actionRecordId === id;
+  }
+
   private recordIdForEntry(t: AspenListTitle): string {
     const id = (t?.id ?? t?.shortId ?? '').toString().trim();
     return id;
+  }
+
+  private canPlaceHoldFromTitle(t: AspenListTitle): boolean {
+    const recordType = (t?.recordType ?? '').toString().trim().toLowerCase();
+    if (recordType === 'event') return false;
+    const groupedKey = this.recordIdForEntry(t);
+    return !!groupedKey;
+  }
+
+  private async placeHoldFromTitle(t: AspenListTitle): Promise<void> {
+    const groupedKey = this.recordIdForEntry(t);
+    if (!groupedKey) {
+      this.toast.presentToast('Could not determine holdable record id. Open details to place hold.');
+      return;
+    }
+    if (!this.auth.snapshot()?.isLoggedIn) {
+      this.toast.presentToast('Log in to place holds.');
+      return;
+    }
+    if (this.rowActionBusyFor(t)) return;
+
+    const holdTargets = await this.resolveIlsHoldTargetsForTitle(t);
+    if (!holdTargets.length) {
+      this.toast.presentToast('No physical holdable format found for this list item.');
+      return;
+    }
+
+    const heldRecordIds = await this.heldRecordIdsForGroupedKey(groupedKey);
+    let availableTargets = holdTargets.filter((x) => !heldRecordIds.has(x.recordId));
+
+    if (!availableTargets.length && heldRecordIds.size === 0) {
+      const heldFormatKeys = await this.heldFormatKeysForGroupedKey(groupedKey);
+      availableTargets = holdTargets.filter(
+        (x) => !heldFormatKeys.has(this.normalizeFormatKey(x.formatLabel)),
+      );
+    }
+
+    if (!availableTargets.length) {
+      this.toast.presentToast('You already have all holdable formats on hold.');
+      return;
+    }
+
+    let selectedTarget = availableTargets[0];
+    if (availableTargets.length > 1) {
+      const picked = await this.pickHoldTarget(availableTargets);
+      if (!picked) return;
+      selectedTarget = picked;
+    }
+
+    const defaultPickup = await this.defaultPickupBranchCode();
+    if (defaultPickup) {
+      this.placeHoldNowForTitle(t, selectedTarget.recordId, defaultPickup, selectedTarget.label);
+      return;
+    }
+
+    const buttons: ActionSheetButton[] = this.globals.pickupLocations.map((loc) => ({
+      text: loc.name,
+      handler: () => this.placeHoldNowForTitle(t, selectedTarget.recordId, loc.code, selectedTarget.label),
+    }));
+    buttons.push({ text: 'Close', role: 'cancel' });
+
+    const sheet = await this.actionSheetCtrl.create({
+      header: 'Pick up where?',
+      buttons,
+    });
+    await sheet.present();
+  }
+
+  private placeHoldNowForTitle(
+    t: AspenListTitle,
+    recordId: string,
+    pickupBranch: string,
+    selectedFormatLabel?: string,
+  ): void {
+    const groupedKey = this.recordIdForEntry(t);
+    if (!groupedKey || this.rowActionBusyFor(t)) return;
+
+    this.actionRecordId = groupedKey;
+    this.holds.placeHold(recordId, pickupBranch, null)
+      .pipe(finalize(() => { this.actionRecordId = ''; }))
+      .subscribe({
+        next: (res) => {
+          if (!res?.success) {
+            this.toast.presentToast(res?.message || 'Could not place hold.');
+            return;
+          }
+          if (selectedFormatLabel) {
+            this.toast.presentToast(`Hold placed on format ${selectedFormatLabel}.`);
+            return;
+          }
+          this.toast.presentToast(res?.message || 'Hold placed.');
+        },
+        error: () => this.toast.presentToast('Could not place hold.'),
+      });
+  }
+
+  private async resolveIlsHoldTargetsForTitle(t: AspenListTitle): Promise<HoldTargetOption[]> {
+    const groupedKey = this.recordIdForEntry(t);
+    if (!groupedKey) return [];
+
+    try {
+      const work = await lastValueFrom(this.itemService.getGroupedWork(groupedKey));
+      const physicalById = new Map<string, HoldTargetOption>();
+      const anyById = new Map<string, HoldTargetOption>();
+
+      for (const [formatKey, fmt] of Object.entries(work?.formats ?? {})) {
+        const formatLabel =
+          (fmt?.label ?? '').toString().trim() ||
+          (formatKey ?? '').toString().trim() ||
+          'Format';
+
+        for (const action of fmt?.actions ?? []) {
+          const id = this.itemService.extractIlsIdFromOnclick((action as any)?.onclick);
+          if (!id) continue;
+
+          const actionTitle = ((action as any)?.title ?? '').toString().trim();
+          const isPlaceHold = actionTitle.toLowerCase() === 'place hold';
+          const label = actionTitle && !isPlaceHold ? `${formatLabel} (${actionTitle})` : formatLabel;
+          const target: HoldTargetOption = { recordId: id, label, formatLabel };
+
+          if (!anyById.has(id)) anyById.set(id, target);
+          if (isPlaceHold && !physicalById.has(id)) physicalById.set(id, target);
+        }
+      }
+
+      const physical = Array.from(physicalById.values());
+      if (physical.length) return physical;
+      return Array.from(anyById.values());
+    } catch {
+      return [];
+    }
+  }
+
+  private async pickHoldTarget(options: HoldTargetOption[]): Promise<HoldTargetOption | null> {
+    return new Promise(async (resolve) => {
+      const sheet = await this.actionSheetCtrl.create({
+        header: 'Place hold on which format?',
+        buttons: [
+          ...options.map((opt): ActionSheetButton => ({
+            text: opt.label,
+            handler: () => resolve(opt),
+          })),
+          {
+            text: 'Close',
+            role: 'cancel',
+            handler: () => resolve(null),
+          },
+        ],
+      });
+
+      await sheet.present();
+      await sheet.onDidDismiss();
+      resolve(null);
+    });
+  }
+
+  private async heldRecordIdsForGroupedKey(groupedKey: string): Promise<Set<string>> {
+    const normalized = (groupedKey ?? '').toString().trim().toLowerCase();
+    if (!normalized) return new Set<string>();
+
+    try {
+      const holds = await lastValueFrom(this.holds.fetchActiveHolds());
+      const ids = new Set<string>();
+      for (const hold of holds ?? []) {
+        const holdGrouped = (hold?.groupedWorkId ?? '').toString().trim().toLowerCase();
+        if (!holdGrouped || holdGrouped !== normalized) continue;
+        const rid = (hold?.recordId ?? '').toString().trim();
+        if (rid) ids.add(rid);
+      }
+      return ids;
+    } catch {
+      return new Set<string>();
+    }
+  }
+
+  private async heldFormatKeysForGroupedKey(groupedKey: string): Promise<Set<string>> {
+    const normalized = (groupedKey ?? '').toString().trim().toLowerCase();
+    if (!normalized) return new Set<string>();
+
+    try {
+      const holds = await lastValueFrom(this.holds.fetchActiveHolds());
+      const keys = new Set<string>();
+      for (const hold of holds ?? []) {
+        const holdGrouped = (hold?.groupedWorkId ?? '').toString().trim().toLowerCase();
+        if (!holdGrouped || holdGrouped !== normalized) continue;
+
+        const f = (hold as any)?.format;
+        if (Array.isArray(f)) {
+          for (const x of f) {
+            const key = this.normalizeFormatKey((x ?? '').toString());
+            if (key) keys.add(key);
+          }
+        } else if (typeof f === 'string') {
+          const key = this.normalizeFormatKey(f);
+          if (key) keys.add(key);
+        }
+      }
+      return keys;
+    } catch {
+      return new Set<string>();
+    }
+  }
+
+  private normalizeFormatKey(value: string): string {
+    return (value ?? '')
+      .toString()
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, ' ');
+  }
+
+  private async defaultPickupBranchCode(): Promise<string | null> {
+    const activeId = (this.auth.snapshot()?.activeAccountId ?? '').toString().trim();
+    if (!activeId) return null;
+
+    try {
+      const prefs = await this.accountPreferences.getCachedPreferences(activeId);
+      const legacyCode = (prefs?.pickup_library ?? '').toString().trim();
+      if (!legacyCode) return null;
+      const loc = this.globals.pickupLocationFromLegacyPreferencesCode(legacyCode);
+      return loc?.code ?? null;
+    } catch {
+      return null;
+    }
   }
 
   private async confirmRemoveFromList(t: AspenListTitle) {

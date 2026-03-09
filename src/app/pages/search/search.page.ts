@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonicModule, ModalController, ActionSheetController, type ActionSheetButton } from '@ionic/angular';
 import { ActivatedRoute } from '@angular/router';
+import { Router } from '@angular/router';
 import { finalize } from 'rxjs';
 import { lastValueFrom } from 'rxjs';
 import {
@@ -112,16 +113,41 @@ export class SearchPage {
     private accountPreferences: AccountPreferencesService,
     private auth: AuthService,
     private route: ActivatedRoute,
+    private router: Router,
   ) {}
 
   ionViewDidEnter() {
     // allow deep link: /search?lookfor=...
-    const advanced = (this.route.snapshot.queryParamMap.get('advanced') ?? '').trim();
+    const qp = this.route.snapshot.queryParamMap;
+    const advanced = (qp.get('advanced') ?? '').trim();
     if (advanced === '1' || advanced.toLowerCase() === 'true') {
       this.showAdvanced = true;
     }
 
-    const q = (this.route.snapshot.queryParamMap.get('lookfor') ?? '').trim();
+    const incomingSearchIndex = (qp.get('searchIndex') ?? '').trim();
+    if (incomingSearchIndex) {
+      this.searchIndex = incomingSearchIndex as AspenSearchIndex;
+    }
+
+    const incomingSort = this.normalizedSortValue((qp.get('sort') ?? '').trim());
+    if (incomingSort) {
+      this.sort = incomingSort;
+    }
+
+    const facets = (qp.get('facets') ?? '').trim();
+    if (facets === '1' || facets.toLowerCase() === 'true') {
+      this.facetsEnabled = true;
+      this.showAdvanced = true;
+    }
+
+    const incomingFilters = qp.getAll('filter').map((x) => x.trim()).filter((x) => !!x);
+    if (incomingFilters.length) {
+      this.filters = Array.from(new Set(incomingFilters));
+      this.facetsEnabled = true;
+      this.showAdvanced = true;
+    }
+
+    const q = (qp.get('lookfor') ?? '').trim();
     if (!q) {
       this.lookfor = '';
       this.clearSearch();
@@ -213,6 +239,7 @@ export class SearchPage {
     this.page = 1;
     this.totalPages = 1;
     this.infiniteDisabled = true;
+    this.syncSearchUrl('');
   }
 
   runSearch(reset: boolean) {
@@ -230,9 +257,11 @@ export class SearchPage {
       this.facetGroups = [];
       this.collapsedFacetGroups = {};
       this.facetDisplayByFilter.clear();
+      this.syncSearchUrl('');
       return;
     }
 
+    this.syncSearchUrl(q);
     this.lastExecutedQuery = q;
 
     // If reset, start over.
@@ -941,6 +970,24 @@ export class SearchPage {
     } catch {
       return null;
     }
+  }
+
+  private syncSearchUrl(query: string): void {
+    const lookfor = (query ?? '').trim();
+    const queryParams: Record<string, any> = {
+      lookfor: lookfor || null,
+      advanced: this.showAdvanced ? '1' : null,
+      searchIndex: this.searchIndex && this.searchIndex !== 'Keyword' ? this.searchIndex : null,
+      sort: this.sort && this.sort !== 'relevance' ? this.sort : null,
+      facets: this.facetsEnabled ? '1' : null,
+      filter: this.filters.length ? this.filters : null,
+    };
+
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams,
+      replaceUrl: true,
+    });
   }
 
   private setRowBusy(hit: AspenSearchHit, busy: boolean) {

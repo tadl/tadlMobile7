@@ -241,7 +241,11 @@ export class HoldsPage {
       {
         text: 'Cancel Hold',
         role: 'destructive',
-        handler: () => this.confirmCancelHold(h),
+        handler: () => {
+          // Presenting a second action sheet directly from this handler can be
+          // swallowed while the first sheet is dismissing on some platforms.
+          setTimeout(() => void this.confirmCancelHold(h), 0);
+        },
       },
       {
         text: 'View details',

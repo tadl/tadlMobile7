@@ -23,11 +23,14 @@ export interface AspenPickupLocationOption extends PickupLocationOption {
 }
 
 type ThemeMode = 'light' | 'dark' | 'system';
+type LinkMode = 'app' | 'browser';
 
 @Injectable({ providedIn: 'root' })
 export class Globals {
   private readonly theme_pref_key = 'app:theme_mode';
+  private readonly link_pref_key = 'app:link_mode';
   private theme_initialized = false;
+  private link_mode_initialized = false;
 
   constructor(
     private menuController: MenuController,
@@ -44,6 +47,7 @@ export class Globals {
   public device_info: any;
   public system_color: any = window.matchMedia('(prefers-color-scheme: dark)');
   public theme_mode: ThemeMode = 'system';
+  public link_mode: LinkMode = 'app';
 
   public system_short_name: string = 'TADL';
 
@@ -188,6 +192,21 @@ export class Globals {
     this.attachSystemThemeListener();
   }
 
+  async initLinkPreference() {
+    if (this.link_mode_initialized) return;
+
+    let preferred: LinkMode = 'app';
+    try {
+      const { value } = await Preferences.get({ key: this.link_pref_key });
+      if (value === 'app' || value === 'browser') preferred = value;
+    } catch {
+      // Keep default when local preferences are unavailable.
+    }
+
+    this.link_mode = preferred;
+    this.link_mode_initialized = true;
+  }
+
   isDarkTheme(): boolean {
     if (this.theme_mode === 'dark') return true;
     if (this.theme_mode === 'light') return false;
@@ -200,6 +219,13 @@ export class Globals {
     this.theme_initialized = true;
     await Preferences.set({ key: this.theme_pref_key, value: this.theme_mode });
     this.attachSystemThemeListener();
+  }
+
+  async setLinkMode(mode: LinkMode) {
+    const next: LinkMode = mode === 'browser' ? 'browser' : 'app';
+    this.link_mode = next;
+    this.link_mode_initialized = true;
+    await Preferences.set({ key: this.link_pref_key, value: next });
   }
 
   private applyThemeClass(mode: ThemeMode) {

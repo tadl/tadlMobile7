@@ -18,6 +18,17 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="https" android:host="discover.tadl.org" android:pathPrefix="/GroupedWork/" />
+                <data android:scheme="https" android:host="discover.tadl.org" android:pathPrefix="/Record/" />
+                <data android:scheme="https" android:host="discover.tadl.org" android:pathPrefix="/Union/Search" />
+                <data android:scheme="https" android:host="discover.tadl.org" android:pathPrefix="/Search/" />
+                <data android:scheme="https" android:host="discover.tadl.org" android:pathPrefix="/MyAccount/" />
+            </intent-filter>
         </activity>
 
         <provider

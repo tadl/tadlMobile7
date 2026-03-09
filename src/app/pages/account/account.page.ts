@@ -245,6 +245,16 @@ export class AccountPage implements OnInit {
     void this.globals.setTheme(value);
   }
 
+  linkMode(): 'app' | 'browser' {
+    return this.globals.link_mode;
+  }
+
+  onLinkModeChange(ev: CustomEvent) {
+    const value = (ev.detail as { value?: string } | undefined)?.value;
+    if (value !== 'app' && value !== 'browser') return;
+    void this.globals.setLinkMode(value);
+  }
+
   private refreshMyListsCount() {
     this.myListsCount = this.listCountFromProfile(this.auth.snapshot()?.profile);
   }

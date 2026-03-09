@@ -1,10 +1,11 @@
 import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { IonicModule } from '@ionic/angular';
+import { IonicModule, ActionSheetController, type ActionSheetButton } from '@ionic/angular';
+import { Capacitor } from '@capacitor/core';
+import { AppLauncher } from '@capacitor/app-launcher';
 import { Globals } from '../../../globals';
 import { ModalController } from '@ionic/angular/standalone';
 import { LocationsService, type AppLocation } from '../../../services/locations.service';
-import { Capacitor } from '@capacitor/core';
 
 type Location = AppLocation;
 
@@ -32,6 +33,7 @@ export class LocationDetailComponent {
     public globals: Globals,
     private modalController: ModalController,
     private locationsService: LocationsService,
+    private actionSheet: ActionSheetController,
   ) {}
 
   ionViewDidEnter() {
@@ -83,17 +85,26 @@ export class LocationDetailComponent {
     if (!query) return;
 
     const encoded = encodeURIComponent(query);
-    const platform = Capacitor.getPlatform();
+    const options = await this.navigationOptions(encoded);
+    if (options.length === 1) {
+      await this.globals.open_external_page(options[0].url);
+      return;
+    }
 
-    // Use platform-native style deep links first, then rely on global external opener fallback behavior.
-    const targetUrl =
-      platform === 'ios'
-        ? `maps://?daddr=${encoded}&dirflg=d`
-        : platform === 'android'
-          ? `geo:0,0?q=${encoded}`
-          : `https://www.google.com/maps/dir/?api=1&destination=${encoded}&travelmode=driving`;
+    const buttons: ActionSheetButton[] = options.map((opt) => ({
+      text: opt.text,
+      handler: () => {
+        void this.globals.open_external_page(opt.url);
+      },
+    }));
+    buttons.push({ text: 'Close', role: 'cancel' });
 
-    await this.globals.open_external_page(targetUrl);
+    const sheet = await this.actionSheet.create({
+      header: 'Navigate with',
+      buttons,
+    });
+
+    await sheet.present();
   }
 
   openTodayLine(loc: Location): string {
@@ -164,5 +175,55 @@ export class LocationDetailComponent {
       .map((v) => (v ?? '').toString().trim())
       .filter(Boolean)
       .join(', ');
+  }
+
+  private async navigationOptions(encodedQuery: string): Promise<Array<{ text: string; url: string }>> {
+    const browserFallback: Array<{ text: string; url: string }> = [
+      {
+        text: 'Google Maps (Web)',
+        url: `https://www.google.com/maps/dir/?api=1&destination=${encodedQuery}&travelmode=driving`,
+      },
+      {
+        text: 'Waze (Web)',
+        url: `https://waze.com/ul?q=${encodedQuery}&navigate=yes`,
+      },
+    ];
+
+    if (!Capacitor.isNativePlatform()) {
+      return browserFallback;
+    }
+
+    const candidates = [
+      {
+        text: 'Apple Maps',
+        probe: 'maps://',
+        url: `maps://?daddr=${encodedQuery}&dirflg=d`,
+      },
+      {
+        text: 'Google Maps',
+        probe: 'comgooglemaps://',
+        url: `comgooglemaps://?daddr=${encodedQuery}&directionsmode=driving`,
+      },
+      {
+        text: 'Waze',
+        probe: 'waze://',
+        url: `waze://?q=${encodedQuery}&navigate=yes`,
+      },
+    ];
+
+    const available: Array<{ text: string; url: string }> = [];
+    for (const candidate of candidates) {
+      try {
+        const result = await AppLauncher.canOpenUrl({ url: candidate.probe });
+        if (result?.value) {
+          available.push({ text: candidate.text, url: candidate.url });
+        }
+      } catch {
+        // Ignore probe failures and continue.
+      }
+    }
+
+    if (available.length) return available;
+    return browserFallback;
   }
 }

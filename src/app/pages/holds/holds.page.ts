@@ -199,23 +199,18 @@ export class HoldsPage {
     // IMPORTANT: react to changes from the modal
     m.onDidDismiss().then((res) => {
       const data = res?.data;
-      if (data?.refreshHolds) {
-        const groupedWorkId = (data?.groupedWorkId ?? '').toString().trim();
-        const updatedHoldsForItem = Array.isArray(data?.holdsForItem) ? (data.holdsForItem as AspenHold[]) : null;
+        if (data?.refreshHolds) {
+          const groupedWorkId = (data?.groupedWorkId ?? '').toString().trim();
+          const updatedHoldsForItem = Array.isArray(data?.holdsForItem) ? (data.holdsForItem as AspenHold[]) : null;
 
         if (groupedWorkId && updatedHoldsForItem) {
           this.applyItemHoldMutation(groupedWorkId, updatedHoldsForItem);
-        } else {
-          this.partitionIlsHolds([...this.ilsReady, ...this.ilsNotReady]);
+          } else {
+            this.partitionIlsHolds([...this.ilsReady, ...this.ilsNotReady]);
+          }
+          void this.persistLocalHolds();
         }
-        void this.persistLocalHolds();
-
-        // refresh badges/counts in the account menu
-        this.auth.refreshActiveProfile().subscribe({
-          error: () => {}, // ignore; holds refresh is the priority
-        });
-      }
-    });
+      });
 
     await m.present();
   }
@@ -246,7 +241,7 @@ export class HoldsPage {
       {
         text: 'Cancel Hold',
         role: 'destructive',
-        handler: () => this.cancelHoldNow(h),
+        handler: () => this.confirmCancelHold(h),
       },
       {
         text: 'View details',
@@ -369,18 +364,41 @@ export class HoldsPage {
             return;
           }
 
+          const wasReady = this.holdIsReady(h);
           this.removeHoldFromLists(h);
+          this.auth.adjustActiveProfileCounts({
+            holds: -1,
+            holdsReady: wasReady ? -1 : 0,
+            holdsRequested: wasReady ? 0 : -1,
+          });
           this.toast.presentToast(res?.message || 'Hold cancelled.');
 
           const snap = this.auth.snapshot();
           if (snap.isLoggedIn && snap.activeAccountId) {
             await this.persistLocalHolds();
           }
-
-          this.auth.refreshActiveProfile().subscribe({ error: () => {} });
         },
         error: () => this.toast.presentToast('Could not cancel hold.'),
       });
+  }
+
+  private async confirmCancelHold(h: AspenHold) {
+    if (this.isHoldActionBusy(h)) return;
+
+    const sheet = await this.actionSheet.create({
+      header: 'Cancel hold?',
+      subHeader: this.holdTitle(h),
+      buttons: [
+        {
+          text: 'Cancel Hold',
+          role: 'destructive',
+          handler: () => this.cancelHoldNow(h),
+        },
+        { text: 'Keep Hold', role: 'cancel' },
+      ],
+    });
+
+    await sheet.present();
   }
 
   isHoldActionBusy(h: AspenHold): boolean {

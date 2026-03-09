@@ -44,6 +44,43 @@ export class AuthService {
     });
   }
 
+  adjustActiveProfileCounts(delta: {
+    holds?: number;
+    holdsReady?: number;
+    holdsRequested?: number;
+    checkouts?: number;
+  }): void {
+    const snap = this.state$.value;
+    if (!snap.activeAccountId || !snap.activeAccountMeta || !snap.profile || !delta) return;
+
+    const nextProfile: any = { ...snap.profile };
+
+    const applyDelta = (keys: string[], amount?: number) => {
+      const n = Number(amount ?? 0);
+      if (!Number.isFinite(n) || n === 0) return;
+
+      for (const key of keys) {
+        if (!(key in nextProfile)) continue;
+        const current = Number(nextProfile[key]);
+        const base = Number.isFinite(current) ? current : 0;
+        nextProfile[key] = Math.max(0, base + n);
+      }
+    };
+
+    applyDelta(['numHolds', 'numHoldsIls', 'holds'], delta.holds);
+    applyDelta(['numHoldsAvailable', 'numHoldsAvailableIls', 'holds_ready'], delta.holdsReady);
+    applyDelta(['numHoldsRequested', 'numHoldsRequestedIls'], delta.holdsRequested);
+    applyDelta(['numCheckedOut', 'numCheckedOutIls', 'checkouts'], delta.checkouts);
+
+    this.state$.next({
+      ...snap,
+      isLoggedIn: true,
+      profile: nextProfile,
+    });
+
+    this.accounts.cacheProfile(snap.activeAccountId, nextProfile).catch(() => {});
+  }
+
   /**
    * Call on app startup (e.g., AppComponent) to restore:
    * - active account id

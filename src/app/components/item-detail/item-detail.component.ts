@@ -742,6 +742,12 @@ export class ItemDetailComponent implements OnInit {
           }
 
           this.needsHoldsRefresh = true;
+          const wasReady = this.holdIsReady(selected);
+          this.auth.adjustActiveProfileCounts({
+            holds: -1,
+            holdsReady: wasReady ? -1 : 0,
+            holdsRequested: wasReady ? 0 : -1,
+          });
 
           this.toast.presentToast(res?.message || 'Hold cancelled.');
 
@@ -1242,6 +1248,7 @@ export class ItemDetailComponent implements OnInit {
           }
 
           this.needsHoldsRefresh = true;
+          this.auth.adjustActiveProfileCounts({ holds: 1, holdsRequested: 1 });
           this.toast.presentToast(res?.message || 'Hold placed.');
           this.insertOptimisticPlacedHold(recordId, pickupBranch);
         },

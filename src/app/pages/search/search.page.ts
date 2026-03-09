@@ -827,6 +827,7 @@ export class SearchPage {
             this.toast.presentToast(res?.message || 'Could not place hold.');
             return;
           }
+          this.auth.adjustActiveProfileCounts({ holds: 1, holdsRequested: 1 });
           if (selectedFormatLabel) {
             this.toast.presentToast(`Hold placed on format ${selectedFormatLabel}.`);
             return;

@@ -220,7 +220,6 @@ export class CheckoutsPage {
           }
           this.applyRenewMutationToCheckout(c, res?.raw);
           this.toast.presentToast(res?.message || 'Renewed.');
-          this.auth.refreshActiveProfile().subscribe({ error: () => {} });
         },
         error: () => this.toast.presentToast('Could not renew.'),
       });
@@ -309,7 +308,6 @@ export class CheckoutsPage {
       const data = res?.data;
       if (data?.refreshCheckouts) {
         this.ilsCheckouts = this.sortCheckouts([...(this.ilsCheckouts ?? [])]);
-        this.auth.refreshActiveProfile().subscribe({ error: () => {} });
       }
     });
 

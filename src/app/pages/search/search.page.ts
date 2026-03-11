@@ -88,6 +88,7 @@ export class SearchPage implements OnInit, OnDestroy {
     { value: 'rating desc', label: 'User Rating' },
     { value: 'total_holds desc', label: 'Number of Holds' },
   ];
+  readonly selectInterfaceOptions = { cssClass: 'search-select-popover' };
 
   filters: string[] = [];
   facetGroups: SearchFacetGroup[] = [];

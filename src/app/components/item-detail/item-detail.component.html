@@ -19,6 +19,12 @@
       <div class="meta" *ngIf="work?.author || hit.author">
         {{ work?.author || hit.author }}
       </div>
+      <div class="facts-grid" *ngIf="detailFacts().length">
+        <div class="fact-chip" *ngFor="let fact of detailFacts()">
+          <span class="fact-label">{{ fact.label }}</span>
+          <span class="fact-value">{{ fact.value }}</span>
+        </div>
+      </div>
       <ion-button
         size="small"
         fill="outline"

@@ -63,6 +63,11 @@ interface FormatShelfDetail {
   availability: boolean | null;
 }
 
+interface DetailFact {
+  label: string;
+  value: string;
+}
+
 @Component({
   standalone: true,
   selector: 'app-item-detail',
@@ -195,6 +200,21 @@ export class ItemDetailComponent implements OnInit {
 
     if (!subtitle) return title;
     return `${title}: ${subtitle}`;
+  }
+
+  detailFacts(): DetailFact[] {
+    const facts: DetailFact[] = [];
+
+    const year = this.publicationYearText();
+    if (year) facts.push({ label: 'Published', value: year });
+
+    const language = this.languageText();
+    if (language) facts.push({ label: 'Language', value: language });
+
+    const series = this.seriesText();
+    if (series) facts.push({ label: 'Series', value: series });
+
+    return facts;
   }
 
   itemDescriptionText(): string {
@@ -1760,6 +1780,56 @@ export class ItemDetailComponent implements OnInit {
   private normalizeDescriptionText(value: any): string {
     if (value === null || value === undefined) return '';
     return String(value).replace(/\s+/g, ' ').trim();
+  }
+
+  private languageText(): string {
+    const raw = (this.work?.language ?? this.hit?.language ?? '').toString().trim();
+    if (!raw) return '';
+    return raw.split(',')[0].trim();
+  }
+
+  private seriesText(): string {
+    const list = (this.work?.series ?? []) as Array<{ seriesTitle?: string; volume?: string }>;
+    if (!Array.isArray(list) || !list.length) return '';
+    const first = list[0] ?? {};
+    const title = (first?.seriesTitle ?? '').toString().trim();
+    const volume = (first?.volume ?? '').toString().trim();
+    if (!title) return '';
+    if (!volume) return title;
+    return `${title} · Vol ${volume}`;
+  }
+
+  private publicationYearText(): string {
+    const candidates: any[] = [
+      (this.work as any)?.publishYear,
+      (this.work as any)?.year,
+      (this.work as any)?.publishDate,
+      (this.work as any)?.publishDateSort,
+      (this.work as any)?.publicationDate,
+      (this.hit?.raw as any)?.publishYear,
+      (this.hit?.raw as any)?.year,
+      (this.hit?.raw as any)?.publishDate,
+      (this.hit?.raw as any)?.publishDateSort,
+      (this.hit?.raw as any)?.publicationDate,
+    ];
+
+    for (const candidate of candidates) {
+      const year = this.extractYear(candidate);
+      if (year) return String(year);
+    }
+    return '';
+  }
+
+  private extractYear(input: unknown): number | null {
+    if (input === null || input === undefined) return null;
+    const raw = String(input).trim();
+    if (!raw) return null;
+
+    const match = raw.match(/\b(18|19|20)\d{2}\b/);
+    if (!match) return null;
+    const year = Number(match[0]);
+    if (!Number.isFinite(year)) return null;
+    return year;
   }
 
   private normalizeCoverUrl(value: unknown): string {

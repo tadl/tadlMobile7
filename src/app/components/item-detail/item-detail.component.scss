@@ -46,6 +46,36 @@
   overflow-wrap: break-word;
 }
 
+.facts-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.fact-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--ion-color-primary-rgb), 0.22);
+  background: rgba(var(--ion-color-primary-rgb), 0.08);
+}
+
+.fact-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-weight: 700;
+  color: var(--ion-color-primary);
+}
+
+.fact-value {
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .add-to-list-button {
   margin-top: 10px;
   --padding-start: 10px;

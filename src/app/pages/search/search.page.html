@@ -53,7 +53,7 @@
     <div *ngIf="showAdvanced" class="advanced">
       <ion-item>
         <ion-label>Search by</ion-label>
-        <ion-select [(ngModel)]="searchIndex" interface="popover">
+        <ion-select [(ngModel)]="searchIndex" interface="popover" [interfaceOptions]="selectInterfaceOptions">
           <ion-select-option value="Keyword">Keyword</ion-select-option>
           <ion-select-option value="Title">Title</ion-select-option>
           <ion-select-option value="Author">Author</ion-select-option>
@@ -64,7 +64,7 @@
 
       <ion-item>
         <ion-label>Sort</ion-label>
-        <ion-select [(ngModel)]="sort" interface="popover">
+        <ion-select [(ngModel)]="sort" interface="popover" [interfaceOptions]="selectInterfaceOptions">
           <ion-select-option *ngFor="let opt of sortOptions" [value]="opt.value">
             {{ opt.label }}
           </ion-select-option>

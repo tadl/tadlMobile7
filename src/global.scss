@@ -109,3 +109,19 @@ ion-card {
 .action-sheet-button.action-sheet-disabled-option {
   opacity: 0.52;
 }
+
+/* Search page select popovers: avoid truncating long option labels on iOS. */
+ion-popover.search-select-popover {
+  --width: min(94vw, 460px);
+}
+
+ion-popover.search-select-popover::part(content) {
+  width: min(94vw, 460px);
+  max-width: min(94vw, 460px);
+}
+
+ion-popover.search-select-popover ion-label {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+}

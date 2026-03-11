@@ -90,6 +90,7 @@ export class HoldsPage {
         next: async (allHolds) => {
           const ilsOnly = (allHolds ?? []).filter(h => (h?.type === 'ils' || h?.source === 'ils'));
           this.partitionIlsHolds(ilsOnly);
+          this.syncProfileHoldCountsFromList(ilsOnly);
 
           try {
             await this.holds.setCachedHolds(snap.activeAccountId!, ilsOnly);
@@ -550,5 +551,28 @@ export class HoldsPage {
     );
 
     this.partitionIlsHolds([...existing, ...incomingIls]);
+  }
+
+  private syncProfileHoldCountsFromList(holds: AspenHold[]) {
+    const total = (holds ?? []).length;
+    const ready = (holds ?? []).filter((h) => this.holdDisplayState(h) === 'ready').length;
+    const requested = Math.max(0, total - ready);
+
+    const snap = this.auth.snapshot();
+    const profile: any = snap?.profile ?? {};
+    const currentTotal = this.toCount(profile?.numHolds ?? profile?.numHoldsIls ?? profile?.holds);
+    const currentReady = this.toCount(profile?.numHoldsAvailable ?? profile?.numHoldsAvailableIls ?? profile?.holds_ready);
+    const currentRequested = this.toCount(profile?.numHoldsRequested ?? profile?.numHoldsRequestedIls);
+
+    this.auth.adjustActiveProfileCounts({
+      holds: total - currentTotal,
+      holdsReady: ready - currentReady,
+      holdsRequested: requested - currentRequested,
+    });
+  }
+
+  private toCount(value: any): number {
+    const n = Number(value ?? 0);
+    return Number.isFinite(n) && n >= 0 ? n : 0;
   }
 }

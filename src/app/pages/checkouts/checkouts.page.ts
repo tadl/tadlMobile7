@@ -65,6 +65,7 @@ export class CheckoutsPage {
       .subscribe({
         next: (list) => {
           this.ilsCheckouts = this.sortCheckouts((list ?? []).slice());
+          this.syncProfileCheckoutCount(this.ilsCheckouts.length);
         },
         error: () => this.toast.presentToast('Could not refresh checkouts.'),
       });
@@ -431,5 +432,18 @@ export class CheckoutsPage {
     }
 
     this.ilsCheckouts = this.sortCheckouts([...this.ilsCheckouts]);
+  }
+
+  private syncProfileCheckoutCount(totalCheckouts: number) {
+    const target = Math.max(0, Number(totalCheckouts ?? 0) || 0);
+    const snap = this.auth.snapshot();
+    const profile: any = snap?.profile ?? {};
+    const current = this.toCount(profile?.numCheckedOut ?? profile?.numCheckedOutIls ?? profile?.checkouts);
+    this.auth.adjustActiveProfileCounts({ checkouts: target - current });
+  }
+
+  private toCount(value: any): number {
+    const n = Number(value ?? 0);
+    return Number.isFinite(n) && n >= 0 ? n : 0;
   }
 }

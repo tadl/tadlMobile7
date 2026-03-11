@@ -1,0 +1,45 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-button (click)="close()">Close</ion-button>
+    </ion-buttons>
+    <ion-title>MyMeLCat</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding melcat-manage-content">
+  <div class="melcat-card">
+    <div class="melcat-logo-wrap">
+      <img src="assets/images/melcat-wordmark.png" alt="MeLCat" />
+    </div>
+
+    <h2>{{ type === 'checkout' ? 'Manage MeLCat checkout' : 'Manage MeLCat hold' }}</h2>
+
+    <div class="record-info" *ngIf="title || author || format">
+      <div class="record-title" *ngIf="title">{{ title }}</div>
+      <div class="record-meta" *ngIf="author">{{ author }}</div>
+      <div class="record-meta" *ngIf="format">{{ format }}</div>
+    </div>
+
+    <p>
+      This item appears to be from MeLCat. To manage this MeLCat
+      {{ type === 'checkout' ? 'checkout' : 'hold' }}, you will need to visit MyMeLCat.
+    </p>
+
+    <div class="melcat-login-tip" *ngIf="melcatId">
+      <div class="tip-title">Login tip</div>
+      <p>You will need to use your MeLCat ID as your library card number to log in.</p>
+      <div class="melcat-id-row">
+        <div class="melcat-id">{{ melcatId }}</div>
+        <ion-button size="small" fill="outline" (click)="copyMelcatId()">
+          <ion-icon name="copy-outline" slot="start"></ion-icon>
+          Copy ID
+        </ion-button>
+      </div>
+    </div>
+
+    <ion-button expand="block" (click)="openMyMelcat()">
+      Go to MyMeLCat
+    </ion-button>
+  </div>
+</ion-content>

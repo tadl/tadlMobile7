@@ -57,6 +57,7 @@ import {
   bookOutline,
   discOutline,
   videocamOutline,
+  copyOutline,
 } from 'ionicons/icons';
 
 import { routes } from './app/app.routes';
@@ -101,6 +102,7 @@ addIcons({
   'book-outline': bookOutline,
   'disc-outline': discOutline,
   'videocam-outline': videocamOutline,
+  'copy-outline': copyOutline,
 });
 
 bootstrapApplication(AppComponent, {

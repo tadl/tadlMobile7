@@ -9,6 +9,7 @@ import { AuthService } from '../../services/auth.service';
 import { HoldsService, AspenHold } from '../../services/holds.service';
 import { ItemDetailComponent } from '../../components/item-detail/item-detail.component';
 import { AspenSearchHit } from '../../services/search.service';
+import { MelcatManageModalComponent } from '../../components/melcat-manage-modal/melcat-manage-modal.component';
 
 @Component({
   standalone: true,
@@ -170,6 +171,11 @@ export class HoldsPage {
   }
 
   async openHold(h: AspenHold) {
+    if (this.isMelcatHold(h)) {
+      await this.openMelcatManager('hold', h);
+      return;
+    }
+
     const key = (h?.groupedWorkId ?? '').toString().trim();
     if (!key) {
       this.toast.presentToast('This hold is missing a grouped work id.');
@@ -220,6 +226,18 @@ export class HoldsPage {
     ev?.preventDefault();
 
     if (this.isHoldActionBusy(h)) return;
+
+    if (this.isMelcatHold(h)) {
+      const sheet = await this.actionSheet.create({
+        header: this.holdTitle(h),
+        buttons: [
+          { text: 'Manage hold', handler: () => this.openMelcatManager('hold', h) },
+          { text: 'Close', role: 'cancel' },
+        ],
+      });
+      await sheet.present();
+      return;
+    }
 
     const frozen = this.holdIsFrozen(h);
     const buttons: ActionSheetButton[] = [];
@@ -421,6 +439,31 @@ export class HoldsPage {
   private holdActionKey(h: AspenHold): string {
     const raw = (h as any)?.id ?? (h as any)?.cancelId ?? (h as any)?.recordId ?? (h as any)?.groupedWorkId ?? '';
     return String(raw).trim();
+  }
+
+  private isMelcatHold(h: AspenHold | null | undefined): boolean {
+    const grouped = ((h as any)?.groupedWorkId ?? '').toString().trim();
+    const cover = ((h as any)?.coverUrl ?? '').toString().trim();
+    return !grouped && !cover;
+  }
+
+  private async openMelcatManager(type: 'hold' | 'checkout', hold?: AspenHold) {
+    const title = hold ? this.holdTitle(hold) : '';
+    const author = hold ? this.holdAuthor(hold) : '';
+    const format = this.holdFormatSummary(hold);
+
+    const modal = await this.modal.create({
+      component: MelcatManageModalComponent,
+      componentProps: { type, title, author, format },
+    });
+    this.globals.modal_open = true;
+    await modal.present();
+  }
+
+  private holdFormatSummary(hold?: AspenHold): string {
+    const raw = (hold as any)?.format;
+    if (Array.isArray(raw)) return raw.map((x) => String(x).trim()).filter(Boolean).join(', ');
+    return (raw ?? '').toString().trim();
   }
 
   private parseAspenNewLocation(s: string): { id: string; code: string } | null {

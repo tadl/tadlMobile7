@@ -9,6 +9,7 @@ import { AuthService } from '../../services/auth.service';
 import { CheckoutsService, type AspenCheckout } from '../../services/checkouts.service';
 import { ItemDetailComponent } from '../../components/item-detail/item-detail.component';
 import { AspenSearchHit } from '../../services/search.service';
+import { MelcatManageModalComponent } from '../../components/melcat-manage-modal/melcat-manage-modal.component';
 
 @Component({
   standalone: true,
@@ -158,6 +159,18 @@ export class CheckoutsPage {
     ev?.stopPropagation();
     ev?.preventDefault();
 
+    if (this.isMelcatCheckout(c)) {
+      const sheet = await this.actionSheetCtrl.create({
+        header: this.checkoutTitle(c),
+        buttons: [
+          { text: 'Manage checkout', handler: () => this.openMelcatManager('checkout', c) },
+          { text: 'Close', role: 'cancel' },
+        ],
+      });
+      await sheet.present();
+      return;
+    }
+
     const canRenew = this.checkoutCanRenew(c);
     const sheet = await this.actionSheetCtrl.create({
       header: this.checkoutTitle(c),
@@ -281,6 +294,11 @@ export class CheckoutsPage {
   }
 
   async openCheckout(c: AspenCheckout) {
+    if (this.isMelcatCheckout(c)) {
+      await this.openMelcatManager('checkout', c);
+      return;
+    }
+
     const key = (c?.groupedWorkId ?? '').toString().trim();
 
     // We prefer groupedWorkId; if missing, still open a minimal hit (no WorkAPI key => item detail won't load work)
@@ -325,6 +343,31 @@ export class CheckoutsPage {
   private checkoutKey(c: AspenCheckout): string {
     const raw = (c as any)?.id ?? (c as any)?.itemId ?? (c as any)?.barcode ?? (c as any)?.recordId ?? '';
     return String(raw).trim();
+  }
+
+  private isMelcatCheckout(c: AspenCheckout | null | undefined): boolean {
+    const grouped = ((c as any)?.groupedWorkId ?? '').toString().trim();
+    const cover = ((c as any)?.coverUrl ?? '').toString().trim();
+    return !grouped && !cover;
+  }
+
+  private async openMelcatManager(type: 'hold' | 'checkout', checkout?: AspenCheckout) {
+    const title = checkout ? this.checkoutTitle(checkout) : '';
+    const author = checkout ? this.checkoutAuthor(checkout) : '';
+    const format = this.checkoutFormatSummary(checkout);
+
+    const modal = await this.modalCtrl.create({
+      component: MelcatManageModalComponent,
+      componentProps: { type, title, author, format },
+    });
+    this.globals.modal_open = true;
+    await modal.present();
+  }
+
+  private checkoutFormatSummary(checkout?: AspenCheckout): string {
+    const raw = (checkout as any)?.format;
+    if (Array.isArray(raw)) return raw.map((x) => String(x).trim()).filter(Boolean).join(', ');
+    return (raw ?? '').toString().trim();
   }
 
   private sortCheckouts(list: AspenCheckout[]): AspenCheckout[] {

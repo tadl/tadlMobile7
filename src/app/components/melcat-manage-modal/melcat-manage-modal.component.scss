@@ -1,0 +1,108 @@
+.melcat-manage-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 100%;
+  background:
+    radial-gradient(circle at 12% 8%, rgba(var(--ion-color-primary-rgb), 0.08) 0%, rgba(var(--ion-color-primary-rgb), 0.02) 38%, transparent 62%),
+    linear-gradient(180deg, rgba(var(--ion-color-primary-rgb), 0.03) 0%, transparent 36%);
+}
+
+.melcat-card {
+  background: var(--ion-item-background, var(--ion-background-color, #fff));
+  border-radius: 16px;
+  border: 1px solid rgba(var(--ion-color-primary-rgb), 0.18);
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.08),
+    0 2px 6px rgba(0, 0, 0, 0.06);
+  padding: 16px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.melcat-logo-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 2px;
+}
+
+.melcat-logo-wrap img {
+  max-width: 280px;
+  width: 100%;
+  height: auto;
+}
+
+h2 {
+  margin: 0;
+  font-size: 1.36rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+p {
+  margin: 0;
+  line-height: 1.42;
+  font-size: 1rem;
+  color: var(--ion-text-color);
+}
+
+.record-info {
+  background: rgba(var(--ion-text-color-rgb), 0.04);
+  border: 1px solid rgba(var(--ion-text-color-rgb), 0.12);
+  border-radius: 12px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.record-title {
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.record-meta {
+  font-size: 0.94rem;
+  line-height: 1.3;
+}
+
+.melcat-login-tip {
+  background: rgba(var(--ion-color-primary-rgb), 0.08);
+  border: 1px solid rgba(var(--ion-color-primary-rgb), 0.22);
+  border-radius: 12px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tip-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ion-color-primary);
+}
+
+.melcat-id-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.melcat-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  word-break: break-all;
+}
+
+.melcat-card > ion-button {
+  margin-top: 4px;
+  --border-radius: 12px;
+  min-height: 44px;
+  font-weight: 700;
+}

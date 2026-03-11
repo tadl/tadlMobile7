@@ -118,6 +118,7 @@ export class Globals {
   public fines_payment_url: string = 'https://pay.catalog.tadl.org/pay';
   public melcat_base: string = 'https://search.mel.org';
   public melcat_search_path: string = '/iii/encore/HomePage,queryComponent.searchFormComponent.sdirect';
+  public my_melcat_url: string = 'https://dcb3.mel.org/patroninfo?agency=zv330';
   public suggest_item_url: string = 'https://www.tadl.org/suggestion';
 
   // Locations APIs

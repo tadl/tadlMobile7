@@ -1,11 +1,12 @@
-import { Component } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonicModule, ModalController, ActionSheetController, type ActionSheetButton } from '@ionic/angular';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, ParamMap } from '@angular/router';
 import { Router } from '@angular/router';
 import { finalize } from 'rxjs';
 import { lastValueFrom } from 'rxjs';
+import { Subscription } from 'rxjs';
 import {
   CapacitorBarcodeScanner,
   CapacitorBarcodeScannerAndroidScanningLibrary,
@@ -64,7 +65,7 @@ interface HoldTargetOption {
   styleUrls: ['./search.page.scss'],
   imports: [CommonModule, FormsModule, IonicModule],
 })
-export class SearchPage {
+export class SearchPage implements OnInit, OnDestroy {
   lookfor = '';
   hits: AspenSearchHit[] = [];
   lastExecutedQuery = '';
@@ -100,6 +101,9 @@ export class SearchPage {
   infiniteDisabled = true;
   scanningIsbn = false;
   actionBusyByKey: Record<string, boolean> = {};
+  private queryParamSub: Subscription | null = null;
+  private lastAppliedRouteCoreState = '';
+  private lastHandledDeepLinkToken = '';
 
   constructor(
     public globals: Globals,
@@ -118,48 +122,15 @@ export class SearchPage {
     private router: Router,
   ) {}
 
-  ionViewDidEnter() {
-    // allow deep link: /search?lookfor=...
-    const qp = this.route.snapshot.queryParamMap;
-    const advanced = (qp.get('advanced') ?? '').trim();
-    if (advanced === '1' || advanced.toLowerCase() === 'true') {
-      this.showAdvanced = true;
-    }
+  ngOnInit() {
+    this.queryParamSub = this.route.queryParamMap.subscribe((qp) => {
+      this.applyRouteQueryParams(qp);
+    });
+  }
 
-    const incomingSearchIndex = (qp.get('searchIndex') ?? '').trim();
-    if (incomingSearchIndex) {
-      this.searchIndex = incomingSearchIndex as AspenSearchIndex;
-    }
-
-    const incomingSort = this.normalizedSortValue((qp.get('sort') ?? '').trim());
-    if (incomingSort) {
-      this.sort = incomingSort;
-    }
-
-    const facets = (qp.get('facets') ?? '').trim();
-    if (facets === '1' || facets.toLowerCase() === 'true') {
-      this.facetsEnabled = true;
-      this.showAdvanced = true;
-    }
-
-    const incomingFilters = qp.getAll('filter').map((x) => x.trim()).filter((x) => !!x);
-    if (incomingFilters.length) {
-      this.filters = Array.from(new Set(incomingFilters));
-      this.facetsEnabled = true;
-      this.showAdvanced = true;
-    }
-
-    const q = (qp.get('lookfor') ?? '').trim();
-    if (!q) {
-      this.lookfor = '';
-      this.clearSearch();
-      return;
-    }
-
-    if (q && q !== this.lookfor) {
-      this.lookfor = q;
-      this.runSearch(true);
-    }
+  ngOnDestroy() {
+    this.queryParamSub?.unsubscribe();
+    this.queryParamSub = null;
   }
 
   async onSubmit() {
@@ -187,6 +158,75 @@ export class SearchPage {
     } catch {
       // Ignore keyboard plugin errors and proceed with search.
     }
+  }
+
+  private applyRouteQueryParams(qp: ParamMap) {
+    const deepLinkToken = (qp.get('dl') ?? '').toString().trim();
+    const q = (qp.get('lookfor') ?? '').trim();
+
+    const advancedParam = (qp.get('advanced') ?? '').trim();
+    const advanced = advancedParam === '1' || advancedParam.toLowerCase() === 'true';
+
+    const incomingSearchIndex = (qp.get('searchIndex') ?? '').trim() as AspenSearchIndex;
+    const nextSearchIndex = incomingSearchIndex || 'Keyword';
+
+    const nextSort = this.normalizedSortValue((qp.get('sort') ?? '').trim() as AspenSearchSort);
+
+    const incomingFilters = qp
+      .getAll('filter')
+      .map((x) => x.trim())
+      .filter((x) => !!x);
+    const nextFilters = Array.from(new Set(incomingFilters));
+
+    const shouldShowAdvanced = advanced || nextFilters.length > 0;
+
+    const nextCoreStateKey = JSON.stringify({
+      q,
+      searchIndex: nextSearchIndex,
+      sort: nextSort,
+      filters: nextFilters,
+    });
+
+    const deepLinkTriggered = !!deepLinkToken && deepLinkToken !== this.lastHandledDeepLinkToken;
+    if (deepLinkTriggered) {
+      this.lastHandledDeepLinkToken = deepLinkToken;
+    }
+
+    const queryChanged =
+      q !== this.lookfor ||
+      nextSearchIndex !== this.searchIndex ||
+      nextSort !== this.sort ||
+      !this.sameStringArray(nextFilters, this.filters);
+
+    if (!deepLinkTriggered && nextCoreStateKey === this.lastAppliedRouteCoreState) {
+      return;
+    }
+    this.lastAppliedRouteCoreState = nextCoreStateKey;
+
+    this.showAdvanced = shouldShowAdvanced;
+    this.searchIndex = nextSearchIndex;
+    this.sort = nextSort;
+    this.filters = nextFilters;
+    this.facetsEnabled = true;
+
+    if (!q) {
+      this.lookfor = '';
+      this.clearSearch(false);
+      return;
+    }
+
+    this.lookfor = q;
+    if (queryChanged || deepLinkTriggered) {
+      this.runSearch(true);
+    }
+  }
+
+  private sameStringArray(a: string[], b: string[]): boolean {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i += 1) {
+      if (a[i] !== b[i]) return false;
+    }
+    return true;
   }
 
   async scanIsbn() {
@@ -235,13 +275,13 @@ export class SearchPage {
     }
   }
 
-  clearSearch() {
+  clearSearch(syncUrl = true) {
     this.lastExecutedQuery = '';
     this.hits = [];
     this.page = 1;
     this.totalPages = 1;
     this.infiniteDisabled = true;
-    this.syncSearchUrl('');
+    if (syncUrl) this.syncSearchUrl('');
   }
 
   runSearch(reset: boolean) {
@@ -424,6 +464,10 @@ export class SearchPage {
 
   closeFiltersSheet() {
     this.filtersSheetOpen = false;
+  }
+
+  onAdvancedChanged(enabled: boolean) {
+    this.showAdvanced = !!enabled;
   }
 
   toggleAdvanced() {
@@ -1072,13 +1116,14 @@ export class SearchPage {
 
   private syncSearchUrl(query: string): void {
     const lookfor = (query ?? '').trim();
+    const hasQuery = !!lookfor;
     const queryParams: Record<string, any> = {
-      lookfor: lookfor || null,
-      advanced: this.showAdvanced ? '1' : null,
-      searchIndex: this.searchIndex && this.searchIndex !== 'Keyword' ? this.searchIndex : null,
-      sort: this.sort && this.sort !== 'relevance' ? this.sort : null,
-      facets: this.facetsEnabled ? '1' : null,
-      filter: this.filters.length ? this.filters : null,
+      lookfor: hasQuery ? lookfor : null,
+      advanced: hasQuery && this.showAdvanced ? '1' : null,
+      searchIndex: hasQuery && this.searchIndex && this.searchIndex !== 'Keyword' ? this.searchIndex : null,
+      sort: hasQuery && this.sort && this.sort !== 'relevance' ? this.sort : null,
+      filter: hasQuery && this.filters.length ? this.filters : null,
+      dl: null,
     };
 
     void this.router.navigate([], {

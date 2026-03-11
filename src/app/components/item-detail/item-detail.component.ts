@@ -75,6 +75,7 @@ export class ItemDetailComponent implements OnInit {
   @Input() listContext: ItemDetailListContext | null = null;
 
   work: AspenGroupedWork | null = null;
+  displayCoverUrl = '';
 
   /** if we got here from HoldsPage, it passes the hold as hit.raw */
   hold: AspenHold | null = null;
@@ -140,11 +141,15 @@ export class ItemDetailComponent implements OnInit {
     void this.seedKnownListMemberships();
 
     const key = (this.hit?.key ?? '').toString().trim();
+    this.displayCoverUrl = this.normalizeCoverUrl(this.hit?.coverUrl);
     if (!key) return;
 
     this.items.getGroupedWork(key).subscribe({
       next: (w) => {
         this.work = w ?? null;
+        if (!this.displayCoverUrl) {
+          this.displayCoverUrl = this.normalizeCoverUrl(this.work?.cover);
+        }
         this.descriptionExpanded = false;
         this.prepareWorkLoadState(this.work);
         this.loadHoldingsCountsForWork(this.work);
@@ -952,7 +957,7 @@ export class ItemDetailComponent implements OnInit {
           formatLabel: label,
           title: (this.work?.title ?? this.hit?.title ?? 'Untitled').toString().trim() || 'Untitled',
           author: (this.work?.author ?? this.hit?.author ?? '').toString().trim(),
-          coverUrl: (this.work?.cover ?? this.hit?.coverUrl ?? '').toString().trim(),
+          coverUrl: this.displayCoverUrl,
           details,
         },
       });
@@ -1122,7 +1127,7 @@ export class ItemDetailComponent implements OnInit {
       pickupLocationName: pickupName,
       title: this.itemDisplayTitle(),
       author: this.work?.author ?? this.hit?.author,
-      coverUrl: this.work?.cover ?? this.hit?.coverUrl,
+      coverUrl: this.displayCoverUrl,
       position: 0,
       holdQueueLength: 0,
     } as AspenHold;
@@ -1755,6 +1760,10 @@ export class ItemDetailComponent implements OnInit {
   private normalizeDescriptionText(value: any): string {
     if (value === null || value === undefined) return '';
     return String(value).replace(/\s+/g, ' ').trim();
+  }
+
+  private normalizeCoverUrl(value: unknown): string {
+    return (value ?? '').toString().trim();
   }
 
   private dedupeShelfDetails(details: FormatShelfDetail[]): FormatShelfDetail[] {

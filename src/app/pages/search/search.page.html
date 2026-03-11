@@ -43,7 +43,11 @@
 
     <ion-item lines="none" class="advanced-toggle">
       <ion-label>Advanced</ion-label>
-      <ion-toggle slot="end" [(ngModel)]="showAdvanced"></ion-toggle>
+      <ion-toggle
+        slot="end"
+        [checked]="showAdvanced"
+        (ionChange)="onAdvancedChanged($event.detail.checked)"
+      ></ion-toggle>
     </ion-item>
 
     <div *ngIf="showAdvanced" class="advanced">
@@ -100,64 +104,6 @@
     </div>
   </div>
 
-  <ion-modal
-    class="filters-modal"
-    [isOpen]="filtersSheetOpen"
-    (didDismiss)="closeFiltersSheet()"
-    [initialBreakpoint]="0.92"
-    [breakpoints]="[0, 0.92, 1]"
-    [expandToScroll]="false"
-  >
-    <ng-template>
-      <ion-header>
-        <ion-toolbar>
-          <ion-title>Search Filters</ion-title>
-          <ion-buttons slot="end">
-            <ion-button (click)="closeFiltersSheet()">Done</ion-button>
-          </ion-buttons>
-        </ion-toolbar>
-      </ion-header>
-      <ion-content class="filters-sheet-content">
-        <ion-item lines="none" *ngIf="filters.length" class="sheet-filter-summary">
-          <ion-label>{{ filters.length }} filter{{ filters.length === 1 ? '' : 's' }} active</ion-label>
-          <ion-button size="small" fill="clear" (click)="clearAllFilters()">Clear all</ion-button>
-        </ion-item>
-
-        <ion-list lines="none" *ngIf="facetGroups.length; else noFiltersLoaded">
-          <ion-item-group *ngFor="let group of facetGroups; trackBy: trackFacetGroup" class="facet-group">
-            <ion-item button detail="false" lines="full" (click)="toggleFacetGroup(group.key)" class="facet-group-header">
-              <ion-label>{{ group.label }}</ion-label>
-              <ion-icon
-                slot="end"
-                [name]="isFacetGroupCollapsed(group.key) ? 'chevron-down' : 'chevron-up'"
-              ></ion-icon>
-            </ion-item>
-
-            <ng-container *ngIf="!isFacetGroupCollapsed(group.key)">
-              <ion-item *ngFor="let option of group.options; trackBy: trackFacetOption">
-                <ion-checkbox
-                  slot="start"
-                  [checked]="isFacetSelected(option.filter)"
-                  (ionChange)="onFacetToggled(group, option, $event.detail.checked)"
-                ></ion-checkbox>
-                <ion-label class="ion-text-wrap">{{ option.display }}</ion-label>
-                <ion-note slot="end">{{ option.count }}</ion-note>
-              </ion-item>
-            </ng-container>
-          </ion-item-group>
-        </ion-list>
-
-        <ng-template #noFiltersLoaded>
-          <ion-item lines="none">
-            <ion-label class="ion-text-wrap">
-              Run a search to load available filters.
-            </ion-label>
-          </ion-item>
-        </ng-template>
-      </ion-content>
-    </ng-template>
-  </ion-modal>
-
   <ion-refresher slot="fixed" (ionRefresh)="runSearch(true); $event.target.complete()">
     <ion-refresher-content></ion-refresher-content>
   </ion-refresher>
@@ -208,3 +154,54 @@
     <ion-infinite-scroll-content loadingSpinner="bubbles"></ion-infinite-scroll-content>
   </ion-infinite-scroll>
 </ion-content>
+
+<ion-modal [isOpen]="filtersSheetOpen" (didDismiss)="closeFiltersSheet()">
+  <ng-template>
+    <ion-header>
+      <ion-toolbar>
+        <ion-title>Search Filters</ion-title>
+        <ion-buttons slot="end">
+          <ion-button (click)="closeFiltersSheet()">Done</ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-header>
+    <ion-content class="filters-sheet-content">
+      <ion-item lines="none" *ngIf="filters.length" class="sheet-filter-summary">
+        <ion-label>{{ filters.length }} filter{{ filters.length === 1 ? '' : 's' }} active</ion-label>
+        <ion-button size="small" fill="clear" (click)="clearAllFilters()">Clear all</ion-button>
+      </ion-item>
+
+      <ion-list lines="none" *ngIf="facetGroups.length; else noFiltersLoaded">
+        <ion-item-group *ngFor="let group of facetGroups; trackBy: trackFacetGroup" class="facet-group">
+          <ion-item button detail="false" lines="full" (click)="toggleFacetGroup(group.key)" class="facet-group-header">
+            <ion-label>{{ group.label }}</ion-label>
+            <ion-icon
+              slot="end"
+              [name]="isFacetGroupCollapsed(group.key) ? 'chevron-down' : 'chevron-up'"
+            ></ion-icon>
+          </ion-item>
+
+          <ng-container *ngIf="!isFacetGroupCollapsed(group.key)">
+            <ion-item *ngFor="let option of group.options; trackBy: trackFacetOption">
+              <ion-checkbox
+                slot="start"
+                [checked]="isFacetSelected(option.filter)"
+                (ionChange)="onFacetToggled(group, option, $event.detail.checked)"
+              ></ion-checkbox>
+              <ion-label class="ion-text-wrap">{{ option.display }}</ion-label>
+              <ion-note slot="end">{{ option.count }}</ion-note>
+            </ion-item>
+          </ng-container>
+        </ion-item-group>
+      </ion-list>
+
+      <ng-template #noFiltersLoaded>
+        <ion-item lines="none">
+          <ion-label class="ion-text-wrap">
+            Run a search to load available filters.
+          </ion-label>
+        </ion-item>
+      </ng-template>
+    </ion-content>
+  </ng-template>
+</ion-modal>

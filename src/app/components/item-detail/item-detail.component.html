@@ -10,7 +10,7 @@
 <ion-content class="ion-padding">
   <!-- Header block (small cover, not hero) -->
   <div class="header">
-    <div class="cover" *ngIf="(work?.cover || hit?.coverUrl) as c">
+    <div class="cover" *ngIf="displayCoverUrl as c">
       <img [src]="c" alt="" />
     </div>
 

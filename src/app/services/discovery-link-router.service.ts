@@ -104,44 +104,11 @@ export class DiscoveryLinkRouterService {
       return;
     }
 
-    const explicitSearchIndex = (url.searchParams.get('searchIndex') ?? '').toString().trim();
-    const inferredSearchIndex = this.mapSearchIndexFromType(type0);
-    const allowed = new Set(['Keyword', 'Title', 'Author', 'Subject', 'ISBN']);
-    const searchIndex = allowed.has(explicitSearchIndex) ? explicitSearchIndex : inferredSearchIndex;
-
-    const sort = (url.searchParams.get('sort') ?? '').toString().trim();
-    const filters = [
-      ...url.searchParams.getAll('filter[]'),
-      ...url.searchParams.getAll('filter'),
-    ]
-      .map((x) => (x ?? '').toString().trim())
-      .filter((x) => !!x);
-
     const queryParams: Record<string, any> = {};
     if (lookfor) queryParams['lookfor'] = lookfor;
-    if (searchIndex) queryParams['searchIndex'] = searchIndex;
-    if (sort) queryParams['sort'] = sort;
-    if (filters.length) queryParams['filter'] = filters;
+    queryParams['dl'] = Date.now().toString();
 
-    if (searchIndex || sort || filters.length) {
-      queryParams['advanced'] = '1';
-    }
-    if (filters.length) {
-      queryParams['facets'] = '1';
-    }
-
-    await this.router.navigate(['/search'], { queryParams });
-  }
-
-  private mapSearchIndexFromType(type0: string): string {
-    const type = (type0 ?? '').toString().trim().toLowerCase();
-    if (!type) return '';
-    if (type === 'keyword') return 'Keyword';
-    if (type === 'title' || type === 'startoftitle') return 'Title';
-    if (type === 'author') return 'Author';
-    if (type === 'subject') return 'Subject';
-    if (type === 'isbn') return 'ISBN';
-    return '';
+    await this.router.navigate(['/search'], { queryParams, replaceUrl: true });
   }
 
   private firstNonEmpty(values: Array<string | null | undefined>): string | null {

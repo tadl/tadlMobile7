@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, NgZone, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { IonicModule } from '@ionic/angular';
@@ -53,6 +53,7 @@ export class AppComponent implements OnInit {
     private cacheWarm: CacheWarmService,
     private router: Router,
     private discoveryLinks: DiscoveryLinkRouterService,
+    private zone: NgZone,
   ) {
     this.isLoading$ = this.loading.isLoading$();
 
@@ -78,12 +79,17 @@ export class AppComponent implements OnInit {
         this.handleAppResume();
       });
       App.addListener('appUrlOpen', ({ url }) => {
-        void this.handleIncomingUrl(url);
+        this.zone.run(() => {
+          void this.handleIncomingUrl(url);
+        });
       });
       App.getLaunchUrl()
         .then((launch) => {
           const url = (launch?.url ?? '').toString().trim();
-          if (url) void this.handleIncomingUrl(url);
+          if (!url) return;
+          this.zone.run(() => {
+            void this.handleIncomingUrl(url);
+          });
         })
         .catch(() => {});
 

@@ -121,10 +121,6 @@
   --inner-padding-end: 12px;
 }
 
-ion-modal.filters-modal::part(content) {
-  max-height: 100vh;
-}
-
 .filters-sheet-content {
   --padding-bottom: calc(env(safe-area-inset-bottom) + 28px);
 }

@@ -27,7 +27,7 @@
                 <data android:scheme="https" android:host="discover.tadl.org" android:pathPrefix="/Record/" />
                 <data android:scheme="https" android:host="discover.tadl.org" android:pathPrefix="/Union/Search" />
                 <data android:scheme="https" android:host="discover.tadl.org" android:pathPrefix="/Search/" />
-                <data android:scheme="https" android:host="discover.tadl.org" android:pathPrefix="/MyAccount/" />
+                <data android:scheme="https" android:host="discover.tadl.org" android:pathPrefix="/MyAccount/Home" />
             </intent-filter>
         </activity>
 

@@ -54,6 +54,7 @@ interface HoldTargetOption {
   recordId: string;
   label: string;
   formatLabel: string;
+  isOnHold?: boolean;
 }
 
 @Component({
@@ -473,10 +474,24 @@ export class SearchPage {
     ev?.stopPropagation();
 
     const buttons: ActionSheetButton[] = [];
-    if (this.canPlaceHoldFromHit(hit)) {
+    const holdTargets = await this.holdTargetsWithStatusForHit(hit);
+    const availableHoldTargets = holdTargets.filter((x) => !x.isOnHold);
+    if (holdTargets.length === 1 && availableHoldTargets.length === 0) {
+      buttons.push({
+        text: 'On hold',
+        cssClass: 'action-sheet-disabled-option',
+        handler: () => false,
+      });
+    } else if (availableHoldTargets.length > 0) {
       buttons.push({
         text: 'Place Hold',
-        handler: () => this.placeHoldFromHit(hit),
+        handler: () => this.placeHoldFromHit(hit, holdTargets),
+      });
+    } else if (holdTargets.length > 1) {
+      buttons.push({
+        text: 'On hold',
+        cssClass: 'action-sheet-disabled-option',
+        handler: () => false,
       });
     }
     buttons.push(
@@ -752,7 +767,7 @@ export class SearchPage {
       });
   }
 
-  private async placeHoldFromHit(hit: AspenSearchHit): Promise<void> {
+  private async placeHoldFromHit(hit: AspenSearchHit, precomputedTargets?: HoldTargetOption[]): Promise<void> {
     if (!this.auth.snapshot()?.isLoggedIn) {
       this.toast.presentToast('Log in to place holds.');
       return;
@@ -763,22 +778,8 @@ export class SearchPage {
     }
     if (this.rowActionBusy(hit)) return;
 
-    const holdTargets = await this.resolveIlsHoldTargets(hit);
-    if (!holdTargets.length) {
-      this.toast.presentToast('Could not determine holdable record id. Open details to place hold.');
-      return;
-    }
-
-    const heldRecordIds = await this.heldRecordIdsForGroupedWork(hit);
-    let availableTargets = holdTargets.filter((x) => !heldRecordIds.has(x.recordId));
-
-    // Fallback when hold entries do not expose recordId reliably.
-    if (!availableTargets.length && heldRecordIds.size === 0) {
-      const heldFormatKeys = await this.heldFormatKeysForGroupedWork(hit);
-      availableTargets = holdTargets.filter(
-        (x) => !heldFormatKeys.has(this.normalizeFormatKey(x.formatLabel)),
-      );
-    }
+    const holdTargets = precomputedTargets ?? await this.holdTargetsWithStatusForHit(hit);
+    const availableTargets = holdTargets.filter((x) => !x.isOnHold);
 
     if (!availableTargets.length) {
       this.toast.presentToast('You already have all holdable formats on hold.');
@@ -786,21 +787,21 @@ export class SearchPage {
     }
 
     let selectedTarget = availableTargets[0];
-    if (availableTargets.length > 1) {
-      const picked = await this.pickHoldTarget(availableTargets);
+    if (holdTargets.length > 1) {
+      const picked = await this.pickHoldTarget(holdTargets);
       if (!picked) return;
       selectedTarget = picked;
     }
 
     const defaultPickup = await this.defaultPickupBranchCode();
     if (defaultPickup) {
-      this.placeHoldNow(hit, selectedTarget.recordId, defaultPickup, selectedTarget.label);
+      this.placeHoldNow(hit, selectedTarget.recordId, defaultPickup, selectedTarget.formatLabel || selectedTarget.label);
       return;
     }
 
     const buttons: ActionSheetButton[] = this.globals.pickupLocations.map((loc) => ({
       text: loc.name,
-      handler: () => this.placeHoldNow(hit, selectedTarget.recordId, loc.code, selectedTarget.label),
+      handler: () => this.placeHoldNow(hit, selectedTarget.recordId, loc.code, selectedTarget.formatLabel || selectedTarget.label),
     }));
     buttons.push({ text: 'Close', role: 'cancel' });
 
@@ -828,6 +829,7 @@ export class SearchPage {
             return;
           }
           this.auth.adjustActiveProfileCounts({ holds: 1, holdsRequested: 1 });
+          this.cacheOptimisticPlacedHold(hit, recordId, selectedFormatLabel);
           if (selectedFormatLabel) {
             this.toast.presentToast(`Hold placed on format ${selectedFormatLabel}.`);
             return;
@@ -836,6 +838,24 @@ export class SearchPage {
         },
         error: () => this.toast.presentToast('Could not place hold.'),
       });
+  }
+
+  private async holdTargetsWithStatusForHit(hit: AspenSearchHit): Promise<HoldTargetOption[]> {
+    if (!this.canPlaceHoldFromHit(hit)) return [];
+
+    const holdTargets = await this.resolveIlsHoldTargets(hit);
+    if (!holdTargets.length) return [];
+    if (!this.auth.snapshot()?.isLoggedIn) return holdTargets;
+
+    const heldRecordIds = await this.heldRecordIdsForGroupedWork(hit);
+    const heldFormatKeys = await this.heldFormatKeysForGroupedWork(hit);
+
+    return holdTargets.map((target) => {
+      const isOnHold =
+        heldRecordIds.has(target.recordId) ||
+        heldFormatKeys.has(this.normalizeFormatKey(target.formatLabel));
+      return { ...target, isOnHold };
+    });
   }
 
   private async resolveIlsHoldTargets(hit: AspenSearchHit): Promise<HoldTargetOption[]> {
@@ -877,13 +897,28 @@ export class SearchPage {
 
   private async pickHoldTarget(options: HoldTargetOption[]): Promise<HoldTargetOption | null> {
     return new Promise(async (resolve) => {
+      const sorted = [...options].sort((a, b) => {
+        const aHeld = !!a.isOnHold;
+        const bHeld = !!b.isOnHold;
+        if (aHeld !== bHeld) return aHeld ? -1 : 1;
+        return (a.label || '').localeCompare((b.label || ''), undefined, { sensitivity: 'base' });
+      });
       const sheet = await this.actionSheetController.create({
         header: 'Place hold on which format?',
         buttons: [
-          ...options.map((opt): ActionSheetButton => ({
-            text: opt.label,
-            handler: () => resolve(opt),
-          })),
+          ...sorted.map((opt): ActionSheetButton => {
+            if (opt.isOnHold) {
+              return {
+                text: `${opt.formatLabel || opt.label} On hold`,
+                cssClass: 'action-sheet-disabled-option',
+                handler: () => false,
+              };
+            }
+            return {
+              text: opt.label,
+              handler: () => resolve(opt),
+            };
+          }),
           {
             text: 'Close',
             role: 'cancel',
@@ -903,7 +938,7 @@ export class SearchPage {
     if (!groupedKey) return new Set<string>();
 
     try {
-      const holds = await lastValueFrom(this.holds.fetchActiveHolds());
+      const holds = await this.cachedHoldsForLookup();
       const keys = new Set<string>();
 
       for (const hold of holds ?? []) {
@@ -933,7 +968,7 @@ export class SearchPage {
     if (!groupedKey) return new Set<string>();
 
     try {
-      const holds = await lastValueFrom(this.holds.fetchActiveHolds());
+      const holds = await this.cachedHoldsForLookup();
       const ids = new Set<string>();
 
       for (const hold of holds ?? []) {
@@ -956,6 +991,44 @@ export class SearchPage {
       .trim()
       .toLowerCase()
       .replace(/\s+/g, ' ');
+  }
+
+  private async cachedHoldsForLookup(): Promise<any[]> {
+    const snap = this.auth.snapshot();
+    const activeId = (snap?.activeAccountId ?? '').toString().trim();
+    if (!activeId) return [];
+
+    try {
+      const cached = await this.holds.getCachedHolds(activeId);
+      return Array.isArray(cached?.holds) ? cached!.holds : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private cacheOptimisticPlacedHold(hit: AspenSearchHit, recordId: string, selectedFormatLabel?: string): void {
+    const groupedKey = (hit?.key ?? '').toString().trim();
+    if (!groupedKey) return;
+    const snap = this.auth.snapshot();
+    const activeId = (snap?.activeAccountId ?? '').toString().trim();
+    if (!activeId) return;
+
+    void (async () => {
+      try {
+        const cached = await this.holds.getCachedHolds(activeId);
+        const current = Array.isArray(cached?.holds) ? cached!.holds : [];
+        current.push({
+          source: 'ils',
+          type: 'ils',
+          groupedWorkId: groupedKey,
+          recordId: Number(recordId),
+          format: selectedFormatLabel ? [selectedFormatLabel] : undefined,
+        } as any);
+        await this.holds.setCachedHolds(activeId, current);
+      } catch {
+        // ignore cache failures
+      }
+    })();
   }
 
   private async defaultPickupBranchCode(): Promise<string | null> {

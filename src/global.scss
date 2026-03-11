@@ -104,3 +104,8 @@ ion-card {
     opacity: 0.9;
   }
 }
+
+/* Dim "disabled" options rendered inside Ionic action sheets. */
+.action-sheet-button.action-sheet-disabled-option {
+  opacity: 0.52;
+}

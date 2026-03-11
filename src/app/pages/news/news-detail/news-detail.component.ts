@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { IonicModule, ModalController } from '@ionic/angular';
 import { Globals } from '../../../globals';
 import { MobilePost } from '../../../services/news.service';
+import { DiscoveryLinkRouterService } from '../../../services/discovery-link-router.service';
 
 @Component({
   standalone: true,
@@ -19,6 +20,7 @@ export class NewsDetailComponent {
   constructor(
     public globals: Globals,
     private modalController: ModalController,
+    private discoveryLinks: DiscoveryLinkRouterService,
   ) {}
 
   close() {
@@ -26,8 +28,35 @@ export class NewsDetailComponent {
     this.globals.modal_open = false;
   }
 
-  openLink(url?: string) {
-    if (url) this.globals.open_page(url);
+  async openLink(url?: string) {
+    const resolved = this.resolveLinkUrl(url);
+    if (!resolved) return;
+
+    const isDiscovery = this.discoveryLinks.isDiscoveryUrl(resolved);
+    if (isDiscovery && this.globals.link_mode === 'app') {
+      this.close();
+    }
+
+    const handled = await this.discoveryLinks.routeIfHandled(resolved, {
+      openExternalWhenBrowserMode: true,
+      openExternalForUnmatchedPath: true,
+    });
+    if (handled) return;
+
+    await this.globals.open_external_page(resolved);
+  }
+
+  async handleBodyLinkClick(ev: Event) {
+    const target = ev?.target as HTMLElement | null;
+    const link = target?.closest?.('a[href]') as HTMLAnchorElement | null;
+    if (!link) return;
+
+    const href = (link.getAttribute('href') ?? '').toString().trim();
+    if (!href) return;
+
+    ev.preventDefault();
+    ev.stopPropagation();
+    await this.openLink(href);
   }
 
   titleFor(): string {
@@ -54,5 +83,17 @@ export class NewsDetailComponent {
 
   htmlContent(): string {
     return (this.news?.content?.rendered ?? '').toString();
+  }
+
+  private resolveLinkUrl(url?: string): string {
+    const raw = (url ?? '').toString().trim();
+    if (!raw) return '';
+
+    try {
+      const base = this.postUrl() || this.globals.aspen_discovery_base;
+      return new URL(raw, base).toString();
+    } catch {
+      return raw;
+    }
   }
 }

@@ -71,7 +71,8 @@ export class SearchPage {
 
   // advanced controls (start simple)
   showAdvanced = false;
-  facetsEnabled = false;
+  facetsEnabled = true;
+  filtersSheetOpen = false;
   searchIndex: AspenSearchIndex = 'Keyword';
   sort: AspenSearchSort = 'relevance';
   sortOptions: SearchSortOption[] = [
@@ -403,6 +404,28 @@ export class SearchPage {
     if (this.lookfor.trim()) this.runSearch(true);
   }
 
+  activeFilterCount(): number {
+    return this.filters.length;
+  }
+
+  async openFiltersSheet() {
+    const q = (this.lookfor ?? '').trim();
+    if (!q) {
+      this.toast.presentToast('Enter a search query first.');
+      return;
+    }
+
+    // Ensure facets are loaded for the current query before presenting the sheet.
+    if (!this.facetGroups.length && !this.globals.api_loading) {
+      this.runSearch(true);
+    }
+    this.filtersSheetOpen = true;
+  }
+
+  closeFiltersSheet() {
+    this.filtersSheetOpen = false;
+  }
+
   toggleAdvanced() {
     this.showAdvanced = !this.showAdvanced;
   }
@@ -635,7 +658,8 @@ export class SearchPage {
   private reconcileCollapsedFacetGroups() {
     const next: Record<string, boolean> = {};
     for (const group of this.facetGroups) {
-      next[group.key] = this.collapsedFacetGroups[group.key] ?? true;
+      const hasSelection = this.selectedOptionsForGroup(group).length > 0;
+      next[group.key] = this.collapsedFacetGroups[group.key] ?? !hasSelection;
     }
     this.collapsedFacetGroups = next;
   }

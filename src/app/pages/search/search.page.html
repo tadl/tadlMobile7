@@ -28,6 +28,19 @@
       </ion-button>
     </ion-item>
 
+    <div class="quick-actions-row">
+      <ion-button class="quick-action-btn" size="small" fill="outline" (click)="scanIsbn()" [disabled]="scanningIsbn">
+        <ion-icon name="barcode-outline" slot="start"></ion-icon>
+        {{ scanningIsbn ? 'Scanning' : 'Scan ISBN' }}
+      </ion-button>
+      <ion-button class="quick-action-btn" size="small" fill="outline" (click)="searchMelcat()">
+        Search MeLCat
+      </ion-button>
+      <ion-button class="quick-action-btn" size="small" fill="outline" (click)="suggestItem()">
+        Suggest Item
+      </ion-button>
+    </div>
+
     <ion-item lines="none" class="advanced-toggle">
       <ion-label>Advanced</ion-label>
       <ion-toggle slot="end" [(ngModel)]="showAdvanced"></ion-toggle>
@@ -54,66 +67,96 @@
         </ion-select>
       </ion-item>
 
-      <div class="advanced-actions">
-        <ion-button expand="block" size="small" (click)="scanIsbn()" [disabled]="scanningIsbn">
-          <ion-icon name="barcode-outline" slot="start"></ion-icon>
-          {{ scanningIsbn ? 'Scanning...' : 'Scan ISBN' }}
+    </div>
+
+    <div class="filters-summary">
+      <div class="filters-toolbar">
+        <ion-button
+          class="filters-launch"
+          size="small"
+          fill="solid"
+          (click)="openFiltersSheet()"
+        >
+          Filters
+          <ion-badge *ngIf="activeFilterCount() > 0" class="filters-count-badge">{{ activeFilterCount() }}</ion-badge>
         </ion-button>
-        <ion-button expand="block" size="small" (click)="searchMelcat()">
-          Search MeLCat
-        </ion-button>
-        <ion-button expand="block" size="small" fill="outline" (click)="suggestItem()">
-          Suggest an Item
+        <ion-button
+          *ngIf="filters.length"
+          class="filters-clear"
+          size="small"
+          fill="clear"
+          (click)="clearAllFilters()"
+        >
+          Clear all
         </ion-button>
       </div>
 
-      <ion-item lines="none" class="facet-toggle-row">
-        <ion-label>Show search filters</ion-label>
-        <ion-toggle
-          slot="end"
-          [(ngModel)]="facetsEnabled"
-          (ionChange)="onFacetsEnabledChanged($event.detail.checked)"
-        ></ion-toggle>
-      </ion-item>
-
-      <div class="facet-controls" *ngIf="facetsEnabled && filters.length">
-        <ion-note class="facet-hint">Tap a filter badge to remove it.</ion-note>
+      <div class="facet-chip-list" *ngIf="filters.length">
         <ion-chip button *ngFor="let f of filters" (click)="removeFilter(f)" [attr.aria-label]="'Remove filter ' + filterChipLabel(f)">
           <ion-label>{{ filterChipLabel(f) }}</ion-label>
           <ion-icon name="close-circle" aria-hidden="true"></ion-icon>
         </ion-chip>
-        <ion-button size="small" fill="clear" (click)="clearAllFilters()">Clear filters</ion-button>
       </div>
-
-      <ion-list lines="none" *ngIf="facetsEnabled && facetGroups.length">
-        <ion-item-group *ngFor="let group of facetGroups; trackBy: trackFacetGroup" class="facet-group">
-          <ion-item button detail="false" lines="full" (click)="toggleFacetGroup(group.key)" class="facet-group-header">
-            <ion-label>{{ group.label }}</ion-label>
-            <ion-icon
-              slot="end"
-              [name]="isFacetGroupCollapsed(group.key) ? 'chevron-down' : 'chevron-up'"
-            ></ion-icon>
-          </ion-item>
-
-          <ng-container *ngIf="!isFacetGroupCollapsed(group.key)">
-            <ion-item *ngFor="let option of group.options; trackBy: trackFacetOption">
-              <ion-checkbox
-                slot="start"
-                [checked]="isFacetSelected(option.filter)"
-                (ionChange)="onFacetToggled(group, option, $event.detail.checked)"
-              ></ion-checkbox>
-              <ion-label class="ion-text-wrap">{{ option.display }}</ion-label>
-              <ion-note slot="end">{{ option.count }}</ion-note>
-            </ion-item>
-          </ng-container>
-        </ion-item-group>
-      </ion-list>
     </div>
-
-    <ion-note *ngIf="hits.length" class="ion-padding-top">
-      Page {{ page }} of {{ totalPages }}
-    </ion-note>
   </div>
+
+  <ion-modal
+    class="filters-modal"
+    [isOpen]="filtersSheetOpen"
+    (didDismiss)="closeFiltersSheet()"
+    [initialBreakpoint]="0.92"
+    [breakpoints]="[0, 0.92, 1]"
+    [expandToScroll]="false"
+  >
+    <ng-template>
+      <ion-header>
+        <ion-toolbar>
+          <ion-title>Search Filters</ion-title>
+          <ion-buttons slot="end">
+            <ion-button (click)="closeFiltersSheet()">Done</ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="filters-sheet-content">
+        <ion-item lines="none" *ngIf="filters.length" class="sheet-filter-summary">
+          <ion-label>{{ filters.length }} filter{{ filters.length === 1 ? '' : 's' }} active</ion-label>
+          <ion-button size="small" fill="clear" (click)="clearAllFilters()">Clear all</ion-button>
+        </ion-item>
+
+        <ion-list lines="none" *ngIf="facetGroups.length; else noFiltersLoaded">
+          <ion-item-group *ngFor="let group of facetGroups; trackBy: trackFacetGroup" class="facet-group">
+            <ion-item button detail="false" lines="full" (click)="toggleFacetGroup(group.key)" class="facet-group-header">
+              <ion-label>{{ group.label }}</ion-label>
+              <ion-icon
+                slot="end"
+                [name]="isFacetGroupCollapsed(group.key) ? 'chevron-down' : 'chevron-up'"
+              ></ion-icon>
+            </ion-item>
+
+            <ng-container *ngIf="!isFacetGroupCollapsed(group.key)">
+              <ion-item *ngFor="let option of group.options; trackBy: trackFacetOption">
+                <ion-checkbox
+                  slot="start"
+                  [checked]="isFacetSelected(option.filter)"
+                  (ionChange)="onFacetToggled(group, option, $event.detail.checked)"
+                ></ion-checkbox>
+                <ion-label class="ion-text-wrap">{{ option.display }}</ion-label>
+                <ion-note slot="end">{{ option.count }}</ion-note>
+              </ion-item>
+            </ng-container>
+          </ion-item-group>
+        </ion-list>
+
+        <ng-template #noFiltersLoaded>
+          <ion-item lines="none">
+            <ion-label class="ion-text-wrap">
+              Run a search to load available filters.
+            </ion-label>
+          </ion-item>
+        </ng-template>
+      </ion-content>
+    </ng-template>
+  </ion-modal>
 
   <ion-refresher slot="fixed" (ionRefresh)="runSearch(true); $event.target.complete()">
     <ion-refresher-content></ion-refresher-content>

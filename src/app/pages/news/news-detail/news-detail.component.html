@@ -22,7 +22,12 @@
     </ion-card-header>
 
     <ion-card-content>
-      <div class="news-body prose" *ngIf="htmlContent()" [innerHTML]="htmlContent()"></div>
+      <div
+        class="news-body prose"
+        *ngIf="htmlContent()"
+        [innerHTML]="htmlContent()"
+        (click)="handleBodyLinkClick($event)"
+      ></div>
     </ion-card-content>
   </ion-card>
 

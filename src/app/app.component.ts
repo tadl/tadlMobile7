@@ -2,8 +2,15 @@ import { Component, NgZone, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { IonicModule } from '@ionic/angular';
-import { Platform } from '@ionic/angular/standalone';
+import {
+  ActionSheetController,
+  AlertController,
+  ModalController,
+  Platform,
+  PopoverController,
+} from '@ionic/angular/standalone';
 import { App } from '@capacitor/app';
+import { Keyboard } from '@capacitor/keyboard';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { fromEvent, Observable } from 'rxjs';
 import { distinctUntilChanged, filter, take } from 'rxjs/operators';
@@ -44,6 +51,8 @@ export class AppComponent implements OnInit {
   private lastResumeRefreshAt = 0;
   private splashHidden = false;
   private readonly appBootStartedAt = Date.now();
+  private incomingUrlInFlight = false;
+  private queuedIncomingUrl: string | null = null;
 
   constructor(
     public globals: Globals,
@@ -54,6 +63,10 @@ export class AppComponent implements OnInit {
     private router: Router,
     private discoveryLinks: DiscoveryLinkRouterService,
     private zone: NgZone,
+    private modalCtrl: ModalController,
+    private actionSheetCtrl: ActionSheetController,
+    private popoverCtrl: PopoverController,
+    private alertCtrl: AlertController,
   ) {
     this.isLoading$ = this.loading.isLoading$();
 
@@ -169,9 +182,69 @@ export class AppComponent implements OnInit {
   }
 
   private async handleIncomingUrl(rawUrl: string): Promise<void> {
-    await this.discoveryLinks.routeIfHandled(rawUrl, {
-      openExternalWhenBrowserMode: true,
-    });
+    const target = (rawUrl ?? '').toString().trim();
+    if (!target) return;
+
+    if (this.incomingUrlInFlight) {
+      this.queuedIncomingUrl = target;
+      return;
+    }
+
+    this.incomingUrlInFlight = true;
+    try {
+      let nextUrl: string | null = target;
+      while (nextUrl) {
+        const currentUrl = nextUrl;
+        nextUrl = null;
+        this.queuedIncomingUrl = null;
+
+        if (!this.discoveryLinks.isDiscoveryUrl(currentUrl)) {
+          continue;
+        }
+
+        await this.dismissOpenOverlaysIfAny();
+        await this.hideKeyboardIfOpen();
+        await this.discoveryLinks.routeIfHandled(currentUrl, {
+          openExternalWhenBrowserMode: true,
+        });
+
+        if (this.queuedIncomingUrl && this.queuedIncomingUrl !== currentUrl) {
+          nextUrl = this.queuedIncomingUrl;
+        }
+      }
+    } finally {
+      this.incomingUrlInFlight = false;
+      this.queuedIncomingUrl = null;
+    }
+  }
+
+  private async dismissOpenOverlaysIfAny(): Promise<void> {
+    try {
+      for (let i = 0; i < 8; i += 1) {
+        const [topModal, topActionSheet, topPopover, topAlert] = await Promise.all([
+          this.modalCtrl.getTop(),
+          this.actionSheetCtrl.getTop(),
+          this.popoverCtrl.getTop(),
+          this.alertCtrl.getTop(),
+        ]);
+
+        const topOverlay = topModal ?? topActionSheet ?? topPopover ?? topAlert;
+        if (!topOverlay) break;
+
+        await topOverlay.dismiss();
+      }
+      this.globals.modal_open = false;
+    } catch {
+      // Ignore modal-dismiss errors and continue deep-link routing.
+    }
+  }
+
+  private async hideKeyboardIfOpen(): Promise<void> {
+    try {
+      await Keyboard.hide();
+    } catch {
+      // Keyboard may be unavailable on web/simulator; safe to ignore.
+    }
   }
 
 }

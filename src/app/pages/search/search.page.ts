@@ -104,6 +104,7 @@ export class SearchPage implements OnInit, OnDestroy {
   private queryParamSub: Subscription | null = null;
   private lastAppliedRouteCoreState = '';
   private lastHandledDeepLinkToken = '';
+  private pendingExternalFilters: string[] = [];
 
   constructor(
     public globals: Globals,
@@ -177,6 +178,11 @@ export class SearchPage implements OnInit, OnDestroy {
       .map((x) => x.trim())
       .filter((x) => !!x);
     const nextFilters = Array.from(new Set(incomingFilters));
+    const incomingExternalFilters = qp
+      .getAll('extFilter')
+      .map((x) => x.trim())
+      .filter((x) => !!x);
+    const nextExternalFilters = Array.from(new Set(incomingExternalFilters));
 
     const shouldShowAdvanced = advanced || nextFilters.length > 0;
 
@@ -209,8 +215,13 @@ export class SearchPage implements OnInit, OnDestroy {
     this.filters = nextFilters;
     this.facetsEnabled = true;
 
+    if (deepLinkTriggered) {
+      this.pendingExternalFilters = nextExternalFilters;
+    }
+
     if (!q) {
       this.lookfor = '';
+      this.pendingExternalFilters = [];
       this.clearSearch(false);
       return;
     }
@@ -348,6 +359,9 @@ export class SearchPage implements OnInit, OnDestroy {
             this.facetGroups = allGroups.filter(g => g.field !== 'sort_by');
             this.reconcileCollapsedFacetGroups();
             this.rebuildFacetDisplayMap();
+            if (this.tryApplyPendingExternalFilters()) {
+              return;
+            }
           } else {
             this.facetGroups = [];
             this.collapsedFacetGroups = {};
@@ -1123,6 +1137,7 @@ export class SearchPage implements OnInit, OnDestroy {
       searchIndex: hasQuery && this.searchIndex && this.searchIndex !== 'Keyword' ? this.searchIndex : null,
       sort: hasQuery && this.sort && this.sort !== 'relevance' ? this.sort : null,
       filter: hasQuery && this.filters.length ? this.filters : null,
+      extFilter: null,
       dl: null,
     };
 
@@ -1140,5 +1155,29 @@ export class SearchPage implements OnInit, OnDestroy {
       ...this.actionBusyByKey,
       [key]: busy,
     };
+  }
+
+  private tryApplyPendingExternalFilters(): boolean {
+    if (!this.pendingExternalFilters.length) return false;
+    if (!this.facetGroups.length) {
+      this.pendingExternalFilters = [];
+      return false;
+    }
+
+    const valid = new Set<string>();
+    for (const group of this.facetGroups) {
+      for (const option of group.options) {
+        valid.add(option.filter);
+      }
+    }
+
+    const supported = Array.from(new Set(this.pendingExternalFilters.filter((f) => valid.has(f))));
+    this.pendingExternalFilters = [];
+    if (!supported.length) return false;
+    if (this.sameStringArray(supported, this.filters)) return false;
+
+    this.filters = supported;
+    this.runSearch(true);
+    return true;
   }
 }

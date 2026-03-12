@@ -556,26 +556,31 @@ export class SearchPage implements OnInit, OnDestroy {
     ev?.stopPropagation();
 
     const buttons: ActionSheetButton[] = [];
-    const holdTargets = await this.holdTargetsWithStatusForHit(hit);
-    const availableHoldTargets = holdTargets.filter((x) => !x.isOnHold);
-    if (holdTargets.length === 1 && availableHoldTargets.length === 0) {
-      buttons.push({
-        text: 'On hold',
-        cssClass: 'action-sheet-disabled-option',
-        handler: () => false,
-      });
-    } else if (availableHoldTargets.length > 0) {
-      buttons.push({
-        text: 'Place Hold',
-        handler: () => this.placeHoldFromHit(hit, holdTargets),
-      });
-    } else if (holdTargets.length > 1) {
-      buttons.push({
-        text: 'On hold',
-        cssClass: 'action-sheet-disabled-option',
-        handler: () => false,
-      });
+    let holdTargets: HoldTargetOption[] = [];
+    let hasCachedHold = false;
+
+    if (this.auth.snapshot()?.isLoggedIn && this.canPlaceHoldFromHit(hit)) {
+      hasCachedHold = await this.hasCachedHoldForGroupedWork(hit);
+
+      if (hasCachedHold) {
+        buttons.push({
+          text: 'On hold',
+          cssClass: 'action-sheet-disabled-option',
+          handler: () => false,
+        });
+      } else {
+        holdTargets = await this.holdTargetsWithStatusForHit(hit);
+        const availableHoldTargets = holdTargets.filter((x) => !x.isOnHold);
+
+        if (availableHoldTargets.length > 0) {
+          buttons.push({
+            text: 'Place Hold',
+            handler: () => this.placeHoldFromHit(hit, holdTargets),
+          });
+        }
+      }
     }
+
     buttons.push(
       {
         text: 'Add to List',
@@ -1065,6 +1070,21 @@ export class SearchPage implements OnInit, OnDestroy {
       return ids;
     } catch {
       return new Set<string>();
+    }
+  }
+
+  private async hasCachedHoldForGroupedWork(hit: AspenSearchHit): Promise<boolean> {
+    const groupedKey = (hit?.key ?? '').toString().trim().toLowerCase();
+    if (!groupedKey) return false;
+
+    try {
+      const holds = await this.cachedHoldsForLookup();
+      return holds.some((hold) => {
+        const holdGrouped = (hold?.groupedWorkId ?? '').toString().trim().toLowerCase();
+        return holdGrouped === groupedKey;
+      });
+    } catch {
+      return false;
     }
   }
 

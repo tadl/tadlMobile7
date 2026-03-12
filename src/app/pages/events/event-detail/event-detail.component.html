@@ -96,6 +96,25 @@
           <p class="muted">No description provided.</p>
         </ng-template>
 
+        <div class="registration-callout" *ngIf="registrationRequired">
+          <div class="registration-note" *ngIf="registrationNote">
+            {{ registrationNote }}
+          </div>
+
+          <div class="registration-window" *ngIf="registrationWindowLabel">
+            {{ registrationWindowLabel }}
+          </div>
+
+          <ion-button
+            *ngIf="registrationButtonVisible"
+            class="registration-button"
+            expand="block"
+            (click)="openExternalUrl()"
+          >
+            Register now
+          </ion-button>
+        </div>
+
         <div class="tags" *ngIf="event?.tags?.length">
           <ion-chip *ngFor="let t of event?.tags" outline="true">
             <ion-label>{{ t }}</ion-label>
@@ -105,7 +124,7 @@
     </ion-card>
 
     <ion-button
-      *ngIf="externalUrl"
+      *ngIf="externalUrl && !registrationRequired"
       class="open-button"
       expand="block"
       (click)="openExternalUrl()"

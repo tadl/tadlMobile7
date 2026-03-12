@@ -27,6 +27,11 @@ type EventLike = {
   // API/mobile fields (yours)
   start_date?: string | null;
   end_date?: string | null;
+  registration_enabled?: boolean | null;
+  registration_type?: string | null;
+  registration_start?: string | null;
+  registration_end?: string | null;
+  timezone?: string | null;
 
   // Other common shapes
   startsAt?: string | null;
@@ -204,6 +209,70 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
     return (this.event?.registrationUrl || this.event?.url || null) as string | null;
   }
 
+  get registrationRequired(): boolean {
+    return this.event?.['registration_enabled'] === true;
+  }
+
+  get registrationStartsAtDate(): Date | null {
+    return this.parseDate(this.event?.['registration_start'] ?? null);
+  }
+
+  get registrationEndsAtDate(): Date | null {
+    return this.parseDate(this.event?.['registration_end'] ?? null);
+  }
+
+  get registrationButtonVisible(): boolean {
+    if (!this.registrationRequired || !this.externalUrl) return false;
+
+    const now = new Date();
+    const startsAt = this.registrationStartsAtDate;
+    const endsAt = this.registrationEndsAtDate;
+
+    if (startsAt && now.getTime() < startsAt.getTime()) return false;
+    if (endsAt && now.getTime() > endsAt.getTime()) return false;
+    return true;
+  }
+
+  get registrationNote(): string | null {
+    if (!this.registrationRequired) return null;
+
+    const now = new Date();
+    const startsAt = this.registrationStartsAtDate;
+    const endsAt = this.registrationEndsAtDate;
+
+    if (startsAt && now.getTime() < startsAt.getTime()) {
+      const startsLabel = this.formatDateOnly(startsAt);
+      return `Note: Registration is required for this event. Registration opens ${startsLabel}.`;
+    }
+
+    if (endsAt && now.getTime() > endsAt.getTime()) {
+      const endsLabel = this.formatDateTime(endsAt);
+      return `Note: Registration is required for this event. Registration for this event has closed as of ${endsLabel}.`;
+    }
+
+    return 'Note: Registration is required for this event. To register please view the event page on our website.';
+  }
+
+  get registrationWindowLabel(): string | null {
+    if (!this.registrationRequired) return null;
+
+    const startsAt = this.registrationStartsAtDate;
+    const endsAt = this.registrationEndsAtDate;
+    const startLabel = startsAt ? this.formatDateOnly(startsAt) : '';
+    const endLabel = endsAt ? this.formatDateTime(endsAt) : '';
+
+    if (startLabel && endLabel) {
+      return `Registration window: ${startLabel} to ${endLabel}`;
+    }
+    if (startLabel) {
+      return `Registration opens: ${startLabel}`;
+    }
+    if (endLabel) {
+      return `Registration closes: ${endLabel}`;
+    }
+    return null;
+  }
+
   get descriptionText(): string {
     const raw =
       (this.event?.description ?? this.event?.summary ?? '')?.toString?.() ?? '';
@@ -230,6 +299,24 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
 
     const d = new Date(normalized);
     return isNaN(d.getTime()) ? null : d;
+  }
+
+  private formatDateOnly(value: Date): string {
+    return new Intl.DateTimeFormat(undefined, {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    }).format(value);
+  }
+
+  private formatDateTime(value: Date): string {
+    return new Intl.DateTimeFormat(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    }).format(value);
   }
 
   private async loadIfNeeded(): Promise<void> {

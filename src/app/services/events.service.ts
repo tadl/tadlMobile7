@@ -12,6 +12,10 @@ export interface MobileEvent {
   title: string;
   start_date: string; // "YYYY-MM-DD HH:MM:SS"
   end_date?: string | null;
+  registration_enabled?: boolean | null;
+  registration_type?: string | null;
+  registration_start?: string | null;
+  registration_end?: string | null;
   location: string;
   room?: string | null;
   age_group?: string[] | null;

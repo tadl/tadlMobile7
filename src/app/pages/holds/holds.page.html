@@ -35,6 +35,9 @@
         <ion-thumbnail slot="start" *ngIf="h.coverUrl">
           <img [src]="h.coverUrl" alt="" />
         </ion-thumbnail>
+        <ion-thumbnail slot="start" *ngIf="showMelcatPlaceholder(h)" class="melcat-placeholder-thumb">
+          <img [src]="melcatPlaceholderImage" alt="MeLCat" />
+        </ion-thumbnail>
 
         <ion-label class="ion-text-wrap">
           <div class="title">{{ holdTitle(h) }}</div>
@@ -75,6 +78,9 @@
       >
         <ion-thumbnail slot="start" *ngIf="h.coverUrl">
           <img [src]="h.coverUrl" alt="" />
+        </ion-thumbnail>
+        <ion-thumbnail slot="start" *ngIf="showMelcatPlaceholder(h)" class="melcat-placeholder-thumb">
+          <img [src]="melcatPlaceholderImage" alt="MeLCat" />
         </ion-thumbnail>
 
         <ion-label class="ion-text-wrap">

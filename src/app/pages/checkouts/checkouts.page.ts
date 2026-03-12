@@ -23,6 +23,7 @@ export class CheckoutsPage {
   loading = false;
   renewAllBusy = false;
   private renewingKeys = new Set<string>();
+  readonly melcatPlaceholderImage = 'assets/images/melcat-logo-square.png';
 
   ilsCheckouts: AspenCheckout[] = [];
 
@@ -112,6 +113,10 @@ export class CheckoutsPage {
 
   checkoutCanRenew(c: AspenCheckout): boolean {
     return c?.canRenew === true || (c as any)?.canrenew === true;
+  }
+
+  showMelcatPlaceholder(c: AspenCheckout): boolean {
+    return !c?.coverUrl && this.isMelcatCheckout(c);
   }
 
   isRenewing(c: AspenCheckout): boolean {

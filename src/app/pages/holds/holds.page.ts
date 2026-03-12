@@ -22,6 +22,7 @@ export class HoldsPage {
   loading = false;
   hydratedFromCache = false;
   private holdActionBusyKeys = new Set<string>();
+  readonly melcatPlaceholderImage = 'assets/images/melcat-logo-square.png';
 
   // We’re only showing ILS holds here (per your direction)
   ilsReady: AspenHold[] = [];
@@ -169,6 +170,10 @@ export class HoldsPage {
 
   holdIsFrozen(h: AspenHold): boolean {
     return this.holdDisplayState(h) === 'frozen';
+  }
+
+  showMelcatPlaceholder(h: AspenHold): boolean {
+    return !h?.coverUrl && this.isMelcatHold(h);
   }
 
   async openHold(h: AspenHold) {

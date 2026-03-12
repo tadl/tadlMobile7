@@ -46,6 +46,9 @@
       <ion-thumbnail slot="start" *ngIf="c.coverUrl">
         <img [src]="c.coverUrl" alt="" />
       </ion-thumbnail>
+      <ion-thumbnail slot="start" *ngIf="showMelcatPlaceholder(c)" class="melcat-placeholder-thumb">
+        <img [src]="melcatPlaceholderImage" alt="MeLCat" />
+      </ion-thumbnail>
 
       <ion-label class="ion-text-wrap">
         <div class="title">{{ checkoutTitle(c) }}</div>

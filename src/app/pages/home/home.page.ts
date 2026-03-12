@@ -156,6 +156,11 @@ export class HomePage {
     this.router.navigate(['/search'], { queryParams: { advanced: 1, lookfor: q } });
   }
 
+  async goToRoute(url: string) {
+    await this.dismissSearchInput();
+    await this.router.navigateByUrl(url);
+  }
+
   private async dismissSearchInput() {
     const active = document.activeElement as HTMLElement | null;
     if (active && typeof active.blur === 'function') {

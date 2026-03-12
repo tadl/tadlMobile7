@@ -14,7 +14,7 @@ import { Keyboard } from '@capacitor/keyboard';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { fromEvent, Observable } from 'rxjs';
 import { distinctUntilChanged, filter, take } from 'rxjs/operators';
-import { NavigationEnd, Router } from '@angular/router';
+import { NavigationEnd, NavigationStart, Router } from '@angular/router';
 
 import { Globals } from './globals';
 import { AuthService } from './services/auth.service';
@@ -115,6 +115,14 @@ export class AppComponent implements OnInit {
   }
 
   ngOnInit() {
+    this.router.events
+      .pipe(
+        filter((e): e is NavigationStart => e instanceof NavigationStart),
+      )
+      .subscribe(() => {
+        this.releaseFocusedElement();
+      });
+
     this.auth.restore().subscribe({
       next: (s) => {
         if (!s?.isLoggedIn || !s?.activeAccountId) return;
@@ -245,6 +253,13 @@ export class AppComponent implements OnInit {
     } catch {
       // Keyboard may be unavailable on web/simulator; safe to ignore.
     }
+  }
+
+  private releaseFocusedElement(): void {
+    const active = document.activeElement as HTMLElement | null;
+    if (!active || typeof active.blur !== 'function') return;
+
+    active.blur();
   }
 
 }

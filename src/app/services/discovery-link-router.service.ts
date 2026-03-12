@@ -10,6 +10,7 @@ import { AccountStoreService } from './account-store.service';
 interface RouteDiscoveryUrlOptions {
   openExternalWhenBrowserMode?: boolean;
   openExternalForUnmatchedPath?: boolean;
+  replaceUrl?: boolean;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -64,7 +65,7 @@ export class DiscoveryLinkRouterService {
     }
 
     if ((first === 'union' && (parts[1] ?? '').toLowerCase() === 'search') || first === 'search') {
-      await this.handleSearchLink(parsed, raw);
+      await this.handleSearchLink(parsed, raw, options);
       return true;
     }
 
@@ -84,7 +85,11 @@ export class DiscoveryLinkRouterService {
     }
   }
 
-  private async handleSearchLink(url: URL, rawUrl: string): Promise<void> {
+  private async handleSearchLink(
+    url: URL,
+    rawUrl: string,
+    options?: RouteDiscoveryUrlOptions,
+  ): Promise<void> {
     const lookfor =
       this.firstNonEmpty([
         url.searchParams.get('lookfor'),
@@ -104,19 +109,14 @@ export class DiscoveryLinkRouterService {
       return;
     }
 
-    const externalFilters = [
-      ...url.searchParams.getAll('filter[]'),
-      ...url.searchParams.getAll('filter'),
-    ]
-      .map((x) => this.normalizeIncomingFilter((x ?? '').toString().trim()))
-      .filter((x) => !!x);
-
     const queryParams: Record<string, any> = {};
     if (lookfor) queryParams['lookfor'] = lookfor;
-    if (externalFilters.length) queryParams['extFilter'] = externalFilters;
     queryParams['dl'] = Date.now().toString();
 
-    await this.router.navigate(['/search'], { queryParams, replaceUrl: true });
+    await this.router.navigate(['/search'], {
+      queryParams,
+      replaceUrl: options?.replaceUrl === true,
+    });
   }
 
   private firstNonEmpty(values: Array<string | null | undefined>): string | null {
@@ -125,27 +125,6 @@ export class DiscoveryLinkRouterService {
       if (v) return v;
     }
     return null;
-  }
-
-  private normalizeIncomingFilter(rawFilter: string): string {
-    const f = (rawFilter ?? '').toString().trim();
-    if (!f) return '';
-
-    const idx = f.indexOf(':');
-    if (idx <= 0 || idx >= f.length - 1) return '';
-
-    const field = f.slice(0, idx).trim();
-    let value = f.slice(idx + 1).trim();
-    if (!field || !value) return '';
-
-    if (
-      value.length >= 2 &&
-      ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")))
-    ) {
-      value = value.slice(1, -1).trim();
-    }
-    if (!value) return '';
-    return `${field}:${value}`;
   }
 
   private async resolveRecordLink(recordIdRaw: string, fallbackUrl: string): Promise<void> {

@@ -137,7 +137,7 @@ export class HomePage {
   }
 
   async submitSearch() {
-    await this.dismissKeyboard();
+    await this.dismissSearchInput();
     const q = (this.homeQuery ?? '').toString().trim();
     if (!q) {
       this.router.navigate(['/search']);
@@ -146,7 +146,8 @@ export class HomePage {
     this.router.navigate(['/search'], { queryParams: { lookfor: q } });
   }
 
-  openAdvancedSearch() {
+  async openAdvancedSearch() {
+    await this.dismissSearchInput();
     const q = (this.homeQuery ?? '').toString().trim();
     if (!q) {
       this.router.navigate(['/search'], { queryParams: { advanced: 1 } });
@@ -155,12 +156,24 @@ export class HomePage {
     this.router.navigate(['/search'], { queryParams: { advanced: 1, lookfor: q } });
   }
 
-  private async dismissKeyboard() {
+  private async dismissSearchInput() {
+    const active = document.activeElement as HTMLElement | null;
+    if (active && typeof active.blur === 'function') {
+      active.blur();
+      await this.waitForFocusRelease();
+    }
+
     if (!Capacitor.isNativePlatform()) return;
     try {
       await Keyboard.hide();
     } catch {
       // Ignore keyboard plugin errors and proceed with navigation.
     }
+  }
+
+  private async waitForFocusRelease(): Promise<void> {
+    await new Promise<void>((resolve) => {
+      window.requestAnimationFrame(() => resolve());
+    });
   }
 }

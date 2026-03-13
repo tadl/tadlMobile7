@@ -88,8 +88,8 @@
           </div>
         </div>
 
-        <div class="desc" *ngIf="descriptionText; else noDesc">
-          <p [innerText]="descriptionText"></p>
+        <div class="desc" *ngIf="descriptionHtml; else noDesc">
+          <div [innerHTML]="descriptionHtml"></div>
         </div>
 
         <ng-template #noDesc>

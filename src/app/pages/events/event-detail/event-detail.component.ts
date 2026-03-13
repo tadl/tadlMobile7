@@ -8,8 +8,10 @@ import {
   OnDestroy,
   OnInit,
   Output,
+  SecurityContext,
   SimpleChanges,
 } from '@angular/core';
+import { DomSanitizer } from '@angular/platform-browser';
 import { IonicModule } from '@ionic/angular';
 import { ModalController } from '@ionic/angular/standalone';
 import { ActivatedRoute } from '@angular/router';
@@ -86,6 +88,8 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
   loading = false;
   error: string | null = null;
 
+  private descriptionHtmlCacheRaw: string | null = null;
+  private descriptionHtmlCacheValue = '';
   private sub?: Subscription;
 
   constructor(
@@ -93,6 +97,7 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
     private eventsService: EventsService,
     private modalController: ModalController,
     private globals: Globals,
+    private sanitizer: DomSanitizer,
   ) {}
 
   ngOnInit(): void {
@@ -278,16 +283,17 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
     return null;
   }
 
-  get descriptionText(): string {
+  get descriptionHtml(): string {
     const raw =
       (this.event?.description ?? this.event?.summary ?? '')?.toString?.() ?? '';
 
-    // Normalize &nbsp; / &#160; to spaces, and collapse whitespace a bit
-    return raw
-      .replace(/&nbsp;|&#160;/g, ' ')
-      .replace(/\s+\n/g, '\n')
-      .replace(/[ \t]{2,}/g, ' ')
-      .trim();
+    if (raw === this.descriptionHtmlCacheRaw) {
+      return this.descriptionHtmlCacheValue;
+    }
+
+    this.descriptionHtmlCacheRaw = raw;
+    this.descriptionHtmlCacheValue = this.buildDescriptionHtml(raw);
+    return this.descriptionHtmlCacheValue;
   }
 
   private parseDate(value: any): Date | null {
@@ -339,6 +345,69 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
       hour: 'numeric',
       minute: '2-digit',
     }).format(value);
+  }
+
+  private buildDescriptionHtml(raw: string): string {
+    if (!raw) return '';
+
+    const sanitized =
+      this.sanitizer.sanitize(SecurityContext.HTML, raw)?.trim() ?? '';
+    if (!sanitized) return '';
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(sanitized, 'text/html');
+    const body = doc.body;
+    if (!body) return '';
+
+    // Remove embedded CMS/media assets and any non-content blocks.
+    body
+      .querySelectorAll(
+        'drupal-media, img, picture, video, audio, iframe, object, embed, script, style',
+      )
+      .forEach((node) => node.remove());
+
+    // Keep links safe and consistent.
+    body.querySelectorAll('a').forEach((link) => {
+      const href = (link.getAttribute('href') ?? '').trim();
+      if (!href || this.isUnsafeHref(href)) {
+        link.removeAttribute('href');
+      }
+      link.setAttribute('target', '_blank');
+      link.setAttribute('rel', 'noopener noreferrer');
+      this.stripAttributes(link, ['href', 'target', 'rel']);
+    });
+
+    // Trim attributes everywhere else to avoid style/class noise.
+    body.querySelectorAll('*').forEach((element) => {
+      if (element.tagName.toLowerCase() !== 'a') {
+        this.stripAttributes(element, []);
+      }
+    });
+
+    const normalized = body.innerHTML
+      .replace(/&nbsp;|&#160;/g, ' ')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+
+    return normalized;
+  }
+
+  private isUnsafeHref(href: string): boolean {
+    const lower = href.toLowerCase();
+    return (
+      lower.startsWith('javascript:') ||
+      lower.startsWith('data:') ||
+      lower.startsWith('vbscript:')
+    );
+  }
+
+  private stripAttributes(element: Element, allowed: string[]): void {
+    const keep = new Set(allowed.map((name) => name.toLowerCase()));
+    for (const attr of Array.from(element.attributes)) {
+      if (!keep.has(attr.name.toLowerCase())) {
+        element.removeAttribute(attr.name);
+      }
+    }
   }
 
   private async loadIfNeeded(): Promise<void> {

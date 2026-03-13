@@ -16,6 +16,7 @@ import { AuthService } from '../../services/auth.service';
 import { ItemService } from '../../services/item.service';
 import { HoldsService } from '../../services/holds.service';
 import { AccountPreferencesService } from '../../services/account-preferences.service';
+import { FormatFamilyService } from '../../services/format-family.service';
 
 interface HoldTargetOption {
   recordId: string;
@@ -61,6 +62,7 @@ export class MyListDetailPage {
     private itemService: ItemService,
     private holds: HoldsService,
     private accountPreferences: AccountPreferencesService,
+    private formatFamily: FormatFamilyService,
   ) {}
 
   ionViewWillEnter() {
@@ -231,25 +233,21 @@ export class MyListDetailPage {
     ev?.stopPropagation();
 
     const buttons: ActionSheetButton[] = [];
-    const holdTargets = await this.holdTargetsWithStatusForTitle(t);
-    const availableHoldTargets = holdTargets.filter((x) => !x.isOnHold);
-    if (holdTargets.length === 1 && availableHoldTargets.length === 0) {
-      buttons.push({
-        text: 'On hold',
-        cssClass: 'action-sheet-disabled-option',
-        handler: () => false,
-      });
-    } else if (availableHoldTargets.length > 0) {
-      buttons.push({
-        text: 'Place Hold',
-        handler: () => this.placeHoldFromTitle(t, holdTargets),
-      });
-    } else if (holdTargets.length > 1) {
-      buttons.push({
-        text: 'On hold',
-        cssClass: 'action-sheet-disabled-option',
-        handler: () => false,
-      });
+    if (this.auth.snapshot()?.isLoggedIn && this.canPlaceHoldFromTitle(t)) {
+      const groupedKey = this.recordIdForEntry(t);
+      const hasCachedHold = await this.hasCachedHoldForGroupedKey(groupedKey);
+      if (hasCachedHold) {
+        buttons.push({
+          text: 'On hold',
+          cssClass: 'action-sheet-disabled-option',
+          handler: () => false,
+        });
+      } else {
+        buttons.push({
+          text: 'Place Hold',
+          handler: () => this.placeHoldFromTitle(t),
+        });
+      }
     }
     buttons.push({
       text: 'Open Details',
@@ -292,6 +290,24 @@ export class MyListDetailPage {
     if (recordType === 'event') return false;
     const groupedKey = this.recordIdForEntry(t);
     return !!groupedKey;
+  }
+
+  mediaIconNameForTitle(t: AspenListTitle): string {
+    const hit: AspenSearchHit = {
+      key: this.recordIdForEntry(t),
+      title: this.titleText(t),
+      author: this.authorText(t) || undefined,
+      format: t?.format,
+      itemList: [],
+      catalogUrl: '',
+      raw: t,
+    };
+
+    const family = this.formatFamily.primaryFamilyForHit(hit);
+    if (family === 'book') return 'book-outline';
+    if (family === 'music') return 'disc-outline';
+    if (family === 'video') return 'videocam-outline';
+    return 'albums-outline';
   }
 
   private async placeHoldFromTitle(t: AspenListTitle, precomputedTargets?: HoldTargetOption[]): Promise<void> {
@@ -482,6 +498,21 @@ export class MyListDetailPage {
       return ids;
     } catch {
       return new Set<string>();
+    }
+  }
+
+  private async hasCachedHoldForGroupedKey(groupedKey: string): Promise<boolean> {
+    const normalized = (groupedKey ?? '').toString().trim().toLowerCase();
+    if (!normalized) return false;
+
+    try {
+      const holds = await this.cachedHoldsForLookup();
+      return (holds ?? []).some((hold) => {
+        const holdGrouped = (hold?.groupedWorkId ?? '').toString().trim().toLowerCase();
+        return !!holdGrouped && holdGrouped === normalized;
+      });
+    } catch {
+      return false;
     }
   }
 

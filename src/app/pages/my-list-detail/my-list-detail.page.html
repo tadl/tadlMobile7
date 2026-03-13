@@ -58,7 +58,10 @@
       </ion-thumbnail>
 
       <ion-label class="ion-text-wrap">
-        <div class="title">{{ titleText(t) }}</div>
+        <h2 class="result-title">
+          <ion-icon [name]="mediaIconNameForTitle(t)" aria-hidden="true"></ion-icon>
+          <span class="title">{{ titleText(t) }}</span>
+        </h2>
         <div class="sub" *ngIf="authorText(t)">{{ authorText(t) }}</div>
       </ion-label>
 

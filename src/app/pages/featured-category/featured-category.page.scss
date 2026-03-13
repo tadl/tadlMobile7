@@ -6,6 +6,18 @@
   opacity: 0.88;
 }
 
+.result-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.result-title ion-icon {
+  font-size: 1.05rem;
+  opacity: 0.9;
+  flex: 0 0 auto;
+}
+
 .row-action {
   margin-inline-start: 8px;
   --padding-start: 10px;

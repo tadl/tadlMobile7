@@ -15,6 +15,7 @@ import { ItemService } from '../../services/item.service';
 import { HoldsService } from '../../services/holds.service';
 import { AccountPreferencesService } from '../../services/account-preferences.service';
 import { AuthService } from '../../services/auth.service';
+import { FormatFamilyService } from '../../services/format-family.service';
 
 interface HoldTargetOption {
   recordId: string;
@@ -56,6 +57,7 @@ export class FeaturedCategoryPage {
     private holds: HoldsService,
     private accountPreferences: AccountPreferencesService,
     private auth: AuthService,
+    private formatFamily: FormatFamilyService,
   ) {}
 
   ionViewWillEnter() {
@@ -192,25 +194,20 @@ export class FeaturedCategoryPage {
     }
 
     const buttons: ActionSheetButton[] = [];
-    const holdTargets = await this.holdTargetsWithStatusForHit(hit);
-    const availableHoldTargets = holdTargets.filter((x) => !x.isOnHold);
-    if (holdTargets.length === 1 && availableHoldTargets.length === 0) {
-      buttons.push({
-        text: 'On hold',
-        cssClass: 'action-sheet-disabled-option',
-        handler: () => false,
-      });
-    } else if (availableHoldTargets.length > 0) {
-      buttons.push({
-        text: 'Place Hold',
-        handler: () => this.placeHoldFromHit(hit, holdTargets),
-      });
-    } else if (holdTargets.length > 1) {
-      buttons.push({
-        text: 'On hold',
-        cssClass: 'action-sheet-disabled-option',
-        handler: () => false,
-      });
+    if (this.auth.snapshot()?.isLoggedIn && this.canPlaceHoldFromHit(hit)) {
+      const hasCachedHold = await this.hasCachedHoldForGroupedWork(hit);
+      if (hasCachedHold) {
+        buttons.push({
+          text: 'On hold',
+          cssClass: 'action-sheet-disabled-option',
+          handler: () => false,
+        });
+      } else {
+        buttons.push({
+          text: 'Place Hold',
+          handler: () => this.placeHoldFromHit(hit),
+        });
+      }
     }
 
     buttons.push(
@@ -239,6 +236,24 @@ export class FeaturedCategoryPage {
 
   trackByRecord(_idx: number, i: FeaturedRecord): string {
     return (i?.key ?? '').toString().trim() || `${_idx}`;
+  }
+
+  canPlaceHoldFromHit(hit: AspenSearchHit): boolean {
+    return this.formatFamily.hasPhysicalHoldableFormat(hit);
+  }
+
+  mediaIconName(hit: AspenSearchHit): string {
+    const family = this.formatFamily.primaryFamilyForHit(hit);
+    if (family === 'book') return 'book-outline';
+    if (family === 'music') return 'disc-outline';
+    if (family === 'video') return 'videocam-outline';
+    return 'albums-outline';
+  }
+
+  mediaIconNameForRecord(i: FeaturedRecord): string {
+    const hit = this.asSearchHit(i);
+    if (!hit) return 'albums-outline';
+    return this.mediaIconName(hit);
   }
 
   private asSearchHit(i: FeaturedRecord): AspenSearchHit | null {
@@ -509,6 +524,21 @@ export class FeaturedCategoryPage {
       return ids;
     } catch {
       return new Set<string>();
+    }
+  }
+
+  private async hasCachedHoldForGroupedWork(hit: AspenSearchHit): Promise<boolean> {
+    const groupedKey = (hit?.key ?? '').toString().trim().toLowerCase();
+    if (!groupedKey) return false;
+
+    try {
+      const holds = await this.cachedHoldsForLookup();
+      return (holds ?? []).some((hold) => {
+        const holdGrouped = (hold?.groupedWorkId ?? '').toString().trim().toLowerCase();
+        return !!holdGrouped && holdGrouped === groupedKey;
+      });
+    } catch {
+      return false;
     }
   }
 

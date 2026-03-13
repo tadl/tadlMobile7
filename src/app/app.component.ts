@@ -48,7 +48,8 @@ export class AppComponent implements OnInit {
   // Bind in templates: *ngIf="isLoading$ | async"
   isLoading$: Observable<boolean>;
   private lastWarmedAccountId: string | null = null;
-  private lastResumeRefreshAt = 0;
+  private lastResumeWarmAt = 0;
+  private readonly resumeWarmThrottleMs = 5 * 60 * 1000;
   private splashHidden = false;
   private readonly appBootStartedAt = Date.now();
   private incomingUrlInFlight = false;
@@ -153,15 +154,9 @@ export class AppComponent implements OnInit {
     if (!snap.isLoggedIn || !snap.activeAccountId) return;
 
     const now = Date.now();
-    if (now - this.lastResumeRefreshAt < 10000) return;
-    this.lastResumeRefreshAt = now;
-
-    this.auth.refreshActiveProfile().subscribe({ error: () => {} });
-
-    const path = this.router.url || '/home';
-    if (path === '/' || path.startsWith('/home')) {
-      this.cacheWarm.warmForActiveAccount();
-    }
+    if (now - this.lastResumeWarmAt < this.resumeWarmThrottleMs) return;
+    this.lastResumeWarmAt = now;
+    this.cacheWarm.warmForActiveAccount();
   }
 
   private whenInitialNavigationReady() {

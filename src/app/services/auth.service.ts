@@ -14,6 +14,10 @@ export interface AuthState {
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
+  private readonly profileRefreshThrottleMs = 5 * 60 * 1000;
+  private lastProfileRefreshAt = 0;
+  private lastProfileRefreshAccountId: string | null = null;
+
   private state$ = new BehaviorSubject<AuthState>({
     isLoggedIn: false,
     activeAccountId: null,
@@ -233,11 +237,24 @@ export class AuthService {
   /**
    * Optional helper: refresh profile for current user (update badges)
    */
-  refreshActiveProfile(): Observable<AuthState> {
+  refreshActiveProfile(options?: { force?: boolean }): Observable<AuthState> {
     const snap = this.snapshot();
     if (!snap.activeAccountMeta || !snap.activeAccountId) {
       return from([snap]);
     }
+
+    const force = options?.force === true;
+    const now = Date.now();
+    if (
+      !force &&
+      this.lastProfileRefreshAccountId === snap.activeAccountId &&
+      now - this.lastProfileRefreshAt < this.profileRefreshThrottleMs
+    ) {
+      return from([snap]);
+    }
+
+    this.lastProfileRefreshAt = now;
+    this.lastProfileRefreshAccountId = snap.activeAccountId;
 
     return from(this.accounts.getPassword(snap.activeAccountId)).pipe(
       switchMap(password => {

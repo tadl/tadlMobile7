@@ -12,6 +12,10 @@ import { AspenUserList } from './lists.service';
 
 @Injectable({ providedIn: 'root' })
 export class CacheWarmService {
+  private readonly warmThrottleMs = 5 * 60 * 1000;
+  private lastWarmAt = 0;
+  private lastWarmAccountId: string | null = null;
+
   constructor(
     private http: HttpClient,
     private globals: Globals,
@@ -23,6 +27,20 @@ export class CacheWarmService {
   ) {}
 
   warmForActiveAccount(): void {
+    const snap = this.auth.snapshot();
+    const accountId = (snap?.activeAccountId ?? '').toString().trim();
+    if (!accountId) return;
+
+    const now = Date.now();
+    if (
+      this.lastWarmAccountId === accountId &&
+      now - this.lastWarmAt < this.warmThrottleMs
+    ) {
+      return;
+    }
+    this.lastWarmAt = now;
+    this.lastWarmAccountId = accountId;
+
     // Keep account warm-up cheap: profile gives us counts/badges without pulling
     // the full holds/checkouts/fines/lists payloads up front.
     void this.safeRun(async () => {

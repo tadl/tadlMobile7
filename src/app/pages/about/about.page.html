@@ -106,7 +106,14 @@
     <ion-row>
       <ion-col>
         <div class="ion-text-center">
-          <a (click)="globals.open_page('https://www.tadl.org/mobileapppolicy')">Privacy Policy</a>
+          <ion-button
+            fill="clear"
+            size="small"
+            aria-label="Open privacy policy"
+            (click)="globals.open_page('https://www.tadl.org/mobileapppolicy')"
+          >
+            Privacy Policy
+          </ion-button>
         </div>
       </ion-col>
     </ion-row>

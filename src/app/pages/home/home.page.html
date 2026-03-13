@@ -74,7 +74,7 @@
     <ng-container *ngIf="patron.badgesFromProfile(s.profile) as b">
       <ion-card class="home-section-card">
         <div class="home-section-header">
-          <div class="home-section-title">Your Account</div>
+          <div class="home-section-title">My Account</div>
           <ion-button *ngIf="s.isLoggedIn" size="small" (click)="showCard()">View card</ion-button>
         </div>
         <ng-container *ngIf="!s.isLoggedIn; else loggedInAccountLinks">

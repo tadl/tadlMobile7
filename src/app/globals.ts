@@ -40,8 +40,8 @@ export class Globals {
   ) {}
 
   // ---- app identity / toggles ----
-  public app_version: string = '7.0.25';
-  public update_version: string = '20260312';
+  public app_version: string = '7.0.30';
+  public update_version: string = '20260313';
   public build_num: string = '00';
 
   public device_info: any;
@@ -67,12 +67,12 @@ export class Globals {
   // Pickup locations (Aspen LocationID + PickupBranch code)
   // NOTE: Aspen expects newLocation formatted as "<locationId>_<pickupBranchCode>"
   public pickupLocations: AspenPickupLocationOption[] = [
-    { id: 7, code: 'TADL-WOOD', name: 'Woodmere' },
-    { id: 2, code: 'TADL-EBB', name: 'East Bay' },
-    { id: 3, code: 'TADL-FLPL', name: 'Fife Lake' },
-    { id: 4, code: 'TADL-IPL', name: 'Interlochen' },
-    { id: 5, code: 'TADL-KBL', name: 'Kingsley' },
-    { id: 6, code: 'TADL-PCL', name: 'Peninsula' },
+    { id: 7, code: 'TADL-WOOD', name: 'Woodmere (Main) Branch Library' },
+    { id: 2, code: 'TADL-EBB', name: 'East Bay Branch Library' },
+    { id: 3, code: 'TADL-FLPL', name: 'Fife Lake Public Library' },
+    { id: 4, code: 'TADL-IPL', name: 'Interlochen Public Library' },
+    { id: 5, code: 'TADL-KBL', name: 'Kingsley Branch Library' },
+    { id: 6, code: 'TADL-PCL', name: 'Peninsula Community Library' },
   ];
 
   // Legacy Preferences pickup_library ids -> Aspen location ids.

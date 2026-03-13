@@ -17,7 +17,13 @@
       <div class="details-card">
         <h2 class="title">{{ location.fullname }}</h2>
 
-        <p class="today-pill" *ngIf="openTodayLine(location)">{{ openTodayLine(location) }}</p>
+        <p
+          class="today-pill"
+          [class.today-pill-exception]="hasTodayException(location)"
+          *ngIf="openTodayLine(location)"
+        >
+          {{ openTodayLine(location) }}
+        </p>
 
         <div class="contact">
           <div class="contact-top">
@@ -62,6 +68,24 @@
           </div>
         </div>
       </div>
+
+      <ng-container *ngIf="upcomingClosureRows(location) as upcomingRows">
+        <ion-card class="exceptions-card" *ngIf="upcomingRows.length">
+          <ion-card-header>
+            <div class="exceptions-subtitle">Upcoming closures</div>
+          </ion-card-header>
+          <ion-card-content>
+            <div class="exceptions-list">
+              <div class="exception-row" *ngFor="let row of upcomingRows">
+                <div class="exception-date">{{ row.dateLabel }}</div>
+                <div class="exception-text">
+                  Closed<span *ngIf="row.reason"> • {{ row.reason }}</span>
+                </div>
+              </div>
+            </div>
+          </ion-card-content>
+        </ion-card>
+      </ng-container>
 
       <ion-card class="hours-card">
         <ion-card-header>

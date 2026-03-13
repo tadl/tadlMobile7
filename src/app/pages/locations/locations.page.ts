@@ -5,7 +5,11 @@ import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
 import { LocationDetailComponent } from './location-detail/location-detail.component';
 import { ModalController } from '@ionic/angular/standalone';
-import { LocationsService, type AppLocation } from '../../services/locations.service';
+import {
+  LocationsService,
+  type AppLocation,
+  type AppLocationException,
+} from '../../services/locations.service';
 
 type Location = AppLocation;
 
@@ -73,6 +77,15 @@ export class LocationsPage {
   }
 
   today_hours(loc: Location): string {
+    const todayException = this.exceptionForDate(loc, this.startOfDay(new Date()));
+    if (todayException) {
+      const exHours = (todayException.hours ?? '').toString().trim();
+      const exReason = (todayException.reason ?? '').toString().trim();
+      const closure = exHours.toLowerCase().includes('closed');
+      const base = closure ? 'Closed today' : exHours ? `Open ${exHours} today` : 'Hours updated today';
+      return exReason ? `${base} (${exReason})` : base;
+    }
+
     const key = this.todayKey();
     if (!key) return '';
 
@@ -116,6 +129,32 @@ export class LocationsPage {
 
   markLocationImageBroken(loc: Location): void {
     this.brokenLocationImages.add(loc);
+  }
+
+  private exceptionForDate(loc: Location, date: Date): AppLocationException | null {
+    const target = this.startOfDay(date).getTime();
+    const exceptions = Array.isArray(loc?.exceptions) ? loc.exceptions : [];
+    for (const ex of exceptions) {
+      const dt = this.parseLocalDate(ex?.date);
+      if (dt && dt.getTime() === target) return ex;
+    }
+    return null;
+  }
+
+  private parseLocalDate(value: string | undefined): Date | null {
+    const raw = (value ?? '').toString().trim();
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+    if (!m) return null;
+    const y = Number(m[1]);
+    const mon = Number(m[2]);
+    const d = Number(m[3]);
+    if (!Number.isFinite(y) || !Number.isFinite(mon) || !Number.isFinite(d)) return null;
+    const parsed = new Date(y, mon - 1, d);
+    return Number.isNaN(parsed.getTime()) ? null : this.startOfDay(parsed);
+  }
+
+  private startOfDay(value: Date): Date {
+    return new Date(value.getFullYear(), value.getMonth(), value.getDate());
   }
 
   async view_details(loc: Location) {

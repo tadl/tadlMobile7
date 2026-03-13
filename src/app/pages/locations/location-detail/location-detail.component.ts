@@ -5,7 +5,11 @@ import { Capacitor } from '@capacitor/core';
 import { AppLauncher } from '@capacitor/app-launcher';
 import { Globals } from '../../../globals';
 import { ModalController } from '@ionic/angular/standalone';
-import { LocationsService, type AppLocation } from '../../../services/locations.service';
+import {
+  LocationsService,
+  type AppLocation,
+  type AppLocationException,
+} from '../../../services/locations.service';
 
 type Location = AppLocation;
 
@@ -14,6 +18,11 @@ type HoursRow = {
   day: string;
   hours: string;
   isToday: boolean;
+};
+
+type UpcomingClosureRow = {
+  dateLabel: string;
+  reason: string;
 };
 
 @Component({
@@ -108,6 +117,15 @@ export class LocationDetailComponent {
   }
 
   openTodayLine(loc: Location): string {
+    const todayException = this.exceptionForDate(loc, this.startOfDay(new Date()));
+    if (todayException) {
+      const exHours = (todayException.hours ?? '').toString().trim();
+      const exReason = (todayException.reason ?? '').toString().trim();
+      const closure = exHours.toLowerCase().includes('closed');
+      const base = closure ? 'Closed today' : exHours ? `Open ${exHours} today` : 'Hours updated today';
+      return exReason ? `${base} (${exReason})` : base;
+    }
+
     const todayKey = this.todayKey();
     const raw = (loc as any)?.[todayKey];
     const hours = (raw ?? '').toString().trim();
@@ -119,6 +137,18 @@ export class LocationDetailComponent {
 
     // Expected: "9:00 AM to 7:00 PM"
     return `Open ${hours} today`;
+  }
+
+  hasTodayException(loc: Location): boolean {
+    return !!this.exceptionForDate(loc, this.startOfDay(new Date()));
+  }
+
+  upcomingClosureRows(loc?: Location): UpcomingClosureRow[] {
+    const exceptions = this.upcomingClosureExceptions(loc, 30);
+    return exceptions.map((ex) => ({
+      dateLabel: this.formatLongDate(ex.date),
+      reason: (ex.reason ?? '').toString().trim(),
+    }));
   }
 
   hoursRows(loc?: Location): HoursRow[] {
@@ -175,6 +205,73 @@ export class LocationDetailComponent {
       .map((v) => (v ?? '').toString().trim())
       .filter(Boolean)
       .join(', ');
+  }
+
+  private upcomingClosureExceptions(
+    loc: Location | undefined,
+    daysAhead: number,
+  ): AppLocationException[] {
+    if (!loc) return [];
+
+    const start = this.startOfDay(new Date());
+    start.setDate(start.getDate() + 1); // Upcoming starts tomorrow, not today.
+    const end = this.startOfDay(new Date());
+    end.setDate(end.getDate() + daysAhead);
+
+    const exceptions = Array.isArray(loc.exceptions) ? loc.exceptions : [];
+    return exceptions
+      .filter((ex) => this.isClosureException(ex))
+      .filter((ex) => {
+        const dt = this.parseLocalDate(ex?.date);
+        if (!dt) return false;
+        return dt.getTime() >= start.getTime() && dt.getTime() <= end.getTime();
+      })
+      .sort((a, b) => {
+        const aTime = this.parseLocalDate(a?.date)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+        const bTime = this.parseLocalDate(b?.date)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+        return aTime - bTime;
+      });
+  }
+
+  private exceptionForDate(loc: Location, date: Date): AppLocationException | null {
+    const target = this.startOfDay(date).getTime();
+    const exceptions = Array.isArray(loc.exceptions) ? loc.exceptions : [];
+    for (const ex of exceptions) {
+      const dt = this.parseLocalDate(ex?.date);
+      if (dt && dt.getTime() === target) return ex;
+    }
+    return null;
+  }
+
+  private isClosureException(ex: AppLocationException | null | undefined): boolean {
+    const hours = (ex?.hours ?? '').toString().trim().toLowerCase();
+    return !!hours && hours.includes('closed');
+  }
+
+  private parseLocalDate(value: string | undefined): Date | null {
+    const raw = (value ?? '').toString().trim();
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+    if (!m) return null;
+    const y = Number(m[1]);
+    const mon = Number(m[2]);
+    const d = Number(m[3]);
+    if (!Number.isFinite(y) || !Number.isFinite(mon) || !Number.isFinite(d)) return null;
+    const parsed = new Date(y, mon - 1, d);
+    return Number.isNaN(parsed.getTime()) ? null : this.startOfDay(parsed);
+  }
+
+  private startOfDay(value: Date): Date {
+    return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+  }
+
+  private formatLongDate(value: string | undefined): string {
+    const date = this.parseLocalDate(value);
+    if (!date) return (value ?? '').toString();
+    return new Intl.DateTimeFormat(undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    }).format(date);
   }
 
   private async navigationOptions(encodedQuery: string): Promise<Array<{ text: string; url: string }>> {

@@ -29,7 +29,9 @@
 
       <ion-label>
         <h2>{{ loc.fullname }}</h2>
-        <p *ngIf="today_hours(loc)">{{ today_hours(loc) }}</p>
+        <p *ngIf="today_hours(loc) as todayHours">
+          {{ todayHours }}
+        </p>
         <p *ngIf="addressLine(loc)">{{ addressLine(loc) }}</p>
       </ion-label>
     </ion-item>

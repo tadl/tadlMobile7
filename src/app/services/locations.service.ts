@@ -23,7 +23,13 @@ export interface AppLocation {
   thursday?: string;
   friday?: string;
   saturday?: string;
-  exceptions?: any[];
+  exceptions?: AppLocationException[];
+}
+
+export interface AppLocationException {
+  date?: string;
+  hours?: string;
+  reason?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -73,4 +79,3 @@ export class LocationsService {
     return concat(cached$, network$);
   }
 }
-

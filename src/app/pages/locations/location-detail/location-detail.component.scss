@@ -53,6 +53,11 @@
   line-height: 1.2;
 }
 
+.today-pill.today-pill-exception {
+  background: rgba(var(--ion-color-danger-rgb), 0.18);
+  color: var(--ion-color-danger, #b42318);
+}
+
 .contact {
   margin-top: 12px;
 
@@ -131,6 +136,64 @@
     rgba(var(--ion-text-color-rgb), 0.07),
     rgba(var(--ion-text-color-rgb), 0.035)
   );
+}
+
+.exceptions-card {
+  margin: 0;
+  border-radius: 14px;
+  border: 1px solid rgba(var(--ion-text-color-rgb), 0.08);
+  background: linear-gradient(
+    160deg,
+    rgba(var(--ion-text-color-rgb), 0.07),
+    rgba(var(--ion-text-color-rgb), 0.035)
+  );
+}
+
+.exceptions-card ion-card-header {
+  padding-bottom: 8px;
+}
+
+.exceptions-subtitle {
+  margin-top: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ion-color-danger, #b42318);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.exceptions-card ion-card-content {
+  padding-top: 4px;
+}
+
+.exceptions-list {
+  display: grid;
+  gap: 8px;
+}
+
+.exception-row {
+  min-height: 44px;
+  padding: 10px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  border-radius: 10px;
+  background: rgba(var(--ion-text-color-rgb), 0.06);
+}
+
+.exception-date {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.exception-text {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: right;
 }
 
 .hours-card ion-card-header {
@@ -215,6 +278,11 @@
     background: rgba(var(--ion-color-primary-rgb), 0.24);
   }
 
+  .today-pill.today-pill-exception {
+    background: rgba(var(--ion-color-danger-rgb), 0.28);
+    color: var(--ion-color-danger, #ff6b6b);
+  }
+
   .hours-card {
     background: linear-gradient(
       160deg,
@@ -234,6 +302,19 @@
     &.today {
       background: rgba(var(--ion-color-primary-rgb), 0.22);
     }
+  }
+
+  .exceptions-card {
+    background: linear-gradient(
+      160deg,
+      rgba(255, 255, 255, 0.06),
+      rgba(255, 255, 255, 0.03)
+    );
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .exception-row {
+    background: rgba(255, 255, 255, 0.05);
   }
 }
 

@@ -214,11 +214,11 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   get registrationStartsAtDate(): Date | null {
-    return this.parseDate(this.event?.['registration_start'] ?? null);
+    return this.parseRegistrationDate(this.event?.['registration_start'] ?? null);
   }
 
   get registrationEndsAtDate(): Date | null {
-    return this.parseDate(this.event?.['registration_end'] ?? null);
+    return this.parseRegistrationDate(this.event?.['registration_end'] ?? null);
   }
 
   get registrationButtonVisible(): boolean {
@@ -242,33 +242,38 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
 
     if (startsAt && now.getTime() < startsAt.getTime()) {
       const startsLabel = this.formatDateOnly(startsAt);
-      return `Note: Registration is required for this event. Registration opens ${startsLabel}.`;
+      return `Registration is available for this event. Registration opens ${startsLabel}.`;
     }
 
     if (endsAt && now.getTime() > endsAt.getTime()) {
       const endsLabel = this.formatDateTime(endsAt);
-      return `Note: Registration is required for this event. Registration for this event has closed as of ${endsLabel}.`;
+      return `Registration for this event has closed as of ${endsLabel}.`;
     }
 
-    return 'Note: Registration is required for this event. To register please view the event page on our website.';
+    return 'Registration is available for this event. To register please view the event page on our website.';
   }
 
   get registrationWindowLabel(): string | null {
     if (!this.registrationRequired) return null;
 
+    const now = new Date();
     const startsAt = this.registrationStartsAtDate;
     const endsAt = this.registrationEndsAtDate;
+
+    if (startsAt && now.getTime() < startsAt.getTime()) return null;
+    if (endsAt && now.getTime() > endsAt.getTime()) return null;
+
     const startLabel = startsAt ? this.formatDateOnly(startsAt) : '';
     const endLabel = endsAt ? this.formatDateTime(endsAt) : '';
 
     if (startLabel && endLabel) {
-      return `Registration window: ${startLabel} to ${endLabel}`;
-    }
-    if (startLabel) {
-      return `Registration opens: ${startLabel}`;
+      return `Registration available: ${startLabel} to ${endLabel}`;
     }
     if (endLabel) {
-      return `Registration closes: ${endLabel}`;
+      return `Registration available until ${endLabel}`;
+    }
+    if (startLabel) {
+      return `Registration available starting ${startLabel}`;
     }
     return null;
   }
@@ -292,6 +297,9 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
 
     const s = String(value).trim();
     if (!s) return null;
+    if (s === '0' || /^0+$/.test(s)) return null;
+    if (s.toLowerCase() === 'null' || s.toLowerCase() === 'undefined') return null;
+    if (s === '0000-00-00' || s.startsWith('0000-00-00 ')) return null;
 
     // Normalize common "YYYY-MM-DD HH:MM:SS" -> "YYYY-MM-DDTHH:MM:SS"
     // Safari/iOS is picky; this avoids "Invalid Date".
@@ -299,6 +307,20 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
 
     const d = new Date(normalized);
     return isNaN(d.getTime()) ? null : d;
+  }
+
+  private parseRegistrationDate(value: any): Date | null {
+    const raw = (value ?? '').toString().trim();
+    if (!raw) return null;
+
+    const parsed = this.parseDate(raw);
+    if (!parsed) return null;
+
+    // Feed sentinel values for "no registration date" can arrive as epoch-ish strings.
+    if (raw.startsWith('1969-12-31') || raw.startsWith('1970-01-01')) return null;
+    if (parsed.getTime() === 0) return null;
+
+    return parsed;
   }
 
   private formatDateOnly(value: Date): string {

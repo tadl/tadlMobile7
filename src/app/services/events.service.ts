@@ -47,14 +47,14 @@ export class EventsService {
       filter((r): r is MobileEventsResponse => !!r && Array.isArray(r.events)),
       map((res) => ({
         ...res,
-        events: res.events.filter((event) => !this.isMidnightOnlyEvent(event)),
+        events: res.events.filter((event) => this.shouldIncludeEvent(event)),
       })),
     );
 
     const network$ = this.http.get<MobileEventsResponse>(this.baseUrl, { params }).pipe(
       tap((res) => {
         if (Array.isArray(res?.events)) {
-          res.events = res.events.filter((event) => !this.isMidnightOnlyEvent(event));
+          res.events = res.events.filter((event) => this.shouldIncludeEvent(event));
         }
       }),
       tap((res) => {
@@ -70,5 +70,55 @@ export class EventsService {
     const end = (event?.end_date ?? '').toString().trim();
     if (!start || !end) return false;
     return start.endsWith('00:00:00') && end.endsWith('00:00:00');
+  }
+
+  private shouldIncludeEvent(event: MobileEvent | null | undefined): boolean {
+    if (!event) return false;
+    if (this.isMidnightOnlyEvent(event)) return false;
+
+    const now = Date.now();
+    const start = this.parseDate((event.start_date ?? '').toString().trim());
+    const explicitEnd = this.parseDate((event.end_date ?? '').toString().trim());
+    const inferredEnd = this.inferEventEnd(start, explicitEnd);
+
+    // Primary rule: hide events that have ended.
+    if (inferredEnd && now > inferredEnd.getTime()) return false;
+
+    // Safety fallback: if we only have a start date and no usable end,
+    // do not keep stale entries older than 24h after start.
+    if (!inferredEnd && start && now - start.getTime() > 24 * 60 * 60 * 1000) return false;
+
+    return true;
+  }
+
+  private inferEventEnd(start: Date | null, explicitEnd: Date | null): Date | null {
+    if (explicitEnd) return explicitEnd;
+    if (!start) return null;
+
+    const isMidnightStart =
+      start.getHours() === 0 &&
+      start.getMinutes() === 0 &&
+      start.getSeconds() === 0;
+
+    if (isMidnightStart) {
+      const endOfDay = new Date(start);
+      endOfDay.setHours(23, 59, 59, 999);
+      return endOfDay;
+    }
+
+    // Missing end date fallback for normal events.
+    return new Date(start.getTime() + (2 * 60 * 60 * 1000));
+  }
+
+  private parseDate(raw: string): Date | null {
+    const s = (raw ?? '').toString().trim();
+    if (!s) return null;
+    if (s === '0' || /^0+$/.test(s)) return null;
+    if (s.toLowerCase() === 'null' || s.toLowerCase() === 'undefined') return null;
+    if (s === '0000-00-00' || s.startsWith('0000-00-00 ')) return null;
+
+    const normalized = s.includes('T') ? s : s.replace(' ', 'T');
+    const d = new Date(normalized);
+    return Number.isNaN(d.getTime()) ? null : d;
   }
 }

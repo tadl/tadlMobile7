@@ -7,6 +7,7 @@ import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
 import { AuthService } from '../../services/auth.service';
 import { AccountStoreService, StoredAccountMeta } from '../../services/account-store.service';
+import { PasswordResetModalComponent } from '../password-reset-modal/password-reset-modal.component';
 
 @Component({
   standalone: true,
@@ -81,8 +82,12 @@ export class SwitchUserModalComponent implements OnInit {
     });
   }
 
-  troubleLoggingIn() {
-    this.globals.open_page('https://discover.tadl.org/MyAccount/Home');
+  async troubleLoggingIn() {
+    const m = await this.modalCtrl.create({
+      component: PasswordResetModalComponent,
+    });
+    this.globals.modal_open = true;
+    await m.present();
   }
 
   submitLogin() {

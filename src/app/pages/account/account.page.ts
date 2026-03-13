@@ -11,6 +11,7 @@ import { AccountStoreService, StoredAccountMeta } from '../../services/account-s
 import { PatronService } from '../../services/patron.service';
 import { ShowCardModalComponent } from '../../components/show-card-modal/show-card-modal.component';
 import { SwitchUserModalComponent } from '../../components/switch-user-modal/switch-user-modal.component';
+import { PasswordResetModalComponent } from '../../components/password-reset-modal/password-reset-modal.component';
 
 @Component({
   standalone: true,
@@ -90,8 +91,12 @@ export class AccountPage implements OnInit {
     return label || a.username || 'Account';
   }
 
-  troubleLoggingIn() {
-    this.globals.open_page('https://discover.tadl.org/MyAccount/Home');
+  async troubleLoggingIn() {
+    const m = await this.modal.create({
+      component: PasswordResetModalComponent,
+    });
+    this.globals.modal_open = true;
+    await m.present();
   }
 
   submitLogin() {

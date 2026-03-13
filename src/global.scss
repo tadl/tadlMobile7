@@ -79,18 +79,33 @@ ion-card {
   margin-inline: 6px;
 }
 
-/* Slightly increase muted-text contrast in light mode. */
+/* Force muted/secondary text to black in light mode for maximum readability. */
 :root:not(.ion-palette-dark) {
+  --app-strong-text: #000000;
+
   ion-note {
-    color: rgba(48, 56, 68, 0.96);
+    color: var(--app-strong-text) !important;
+    opacity: 1 !important;
   }
 
   .muted {
-    opacity: 0.96;
+    color: var(--app-strong-text) !important;
+    opacity: 1 !important;
+  }
+
+  .sub,
+  .meta {
+    color: var(--app-strong-text) !important;
+    opacity: 1 !important;
   }
 
   ion-label p {
-    color: rgba(66, 74, 88, 0.96);
+    color: var(--app-strong-text) !important;
+    opacity: 1 !important;
+  }
+
+  p {
+    color: var(--app-strong-text);
   }
 }
 

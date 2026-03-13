@@ -27,7 +27,8 @@
 
 .welcome-text {
   margin-top: 6px;
-  opacity: 0.92;
+  color: var(--ion-text-color);
+  opacity: 1;
   line-height: 1.35;
 }
 
@@ -159,6 +160,8 @@
   display: block;
   margin-top: 2px;
   min-height: 16px;
+  color: var(--ion-text-color);
+  opacity: 1;
 }
 
 .menu-row-label--single {

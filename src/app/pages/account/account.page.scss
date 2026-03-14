@@ -180,33 +180,6 @@ ion-note {
   font-weight: 600;
 }
 
-.menu-subnote {
-  display: block;
-  margin-top: 2px;
-  min-height: 16px;
-}
-
-.menu-row-title {
-  font-size: 1rem;
-  line-height: 1.25;
-  font-weight: 500;
-}
-
-.menu-row-label {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  min-height: 38px;
-}
-
-.menu-row-label--single {
-  justify-content: center;
-}
-
-.menu-row-label--double {
-  justify-content: flex-start;
-}
-
 .actions {
   padding: 12px 16px 18px 16px;
 }

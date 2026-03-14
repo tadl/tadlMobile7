@@ -12,8 +12,10 @@
     "lint": "ng lint",
     "prep:ios": "node scripts/release-prep.mjs ios",
     "prep:android": "node scripts/release-prep.mjs android",
+    "prep:both": "node scripts/release-prep.mjs both",
     "prep:ios:clean": "node scripts/release-prep.mjs ios --recreate",
-    "prep:android:clean": "node scripts/release-prep.mjs android --recreate"
+    "prep:android:clean": "node scripts/release-prep.mjs android --recreate",
+    "prep:both:clean": "node scripts/release-prep.mjs both --recreate"
   },
   "private": true,
   "dependencies": {

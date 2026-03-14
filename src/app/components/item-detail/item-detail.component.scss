@@ -13,7 +13,6 @@
   padding-inline: 10px;
 }
 
-/* Header (small cover, not hero) */
 .header {
   display: flex;
   gap: 14px;
@@ -30,7 +29,7 @@
 
 .header-text {
   flex: 1 1 auto;
-  min-width: 0; /* critical so text wraps normally */
+  min-width: 0;
 }
 
 .title {
@@ -128,7 +127,6 @@
   font-size: 20px;
 }
 
-/* Hold card */
 .hold-card ion-card-title {
   font-size: 14px;
   text-transform: uppercase;
@@ -174,7 +172,6 @@
   margin-top: 12px;
 }
 
-/* Formats list layout (the important part) */
 .formats-list {
   padding-top: 6px;
   padding-bottom: 6px;
@@ -198,8 +195,6 @@
   font-weight: 600;
   font-size: 15px;
   line-height: 1.2;
-
-  /* This is the key to prevent letter-by-letter stacking */
   overflow-wrap: break-word;
   word-break: normal;
 }
@@ -293,7 +288,6 @@
   width: 100%;
 }
 
-/* On narrow screens, stack buttons instead of crushing the label */
 @media (max-width: 420px) {
   .format-actions {
     max-width: 52%;

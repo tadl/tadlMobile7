@@ -143,33 +143,9 @@
   opacity: 1;
 }
 
-.menu-row-title {
-  font-size: 1rem;
-  line-height: 1.25;
-  font-weight: 500;
-}
-
-.menu-row-label {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  min-height: 38px;
-}
-
 .menu-subnote {
-  display: block;
-  margin-top: 2px;
-  min-height: 16px;
   color: var(--ion-text-color);
   opacity: 1;
-}
-
-.menu-row-label--single {
-  justify-content: center;
-}
-
-.menu-row-label--double {
-  justify-content: flex-start;
 }
 
 .home-account-login {

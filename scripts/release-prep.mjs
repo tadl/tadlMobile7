@@ -185,6 +185,20 @@ function updateGlobalsVersion(versionName, updateDate, buildNum) {
   console.log('[release-prep] Patched globals app_version/update_version/build_num.');
 }
 
+function readCurrentGlobalsMeta() {
+  const globalsPath = resolve('src/app/globals.ts');
+  if (!existsSync(globalsPath)) {
+    fail('src/app/globals.ts not found.');
+  }
+
+  const globals = readText(globalsPath);
+  const version = globals.match(/public app_version: string = '([^']*)';/)?.[1] ?? '';
+  const updateVersion = globals.match(/public update_version: string = '([^']*)';/)?.[1] ?? '';
+  const buildNum = globals.match(/public build_num: string = '([^']*)';/)?.[1] ?? '';
+
+  return { version, updateVersion, buildNum };
+}
+
 function defaultUpdateDate() {
   const d = new Date();
   const yyyy = d.getFullYear().toString();
@@ -193,11 +207,47 @@ function defaultUpdateDate() {
   return `${yyyy}${mm}${dd}`;
 }
 
+function deriveBuildFromVersion(version) {
+  const m = /^(\d+)\.(\d+)\.(\d+)$/.exec((version ?? '').trim());
+  if (!m) {
+    fail('Invalid --version format. Expected semantic version like 7.0.35.');
+  }
+
+  const major = m[1];
+  const minor = m[2].padStart(2, '0');
+  const patch = m[3].padStart(2, '0');
+  return `${major}${minor}${patch}`;
+}
+
+function nextBuildNum(currentUpdateDate, currentBuildNum, targetUpdateDate) {
+  if (currentUpdateDate !== targetUpdateDate) return '00';
+  const n = Number(currentBuildNum);
+  if (!Number.isFinite(n) || n < 0) return '00';
+  if (n >= 99) fail('build_num would exceed 99. Pass --build-num explicitly.');
+  return String(n + 1).padStart(2, '0');
+}
+
+function printSummary(summary) {
+  console.log('\n[release-prep] Summary');
+  console.log(`[release-prep] App name: ${summary.appName}`);
+  console.log(`[release-prep] Platforms: ${summary.platforms.join(', ')}`);
+  console.log(`[release-prep] Version: ${summary.version}`);
+  console.log(`[release-prep] Build: ${summary.build}`);
+  console.log(`[release-prep] Update date: ${summary.updateDate}`);
+  console.log(`[release-prep] Daily build number: ${summary.buildNum}`);
+  console.log(`[release-prep] Globals updated: app_version=${summary.version}, update_version=${summary.updateDate}, build_num=${summary.buildNum}`);
+  console.log(`[release-prep] Web build: ${summary.webBuildRan ? 'ran' : 'skipped'}`);
+  console.log(`[release-prep] Platform dirs recreated: ${summary.recreated ? 'yes' : 'no'}`);
+  console.log(`[release-prep] Asset generation: ${summary.assetsRan ? 'ran' : 'skipped'}`);
+  console.log(`[release-prep] App IDs: ios=${IOS_APP_ID}, android=${ANDROID_APP_ID}`);
+  console.log('[release-prep] Done.');
+}
+
 function parseArgs(argv) {
   const [platformArg, ...rest] = argv;
   const platform = (platformArg ?? '').toLowerCase().trim();
-  if (platform !== 'ios' && platform !== 'android') {
-    fail('Usage: node scripts/release-prep.mjs <ios|android> --version <x.y.z> --build <number> [--recreate] [--skip-build] [--skip-assets]');
+  if (platform !== 'ios' && platform !== 'android' && platform !== 'both') {
+    fail('Usage: node scripts/release-prep.mjs <ios|android|both> --version <x.y.z> [--build <number>] [--recreate] [--skip-build] [--skip-assets]');
   }
 
   const opts = {
@@ -237,7 +287,7 @@ function parseArgs(argv) {
   }
 
   if (!opts.version) fail('Missing required --version argument (example: --version 7.0.1).');
-  if (!/^\d+$/.test(opts.build)) fail('Missing or invalid --build argument (must be numeric).');
+  if (opts.build && !/^\d+$/.test(opts.build)) fail('Invalid --build argument (must be numeric).');
   if (opts.updateDate && !/^\d{8}(\d{2})?$/.test(opts.updateDate)) {
     fail('Invalid --update-date/--update-stamp format (expected YYYYMMDD or YYYYMMDDNN, e.g. 20260302 or 2026030201).');
   }
@@ -248,50 +298,32 @@ function parseArgs(argv) {
   return opts;
 }
 
-function main() {
-  const opts = parseArgs(process.argv.slice(2));
-  const appId = opts.platform === 'ios' ? IOS_APP_ID : ANDROID_APP_ID;
-  const appName = 'TADL';
-  let updateDate = opts.updateDate || defaultUpdateDate();
-  let buildNum = opts.buildNum || '00';
-
-  if (/^\d{10}$/.test(updateDate)) {
-    buildNum = updateDate.slice(-2);
-    updateDate = updateDate.slice(0, 8);
-  }
-
+function preparePlatform(platform, opts, appName) {
+  const appId = platform === 'ios' ? IOS_APP_ID : ANDROID_APP_ID;
   const env = {
-    TADL_TARGET: opts.platform,
+    TADL_TARGET: platform,
     CAP_APP_ID: appId,
   };
 
-  console.log(`[release-prep] Platform: ${opts.platform}`);
+  console.log(`[release-prep] Platform: ${platform}`);
   console.log(`[release-prep] App ID: ${appId}`);
   console.log(`[release-prep] App Name: ${appName}`);
   console.log(`[release-prep] Version: ${opts.version}`);
   console.log(`[release-prep] Build: ${opts.build}`);
-  console.log(`[release-prep] Update date: ${updateDate}`);
-  console.log(`[release-prep] Daily build number: ${buildNum}`);
 
-  updateGlobalsVersion(opts.version, updateDate, buildNum);
-
-  if (!opts.skipBuild) {
-    run('npm', ['run', 'build']);
-  }
-
-  const platformDir = resolve(opts.platform);
+  const platformDir = resolve(platform);
   if (opts.recreate && existsSync(platformDir)) {
-    console.log(`[release-prep] Removing ./${opts.platform} for clean re-add...`);
+    console.log(`[release-prep] Removing ./${platform} for clean re-add...`);
     rmSync(platformDir, { recursive: true, force: true });
   }
 
   if (!existsSync(platformDir)) {
-    run('npx', ['cap', 'add', opts.platform], env);
+    run('npx', ['cap', 'add', platform], env);
   }
 
-  run('npx', ['cap', 'sync', opts.platform], env);
+  run('npx', ['cap', 'sync', platform], env);
 
-  if (opts.platform === 'ios') {
+  if (platform === 'ios') {
     updateIosProject(opts.version, opts.build, appId);
     updateIosInfoPlistDisplayName(appName);
   } else {
@@ -300,15 +332,78 @@ function main() {
   }
 
   if (!opts.skipAssets && existsSync(resolve('resources'))) {
-    const ok = runAllowFail('npx', ['capacitor-assets', 'generate', `--${opts.platform}`]);
+    const ok = runAllowFail('npx', ['capacitor-assets', 'generate', `--${platform}`]);
     if (!ok) {
       fail(
         `Asset generation failed. Install with "npm i -D @capacitor/assets" and rerun (or pass --skip-assets).`,
       );
     }
   }
+}
 
-  console.log('[release-prep] Done.');
+function main() {
+  const opts = parseArgs(process.argv.slice(2));
+  const appName = 'TADL';
+  const currentGlobals = readCurrentGlobalsMeta();
+  const versionWasDerived = !opts.build;
+  const updateDateWasDerived = !opts.updateDate;
+  const buildNumWasDerived = !opts.buildNum;
+  let updateDate = opts.updateDate || defaultUpdateDate();
+  let buildNum = opts.buildNum || '';
+
+  if (/^\d{10}$/.test(updateDate)) {
+    buildNum = updateDate.slice(-2);
+    updateDate = updateDate.slice(0, 8);
+  }
+
+  opts.build = opts.build || deriveBuildFromVersion(opts.version);
+  buildNum = buildNum || nextBuildNum(currentGlobals.updateVersion, currentGlobals.buildNum, updateDate);
+
+  console.log(`[release-prep] Version: ${opts.version}`);
+  console.log(`[release-prep] Build: ${opts.build}`);
+  console.log(`[release-prep] Update date: ${updateDate}`);
+  console.log(`[release-prep] Daily build number: ${buildNum}`);
+  if (versionWasDerived) {
+    console.log('[release-prep] Build was derived from the semantic version.');
+  }
+  if (updateDateWasDerived) {
+    console.log('[release-prep] Update date defaulted to today.');
+  }
+  if (buildNumWasDerived) {
+    if (currentGlobals.updateVersion === updateDate) {
+      console.log(`[release-prep] Daily build number incremented from existing globals value ${currentGlobals.buildNum}.`);
+    } else {
+      console.log('[release-prep] Daily build number reset to 00 for a new update date.');
+    }
+  }
+
+  updateGlobalsVersion(opts.version, updateDate, buildNum);
+
+  const platforms = opts.platform === 'both' ? ['ios', 'android'] : [opts.platform];
+  const assetsRan = !opts.skipAssets && existsSync(resolve('resources'));
+
+  if (!opts.skipBuild) {
+    run('npm', ['run', 'build']);
+  }
+
+  if (opts.platform === 'both') {
+    preparePlatform('ios', opts, appName);
+    preparePlatform('android', opts, appName);
+  } else {
+    preparePlatform(opts.platform, opts, appName);
+  }
+
+  printSummary({
+    appName,
+    platforms,
+    version: opts.version,
+    build: opts.build,
+    updateDate,
+    buildNum,
+    webBuildRan: !opts.skipBuild,
+    recreated: opts.recreate,
+    assetsRan,
+  });
 }
 
 main();

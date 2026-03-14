@@ -70,15 +70,15 @@
       </div>
 
       <ng-container *ngIf="upcomingClosureRows(location) as upcomingRows">
-        <ion-card class="exceptions-card" *ngIf="upcomingRows.length">
+        <ion-card class="hours-card exceptions-card" *ngIf="upcomingRows.length">
           <ion-card-header>
             <div class="exceptions-subtitle">Upcoming closures</div>
           </ion-card-header>
           <ion-card-content>
-            <div class="exceptions-list">
-              <div class="exception-row" *ngFor="let row of upcomingRows">
-                <div class="exception-date">{{ row.dateLabel }}</div>
-                <div class="exception-text">
+            <div class="hours-grid">
+              <div class="hours-row exception-row" *ngFor="let row of upcomingRows">
+                <div class="day">{{ row.dateLabel }}</div>
+                <div class="hours">
                   Closed<span *ngIf="row.reason"> • {{ row.reason }}</span>
                 </div>
               </div>

@@ -140,3 +140,31 @@ ion-popover.search-select-popover ion-label {
   overflow: visible;
   text-overflow: unset;
 }
+
+/* Shared list-row label treatment used on Home and Account. */
+.menu-row-title {
+  font-size: 1rem;
+  line-height: 1.25;
+  font-weight: 500;
+}
+
+.menu-row-label {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.menu-row-label--single {
+  justify-content: center;
+}
+
+.menu-row-label--double {
+  justify-content: flex-start;
+  min-height: 38px;
+}
+
+.menu-subnote {
+  display: block;
+  margin-top: 2px;
+  min-height: 16px;
+}

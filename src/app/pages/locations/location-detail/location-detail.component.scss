@@ -1,6 +1,23 @@
 :host {
   --hours-grid-text-color: #111111;
   --hours-subtitle-color: #555555;
+  --surface-bg: linear-gradient(
+    160deg,
+    rgba(var(--ion-text-color-rgb), 0.07),
+    rgba(var(--ion-text-color-rgb), 0.035)
+  );
+  --surface-border: rgba(var(--ion-text-color-rgb), 0.08);
+  --details-bg: linear-gradient(
+    160deg,
+    rgba(var(--ion-text-color-rgb), 0.08),
+    rgba(var(--ion-text-color-rgb), 0.04)
+  );
+  --hero-shadow: 0 10px 26px rgba(0, 0, 0, 0.18);
+  --today-pill-bg: rgba(var(--ion-color-primary-rgb), 0.18);
+  --today-pill-ex-bg: rgba(var(--ion-color-danger-rgb), 0.18);
+  --today-pill-ex-color: var(--ion-color-danger, #b42318);
+  --hours-row-bg: rgba(var(--ion-text-color-rgb), 0.06);
+  --hours-row-today-bg: rgba(var(--ion-color-primary-rgb), 0.18);
 }
 
 .hero-wrap {
@@ -13,7 +30,7 @@
   border-radius: 16px;
   max-height: 250px;
   object-fit: cover;
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--hero-shadow);
 }
 
 .content {
@@ -26,12 +43,8 @@
 .details-card {
   border-radius: 14px;
   padding: 14px;
-  background: linear-gradient(
-    160deg,
-    rgba(var(--ion-text-color-rgb), 0.08),
-    rgba(var(--ion-text-color-rgb), 0.04)
-  );
-  border: 1px solid rgba(var(--ion-text-color-rgb), 0.08);
+  background: var(--details-bg);
+  border: 1px solid var(--surface-border);
 }
 
 .title {
@@ -46,7 +59,7 @@
   margin: 12px 0 0 0;
   padding: 6px 10px;
   border-radius: 999px;
-  background: rgba(var(--ion-color-primary-rgb), 0.18);
+  background: var(--today-pill-bg);
   color: var(--ion-text-color);
   font-size: 14px;
   font-weight: 600;
@@ -54,8 +67,8 @@
 }
 
 .today-pill.today-pill-exception {
-  background: rgba(var(--ion-color-danger-rgb), 0.18);
-  color: var(--ion-color-danger, #b42318);
+  background: var(--today-pill-ex-bg);
+  color: var(--today-pill-ex-color);
 }
 
 .contact {
@@ -130,26 +143,11 @@
 .hours-card {
   margin: 0;
   border-radius: 14px;
-  border: 1px solid rgba(var(--ion-text-color-rgb), 0.08);
-  background: linear-gradient(
-    160deg,
-    rgba(var(--ion-text-color-rgb), 0.07),
-    rgba(var(--ion-text-color-rgb), 0.035)
-  );
+  border: 1px solid var(--surface-border);
+  background: var(--surface-bg);
 }
 
-.exceptions-card {
-  margin: 0;
-  border-radius: 14px;
-  border: 1px solid rgba(var(--ion-text-color-rgb), 0.08);
-  background: linear-gradient(
-    160deg,
-    rgba(var(--ion-text-color-rgb), 0.07),
-    rgba(var(--ion-text-color-rgb), 0.035)
-  );
-}
-
-.exceptions-card ion-card-header {
+.hours-card ion-card-header {
   padding-bottom: 8px;
 }
 
@@ -162,42 +160,8 @@
   letter-spacing: 0.08em;
 }
 
-.exceptions-card ion-card-content {
+.hours-card ion-card-content {
   padding-top: 4px;
-}
-
-.exceptions-list {
-  display: grid;
-  gap: 8px;
-}
-
-.exception-row {
-  min-height: 44px;
-  padding: 10px 12px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  border-radius: 10px;
-  background: rgba(var(--ion-text-color-rgb), 0.06);
-}
-
-.exception-date {
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 1.2;
-  white-space: nowrap;
-}
-
-.exception-text {
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.25;
-  text-align: right;
-}
-
-.hours-card ion-card-header {
-  padding-bottom: 8px;
 }
 
 .hours-subtitle {
@@ -207,10 +171,6 @@
   color: var(--hours-subtitle-color);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-}
-
-.hours-card ion-card-content {
-  padding-top: 4px;
 }
 
 .hours-grid {
@@ -225,7 +185,7 @@
   justify-content: space-between;
   align-items: center;
   border-radius: 11px;
-  background: rgba(var(--ion-text-color-rgb), 0.06);
+  background: var(--hours-row-bg);
 
   .day {
     color: var(--hours-grid-text-color);
@@ -248,7 +208,7 @@
   }
 
   &.today {
-    background: rgba(var(--ion-color-primary-rgb), 0.18);
+    background: var(--hours-row-today-bg);
 
     .day,
     .hours {
@@ -260,62 +220,19 @@
 :host-context(.ion-palette-dark) {
   --hours-grid-text-color: var(--ion-text-color);
   --hours-subtitle-color: rgba(255, 255, 255, 0.78);
-
-  .hero {
-    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.35);
-  }
-
-  .details-card {
-    background: linear-gradient(
-      160deg,
-      rgba(255, 255, 255, 0.06),
-      rgba(255, 255, 255, 0.03)
-    );
-    border-color: rgba(255, 255, 255, 0.08);
-  }
-
-  .today-pill {
-    background: rgba(var(--ion-color-primary-rgb), 0.24);
-  }
-
-  .today-pill.today-pill-exception {
-    background: rgba(var(--ion-color-danger-rgb), 0.28);
-    color: var(--ion-color-danger, #ff6b6b);
-  }
-
-  .hours-card {
-    background: linear-gradient(
-      160deg,
-      rgba(255, 255, 255, 0.06),
-      rgba(255, 255, 255, 0.03)
-    );
-    border-color: rgba(255, 255, 255, 0.08);
-  }
-
-  .hours-row {
-    background: rgba(255, 255, 255, 0.05);
-
-    .day {
-      color: var(--hours-grid-text-color);
-    }
-
-    &.today {
-      background: rgba(var(--ion-color-primary-rgb), 0.22);
-    }
-  }
-
-  .exceptions-card {
-    background: linear-gradient(
-      160deg,
-      rgba(255, 255, 255, 0.06),
-      rgba(255, 255, 255, 0.03)
-    );
-    border-color: rgba(255, 255, 255, 0.08);
-  }
-
-  .exception-row {
-    background: rgba(255, 255, 255, 0.05);
-  }
+  --surface-bg: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.06),
+    rgba(255, 255, 255, 0.03)
+  );
+  --details-bg: var(--surface-bg);
+  --surface-border: rgba(255, 255, 255, 0.08);
+  --hero-shadow: 0 10px 26px rgba(0, 0, 0, 0.35);
+  --today-pill-bg: rgba(var(--ion-color-primary-rgb), 0.24);
+  --today-pill-ex-bg: rgba(var(--ion-color-danger-rgb), 0.28);
+  --today-pill-ex-color: var(--ion-color-danger, #ff6b6b);
+  --hours-row-bg: rgba(255, 255, 255, 0.05);
+  --hours-row-today-bg: rgba(var(--ion-color-primary-rgb), 0.22);
 }
 
 .loading-overlay {

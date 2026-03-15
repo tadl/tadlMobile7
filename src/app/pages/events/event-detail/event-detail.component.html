@@ -97,7 +97,7 @@
         </div>
 
         <div class="desc" *ngIf="descriptionHtml; else noDesc">
-          <div [innerHTML]="descriptionHtml"></div>
+          <div [innerHTML]="descriptionHtml" (click)="handleBodyLinkClick($event)"></div>
         </div>
 
         <ng-template #noDesc>

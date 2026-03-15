@@ -19,6 +19,7 @@ import { Subscription, isObservable, lastValueFrom } from 'rxjs';
 
 import { EventsService } from '../../../services/events.service';
 import { Globals } from '../../../globals';
+import { DiscoveryLinkRouterService } from '../../../services/discovery-link-router.service';
 
 type EventLike = {
   id?: string | number;
@@ -99,6 +100,7 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
     private modalController: ModalController,
     private globals: Globals,
     private sanitizer: DomSanitizer,
+    private discoveryLinks: DiscoveryLinkRouterService,
   ) {}
 
   ngOnInit(): void {
@@ -139,7 +141,38 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
 
   async openExternalUrl() {
     if (!this.externalUrl) return;
-    await this.globals.open_page(this.externalUrl);
+    await this.openLink(this.externalUrl);
+  }
+
+  async openLink(url?: string) {
+    const resolved = this.resolveLinkUrl(url);
+    if (!resolved) return;
+
+    const isDiscovery = this.discoveryLinks.isDiscoveryUrl(resolved);
+    if (isDiscovery && this.globals.link_mode === 'app') {
+      await this.dismiss();
+    }
+
+    const handled = await this.discoveryLinks.routeIfHandled(resolved, {
+      openExternalWhenBrowserMode: true,
+      openExternalForUnmatchedPath: true,
+    });
+    if (handled) return;
+
+    await this.globals.open_external_page(resolved);
+  }
+
+  async handleBodyLinkClick(ev: Event) {
+    const target = ev?.target as HTMLElement | null;
+    const link = target?.closest?.('a[href]') as HTMLAnchorElement | null;
+    if (!link) return;
+
+    const href = (link.getAttribute('href') ?? '').toString().trim();
+    if (!href) return;
+
+    ev.preventDefault();
+    ev.stopPropagation();
+    await this.openLink(href);
   }
 
   get title(): string {
@@ -396,6 +429,18 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
       .trim();
 
     return normalized;
+  }
+
+  private resolveLinkUrl(url?: string): string {
+    const raw = (url ?? '').toString().trim();
+    if (!raw) return '';
+
+    try {
+      const base = this.externalUrl || this.globals.aspen_discovery_base;
+      return new URL(raw, base).toString();
+    } catch {
+      return raw;
+    }
   }
 
   private isUnsafeHref(href: string): boolean {

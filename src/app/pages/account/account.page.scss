@@ -24,7 +24,7 @@
 .login-card {
   margin: 0 12px 6px;
   padding: 10px;
-  border-radius: 12px;
+  border-radius: 8px;
   border: 1px solid rgba(var(--ion-text-color-rgb), 0.12);
   background: rgba(var(--ion-text-color-rgb), 0.04);
 }
@@ -47,7 +47,7 @@
 
 .login-input {
   --background: #e7ebf1;
-  --border-radius: 10px;
+  --border-radius: 8px;
   --border-width: 1.5px;
   --border-color: rgba(var(--ion-color-medium-rgb), 0.9);
   --padding-start: 12px;
@@ -102,7 +102,7 @@
 .logged-in-header {
   margin: 12px 12px 8px 12px;
   padding: 12px 14px;
-  border-radius: 12px;
+  border-radius: 8px;
   border: 1px solid rgba(var(--ion-text-color-rgb), 0.14);
   background-image:
     linear-gradient(

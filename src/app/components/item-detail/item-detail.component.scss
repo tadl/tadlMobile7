@@ -23,7 +23,7 @@
 .cover img {
   width: clamp(112px, 32vw, 148px);
   height: auto;
-  border-radius: 10px;
+  border-radius: 8px;
   display: block;
 }
 
@@ -118,7 +118,7 @@
   --padding-end: 10px;
   min-width: 44px;
   min-height: 44px;
-  border-radius: 10px;
+  border-radius: 8px;
   background: rgba(var(--ion-text-color-rgb), 0.08);
   margin: 0;
 }
@@ -147,7 +147,7 @@
 .hold-entry {
   padding: 8px 10px;
   border: 1px solid rgba(var(--ion-text-color-rgb), 0.12);
-  border-radius: 10px;
+  border-radius: 8px;
 }
 
 .hold-entry-format {

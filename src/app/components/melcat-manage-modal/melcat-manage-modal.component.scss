@@ -10,7 +10,7 @@
 
 .melcat-card {
   background: var(--ion-item-background, var(--ion-background-color, #fff));
-  border-radius: 16px;
+  border-radius: 8px;
   border: 1px solid rgba(var(--ion-color-primary-rgb), 0.18);
   box-shadow:
     0 10px 24px rgba(0, 0, 0, 0.08),
@@ -50,7 +50,7 @@ p {
 .record-info {
   background: rgba(var(--ion-text-color-rgb), 0.04);
   border: 1px solid rgba(var(--ion-text-color-rgb), 0.12);
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 10px;
   display: flex;
   flex-direction: column;
@@ -70,7 +70,7 @@ p {
 .melcat-login-tip {
   background: rgba(var(--ion-color-primary-rgb), 0.08);
   border: 1px solid rgba(var(--ion-color-primary-rgb), 0.22);
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 10px;
   display: flex;
   flex-direction: column;
@@ -102,7 +102,7 @@ p {
 
 .melcat-card > ion-button {
   margin-top: 4px;
-  --border-radius: 12px;
+  --border-radius: 8px;
   min-height: 44px;
   font-weight: 700;
 }

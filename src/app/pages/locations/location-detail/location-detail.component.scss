@@ -27,7 +27,7 @@
 .hero {
   width: 100%;
   display: block;
-  border-radius: 16px;
+  border-radius: 8px;
   max-height: 250px;
   object-fit: cover;
   box-shadow: var(--hero-shadow);
@@ -41,7 +41,7 @@
 }
 
 .details-card {
-  border-radius: 14px;
+  border-radius: 8px;
   padding: 14px;
   background: var(--details-bg);
   border: 1px solid var(--surface-border);
@@ -105,7 +105,7 @@
     margin: 0;
     --padding-start: 10px;
     --padding-end: 10px;
-    --border-radius: 10px;
+    --border-radius: 8px;
     --border-color: rgba(var(--ion-color-primary-rgb), 0.65);
     font-size: 13px;
     letter-spacing: 0.01em;
@@ -121,7 +121,7 @@
     flex: 0 0 auto;
     --padding-start: 12px;
     --padding-end: 12px;
-    --border-radius: 10px;
+    --border-radius: 8px;
   }
 }
 
@@ -142,7 +142,7 @@
 
 .hours-card {
   margin: 0;
-  border-radius: 14px;
+  border-radius: 8px;
   border: 1px solid var(--surface-border);
   background: var(--surface-bg);
 }
@@ -184,7 +184,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-radius: 11px;
+  border-radius: 8px;
   background: var(--hours-row-bg);
 
   .day {

@@ -38,7 +38,7 @@
 
 .melcat-placeholder-thumb {
   --size: 56px;
-  border-radius: 10px;
+  border-radius: 8px;
   overflow: hidden;
   background: #fff;
   border: 1px solid rgba(0, 0, 0, 0.08);
@@ -57,7 +57,7 @@
   --padding-end: 10px;
   min-width: 44px;
   min-height: 44px;
-  border-radius: 10px;
+  border-radius: 8px;
   background: rgba(var(--ion-text-color-rgb), 0.08);
   margin: 0;
 }
@@ -83,7 +83,7 @@
   --padding-end: 10px;
   min-width: 44px;
   min-height: 44px;
-  border-radius: 10px;
+  border-radius: 8px;
   background: rgba(var(--ion-text-color-rgb), 0.08);
 }
 

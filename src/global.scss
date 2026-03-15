@@ -36,6 +36,13 @@
 @import "@ionic/angular/css/palettes/dark.class.css";
 /* @import "@ionic/angular/css/palettes/dark.system.css"; */
 
+:root {
+  --app-radius-sm: 8px;
+  --app-radius-md: 8px;
+  --app-radius-lg: 8px;
+  --app-radius-xl: 8px;
+}
+
 /* Centered “full page” spinner container */
 .page-spinner {
   display: flex;
@@ -77,6 +84,15 @@ ion-content.ion-padding {
 /* Reduce default card margins across pages (Ionic default is visually wide). */
 ion-card {
   margin-inline: 6px;
+  border-radius: var(--app-radius-lg);
+}
+
+ion-button {
+  --border-radius: var(--app-radius-md);
+}
+
+ion-searchbar {
+  --border-radius: var(--app-radius-xl);
 }
 
 /* Force muted/secondary text to black in light mode for maximum readability. */

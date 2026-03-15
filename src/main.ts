@@ -56,6 +56,7 @@ import {
   helpCircleOutline,
   bookOutline,
   discOutline,
+  videocam,
   videocamOutline,
   copyOutline,
 } from 'ionicons/icons';
@@ -73,6 +74,7 @@ addIcons({
   megaphone,
   star,
   search,
+  videocam,
   'chevron-forward': chevronForward,
   'calendar-outline': calendarOutline,
   'open-outline': openOutline,

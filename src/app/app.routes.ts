@@ -40,6 +40,10 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/featured/featured.page').then(m => m.FeaturedPage),
   },
   {
+    path: 'webcams',
+    loadComponent: () => import('./pages/webcams/webcams.page').then(m => m.WebcamsPage),
+  },
+  {
     path: 'about',
     loadComponent: () => import('./pages/about/about.page').then(m => m.AboutPage),
   },

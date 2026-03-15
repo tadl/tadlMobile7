@@ -1,0 +1,48 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/home"></ion-back-button>
+    </ion-buttons>
+
+    <ion-title>Webcams</ion-title>
+
+    <ion-buttons slot="end">
+      <ion-menu-button menu="main"></ion-menu-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  <ion-refresher slot="fixed" (ionRefresh)="refresh($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  <div class="webcams-shell">
+    <ion-card class="webcams-intro">
+      <ion-card-header>
+        <ion-card-title>Live from TADL</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        Enjoy a selection of live camera feeds from TADL.
+      </ion-card-content>
+    </ion-card>
+
+    <ion-card *ngIf="loading && !webcams.length" class="webcams-state-card">
+      <ion-card-content>Loading webcams...</ion-card-content>
+    </ion-card>
+
+    <ion-list *ngIf="webcams.length" class="webcams-list">
+      <ion-item button detail="true" *ngFor="let cam of webcams" (click)="openWebcam(cam)">
+        <ion-icon slot="start" name="videocam-outline" class="webcam-list-icon"></ion-icon>
+        <ion-label>
+          <h2>{{ cam.title }}</h2>
+          <p *ngIf="cam.subtitle">{{ cam.subtitle }}</p>
+        </ion-label>
+      </ion-item>
+    </ion-list>
+
+    <ion-card *ngIf="!loading && !webcams.length" class="webcams-state-card">
+      <ion-card-content>No webcams are available right now.</ion-card-content>
+    </ion-card>
+  </div>
+</ion-content>

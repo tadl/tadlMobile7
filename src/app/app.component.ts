@@ -42,6 +42,7 @@ export class AppComponent implements OnInit {
     { title: 'Events', url: '/events', icon: 'calendar' },
     { title: 'Newsletter', url: '/news', icon: 'megaphone' },
     { title: 'Featured Items', url: '/featured', icon: 'star' },
+    { title: 'Webcams', url: '/webcams', icon: 'videocam' },
     { title: 'About', url: '/about', icon: 'information-circle' },
   ];
 

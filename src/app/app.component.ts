@@ -40,7 +40,7 @@ export class AppComponent implements OnInit {
     { title: 'Search', url: '/search', icon: 'search' },
     { title: 'Locations', url: '/locations', icon: 'compass' },
     { title: 'Events', url: '/events', icon: 'calendar' },
-    { title: 'News', url: '/news', icon: 'megaphone' },
+    { title: 'Newsletter', url: '/news', icon: 'megaphone' },
     { title: 'Featured Items', url: '/featured', icon: 'star' },
     { title: 'About', url: '/about', icon: 'information-circle' },
   ];

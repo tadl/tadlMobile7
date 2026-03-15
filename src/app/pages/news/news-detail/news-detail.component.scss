@@ -1,5 +1,28 @@
+:host {
+  ion-header,
+  ion-toolbar {
+    --min-height: 44px;
+    --padding-top: 0;
+    --padding-bottom: 0;
+    min-height: 44px;
+  }
+
+  ion-title {
+    padding-inline: 16px;
+    font-size: 17px;
+    line-height: 44px;
+  }
+
+  ion-button {
+    min-height: 44px;
+    height: 44px;
+    margin: 0;
+  }
+}
+
 .news-card {
   overflow: hidden;
+  color: var(--ion-color-step-900, var(--ion-text-color));
 }
 
 .hero {
@@ -19,7 +42,7 @@
   margin-top: 8px;
   font-size: 15px;
   line-height: 1.25;
-  opacity: 0.8;
+  opacity: 0.88;
 }
 
 .news-body {
@@ -79,4 +102,16 @@
 
 ion-button {
   margin: 16px;
+}
+
+.browser-link-wrap {
+  padding: 16px 16px 24px 16px;
+}
+
+.browser-link-button {
+  margin: 0;
+}
+
+:host-context(.ion-palette-dark) .news-card {
+  color: var(--ion-text-color);
 }

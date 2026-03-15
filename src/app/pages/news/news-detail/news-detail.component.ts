@@ -1,8 +1,10 @@
 import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { SecurityContext } from '@angular/core';
 import { IonicModule, ModalController } from '@ionic/angular';
+import { DomSanitizer } from '@angular/platform-browser';
 import { Globals } from '../../../globals';
-import { MobilePost } from '../../../services/news.service';
+import { NewsletterItem } from '../../../services/news.service';
 import { DiscoveryLinkRouterService } from '../../../services/discovery-link-router.service';
 
 @Component({
@@ -13,14 +15,17 @@ import { DiscoveryLinkRouterService } from '../../../services/discovery-link-rou
   imports: [CommonModule, IonicModule],
 })
 export class NewsDetailComponent {
-  @Input() news?: MobilePost;
+  @Input() news?: NewsletterItem;
 
   readonly placeholderImage = 'assets/location-placeholder.png';
+  private htmlContentCacheRaw: string | null = null;
+  private htmlContentCacheValue = '';
 
   constructor(
     public globals: Globals,
     private modalController: ModalController,
     private discoveryLinks: DiscoveryLinkRouterService,
+    private sanitizer: DomSanitizer,
   ) {}
 
   close() {
@@ -60,29 +65,43 @@ export class NewsDetailComponent {
   }
 
   titleFor(): string {
-    return (this.news?.title?.rendered ?? '').toString();
+    return (this.news?.title ?? '').toString();
   }
 
   dateFor(): string {
-    const raw = (this.news?.date ?? '').toString();
+    const raw = (this.news?.published_at ?? '').toString();
     if (!raw) return '';
     const d = new Date(raw);
     if (Number.isNaN(d.getTime())) return raw;
-    return d.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    return d.toLocaleString(undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
   }
 
   heroImage(): string | null {
-    const thumb = (this.news?.featured_image_urls?.thumbnail ?? '').toString().trim();
+    const thumb = (this.news?.image ?? '').toString().trim();
     return thumb || null;
   }
 
+  shouldShowHero(): boolean {
+    return !!this.heroImage() && !this.renderedHtmlContainsImage();
+  }
+
   postUrl(): string | null {
-    const u = (this.news?.post_url ?? '').toString().trim();
+    const u = (this.news?.url ?? '').toString().trim();
     return u || null;
   }
 
   htmlContent(): string {
-    return (this.news?.content?.rendered ?? '').toString();
+    const raw = (this.news?.html ?? '').toString();
+    if (raw === this.htmlContentCacheRaw) return this.htmlContentCacheValue;
+
+    this.htmlContentCacheRaw = raw;
+    this.htmlContentCacheValue = this.buildHtmlContent(raw);
+    return this.htmlContentCacheValue;
   }
 
   private resolveLinkUrl(url?: string): string {
@@ -95,5 +114,29 @@ export class NewsDetailComponent {
     } catch {
       return raw;
     }
+  }
+
+  private buildHtmlContent(raw: string): string {
+    if (!raw) return '';
+
+    const sanitized =
+      this.sanitizer.sanitize(SecurityContext.HTML, raw)?.trim() ?? '';
+    if (!sanitized) return '';
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(sanitized, 'text/html');
+    const body = doc.body;
+    if (!body) return '';
+
+    return body.innerHTML.trim();
+  }
+
+  private renderedHtmlContainsImage(): boolean {
+    const rendered = this.htmlContent();
+    if (!rendered) return false;
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(rendered, 'text/html');
+    return !!doc.body?.querySelector('img');
   }
 }

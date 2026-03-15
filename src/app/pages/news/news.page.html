@@ -4,7 +4,7 @@
       <ion-back-button defaultHref="/home"></ion-back-button>
     </ion-buttons>
 
-    <ion-title>News</ion-title>
+    <ion-title>Newsletter</ion-title>
 
     <ion-buttons slot="end">
       <ion-menu-button menu="main"></ion-menu-button>
@@ -18,7 +18,7 @@
   </ion-refresher>
 
   <ion-list>
-    <ion-item button detail="true" *ngFor="let n of news" (click)="view_details(n)">
+    <ion-item button detail="true" *ngFor="let n of newsletters" (click)="view_details(n)">
       <ion-thumbnail slot="start">
         <ion-img
           [src]="thumbFor(n)"
@@ -30,12 +30,13 @@
       <ion-label>
         <h2 [innerText]="titleFor(n)"></h2>
         <p class="muted" *ngIf="dateFor(n)">{{ dateFor(n) }}</p>
+        <p class="muted" *ngIf="excerptFor(n)">{{ excerptFor(n) }}</p>
       </ion-label>
     </ion-item>
   </ion-list>
 
-  <ion-item *ngIf="!globals.api_loading && news.length === 0">
-    <ion-label>No posts found.</ion-label>
+  <ion-item *ngIf="!globals.api_loading && newsletters.length === 0">
+    <ion-label>No newsletters found.</ion-label>
   </ion-item>
 
 </ion-content>

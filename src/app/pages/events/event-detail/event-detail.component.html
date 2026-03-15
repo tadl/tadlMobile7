@@ -50,6 +50,14 @@
       </ion-card-header>
 
       <ion-card-content>
+        <div class="cancelled-banner" *ngIf="isCancelled">
+          <ion-icon name="close-circle-outline" aria-hidden="true"></ion-icon>
+          <div class="cancelled-copy">
+            <div class="cancelled-title">This event has been cancelled</div>
+            <div class="cancelled-text">Please check the event page for any updates or rescheduling details.</div>
+          </div>
+        </div>
+
         <div class="details">
           <div class="when-card" *ngIf="startsAtDate; else noWhen">
             <ion-icon name="calendar-outline" aria-hidden="true"></ion-icon>

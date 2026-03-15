@@ -24,6 +24,43 @@
   margin: 8px 0 20px 0;
 }
 
+.cancelled-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 4px 0 18px 0;
+  padding: 14px 15px;
+  border-radius: 14px;
+  background: rgba(var(--ion-text-color-rgb), 0.05);
+  border: 1px solid rgba(var(--ion-color-danger-rgb), 0.32);
+  color: var(--ion-color-step-950, var(--ion-text-color));
+
+  ion-icon {
+    font-size: 22px;
+    flex: 0 0 auto;
+    margin-top: 1px;
+    color: var(--ion-color-danger, #b42318);
+  }
+}
+
+.cancelled-copy {
+  min-width: 0;
+}
+
+.cancelled-title {
+  font-size: 18px;
+  line-height: 1.25;
+  font-weight: 700;
+  color: var(--ion-color-danger, #b42318);
+}
+
+.cancelled-text {
+  margin-top: 4px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ion-color-step-850, var(--ion-text-color));
+}
+
 .when-card {
   display: flex;
   align-items: center;
@@ -178,6 +215,20 @@
 
 :host-context(.ion-palette-dark) .when-card {
   background: rgba(255, 255, 255, 0.08);
+}
+
+:host-context(.ion-palette-dark) .cancelled-banner {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(var(--ion-color-danger-rgb), 0.4);
+}
+
+:host-context(.ion-palette-dark) .cancelled-title,
+:host-context(.ion-palette-dark) .cancelled-banner ion-icon {
+  color: #ff8a8a;
+}
+
+:host-context(.ion-palette-dark) .cancelled-text {
+  color: rgba(255, 255, 255, 0.9);
 }
 
 :host-context(.ion-palette-dark) ::ng-deep .desc {

@@ -49,7 +49,10 @@
 
       <ion-label>
         <h2>{{ ev.title }}</h2>
-        <p>{{ ev.start_date | date: 'EEE, MMM d, y · h:mm a' }}</p>
+        <p *ngIf="!isCancelled(ev); else cancelledLine">{{ ev.start_date | date: 'EEE, MMM d, y · h:mm a' }}</p>
+        <ng-template #cancelledLine>
+          <p class="event-cancelled">Cancelled</p>
+        </ng-template>
         <p>{{ ev.location }}</p>
       </ion-label>
     </ion-item>

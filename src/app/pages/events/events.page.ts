@@ -72,6 +72,10 @@ export class EventsPage implements OnInit, OnDestroy {
     return (ev.title || 'Event').toString();
   }
 
+  isCancelled(ev: MobileEvent): boolean {
+    return (ev?.moderation_state ?? '').toString().trim().toLowerCase() === 'cancelled';
+  }
+
   venueLabel(v: VenueOption): string {
     const code = (v as any)?.code?.toString?.() ?? '';
     if (code === 'all') return 'All Locations';

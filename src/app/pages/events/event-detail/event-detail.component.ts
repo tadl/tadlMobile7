@@ -33,6 +33,7 @@ type EventLike = {
   registration_type?: string | null;
   registration_start?: string | null;
   registration_end?: string | null;
+  moderation_state?: string | null;
   timezone?: string | null;
 
   // Other common shapes
@@ -215,7 +216,12 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   get registrationRequired(): boolean {
+    if (this.isCancelled) return false;
     return this.event?.['registration_enabled'] === true;
+  }
+
+  get isCancelled(): boolean {
+    return (this.event?.['moderation_state'] ?? '').toString().trim().toLowerCase() === 'cancelled';
   }
 
   get registrationStartsAtDate(): Date | null {

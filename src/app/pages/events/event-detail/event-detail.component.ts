@@ -1,8 +1,10 @@
 import { CommonModule } from '@angular/common';
 import {
+  DOCUMENT,
   ChangeDetectionStrategy,
   Component,
   EventEmitter,
+  Inject,
   Input,
   OnChanges,
   OnDestroy,
@@ -12,7 +14,7 @@ import {
   SimpleChanges,
 } from '@angular/core';
 import { DomSanitizer } from '@angular/platform-browser';
-import { IonicModule } from '@ionic/angular';
+import { ActionSheetController, IonicModule } from '@ionic/angular';
 import { ModalController } from '@ionic/angular/standalone';
 import { ActivatedRoute } from '@angular/router';
 import { Subscription, isObservable, lastValueFrom } from 'rxjs';
@@ -98,9 +100,11 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
     private route: ActivatedRoute,
     private eventsService: EventsService,
     private modalController: ModalController,
+    private actionSheetController: ActionSheetController,
     private globals: Globals,
     private sanitizer: DomSanitizer,
     private discoveryLinks: DiscoveryLinkRouterService,
+    @Inject(DOCUMENT) private document: Document,
   ) {}
 
   ngOnInit(): void {
@@ -142,6 +146,34 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
   async openExternalUrl() {
     if (!this.externalUrl) return;
     await this.openLink(this.externalUrl);
+  }
+
+  async addToCalendar() {
+    if (!this.startsAtDate) return;
+
+    const actionSheet = await this.actionSheetController.create({
+      header: 'Add to calendar',
+      buttons: [
+        {
+          text: 'Google Calendar',
+          handler: () => {
+            void this.openGoogleCalendar();
+          },
+        },
+        {
+          text: 'Calendar file (.ics)',
+          handler: () => {
+            void this.shareCalendarFile();
+          },
+        },
+        {
+          text: 'Cancel',
+          role: 'cancel',
+        },
+      ],
+    });
+
+    await actionSheet.present();
   }
 
   async openLink(url?: string) {
@@ -246,6 +278,13 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
 
   get externalUrl(): string | null {
     return (this.event?.registrationUrl || this.event?.url || null) as string | null;
+  }
+
+  get calendarLocation(): string {
+    const parts = [this.location, this.displayRoom]
+      .map((value) => (value ?? '').toString().trim())
+      .filter((value) => !!value);
+    return parts.join(', ');
   }
 
   get registrationRequired(): boolean {
@@ -386,6 +425,91 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
     }).format(value);
   }
 
+  private async openGoogleCalendar(): Promise<void> {
+    const start = this.startsAtDate;
+    if (!start) return;
+
+    const end = this.calendarEndDate(start);
+    const params = new URLSearchParams({
+      action: 'TEMPLATE',
+      text: this.title,
+      details: this.calendarDetailsText(),
+      location: this.calendarLocation,
+      dates: `${this.formatDateForCalendar(start, this.event?.allDay === true)}/${this.formatDateForCalendar(end, this.event?.allDay === true)}`,
+    });
+
+    await this.globals.open_external_page(
+      `https://calendar.google.com/calendar/render?${params.toString()}`,
+    );
+  }
+
+  private async shareCalendarFile(): Promise<void> {
+    const start = this.startsAtDate;
+    if (!start) return;
+
+    const end = this.calendarEndDate(start);
+    const allDay = this.event?.allDay === true;
+    const now = new Date();
+    const lines = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//TADL Mobile//Event Calendar//EN',
+      'CALSCALE:GREGORIAN',
+      'BEGIN:VEVENT',
+      `UID:${this.calendarUid(start)}`,
+      `DTSTAMP:${this.formatDateForCalendar(now, false)}`,
+      allDay
+        ? `DTSTART;VALUE=DATE:${this.formatDateForCalendar(start, true)}`
+        : `DTSTART:${this.formatDateForCalendar(start, false)}`,
+      allDay
+        ? `DTEND;VALUE=DATE:${this.formatDateForCalendar(end, true)}`
+        : `DTEND:${this.formatDateForCalendar(end, false)}`,
+      `SUMMARY:${this.escapeIcsText(this.title)}`,
+      `DESCRIPTION:${this.escapeIcsText(this.calendarDetailsText())}`,
+      `LOCATION:${this.escapeIcsText(this.calendarLocation)}`,
+      this.externalUrl ? `URL:${this.escapeIcsText(this.externalUrl)}` : '',
+      'END:VEVENT',
+      'END:VCALENDAR',
+    ].filter((line) => !!line);
+
+    const file = new File([lines.join('\r\n')], `${this.safeFileName(this.title)}.ics`, {
+      type: 'text/calendar;charset=utf-8',
+    });
+
+    const nav = navigator as Navigator & {
+      canShare?: (data?: ShareData) => boolean;
+    };
+
+    if (nav.share && nav.canShare?.({ files: [file] })) {
+      try {
+        await nav.share({
+          title: this.title,
+          text: 'Add this event to your calendar.',
+          files: [file],
+        });
+        return;
+      } catch (error: any) {
+        const name = (error?.name ?? '').toString();
+        if (name === 'AbortError') {
+          return;
+        }
+      }
+    }
+
+    const url = URL.createObjectURL(file);
+    try {
+      const anchor = this.document.createElement('a');
+      anchor.href = url;
+      anchor.download = file.name;
+      anchor.rel = 'noopener';
+      this.document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+    } finally {
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+  }
+
   private buildDescriptionHtml(raw: string): string {
     if (!raw) return '';
 
@@ -429,6 +553,86 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
       .trim();
 
     return normalized;
+  }
+
+  private calendarEndDate(start: Date): Date {
+    const explicitEnd = this.endsAtDate;
+    if (explicitEnd && explicitEnd.getTime() > start.getTime()) {
+      return explicitEnd;
+    }
+
+    if (this.event?.allDay === true) {
+      const nextDay = new Date(start);
+      nextDay.setDate(nextDay.getDate() + 1);
+      return nextDay;
+    }
+
+    return new Date(start.getTime() + 2 * 60 * 60 * 1000);
+  }
+
+  private calendarDetailsText(): string {
+    const parts = [
+      this.descriptionPlainText(),
+      this.externalUrl ? `More details: ${this.externalUrl}` : '',
+    ].filter((value) => !!value);
+    return parts.join('\n\n');
+  }
+
+  private descriptionPlainText(): string {
+    const raw =
+      (this.event?.description ?? this.event?.summary ?? '')?.toString?.() ?? '';
+    if (!raw) return '';
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(raw, 'text/html');
+    return (doc.body.textContent ?? '')
+      .replace(/\u00a0/g, ' ')
+      .replace(/\s+\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .replace(/[ \t]{2,}/g, ' ')
+      .trim();
+  }
+
+  private formatDateForCalendar(value: Date, allDay: boolean): string {
+    if (allDay) {
+      const year = value.getFullYear();
+      const month = String(value.getMonth() + 1).padStart(2, '0');
+      const day = String(value.getDate()).padStart(2, '0');
+      return `${year}${month}${day}`;
+    }
+
+    const year = value.getUTCFullYear();
+    const month = String(value.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(value.getUTCDate()).padStart(2, '0');
+    const hours = String(value.getUTCHours()).padStart(2, '0');
+    const minutes = String(value.getUTCMinutes()).padStart(2, '0');
+    const seconds = String(value.getUTCSeconds()).padStart(2, '0');
+    return `${year}${month}${day}T${hours}${minutes}${seconds}Z`;
+  }
+
+  private escapeIcsText(value: string): string {
+    return (value ?? '')
+      .replace(/\\/g, '\\\\')
+      .replace(/\r?\n/g, '\\n')
+      .replace(/,/g, '\\,')
+      .replace(/;/g, '\\;');
+  }
+
+  private calendarUid(start: Date): string {
+    const base = (this.event?.id ?? this.event?.slug ?? this.title)
+      .toString()
+      .trim()
+      .replace(/\s+/g, '-');
+    return `${base}-${start.getTime()}@tadl.org`;
+  }
+
+  private safeFileName(value: string): string {
+    return (
+      value
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'event'
+    );
   }
 
   private resolveLinkUrl(url?: string): string {

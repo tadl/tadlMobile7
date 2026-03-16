@@ -60,11 +60,17 @@
 
         <div class="details">
           <div class="when-card" *ngIf="startsAtDate; else noWhen">
-            <ion-icon name="calendar-outline" aria-hidden="true"></ion-icon>
-            <div class="when-copy">
-              <div class="when-date">{{ startsAtDate | date : 'EEE, MMM d, y' }}</div>
-              <div class="when-time" *ngIf="!event?.allDay">{{ startsAtDate | date : 'h:mm a' }}</div>
+            <div class="when-main">
+              <ion-icon name="calendar-outline" aria-hidden="true"></ion-icon>
+              <div class="when-copy">
+                <div class="when-date">{{ startsAtDate | date : 'EEE, MMM d, y' }}</div>
+                <div class="when-time" *ngIf="!event?.allDay">{{ startsAtDate | date : 'h:mm a' }}</div>
+                <div class="when-time" *ngIf="event?.allDay">All day</div>
+              </div>
             </div>
+            <ion-button fill="outline" size="small" class="calendar-button" (click)="addToCalendar()">
+              Add to calendar
+            </ion-button>
           </div>
 
           <ng-template #noWhen>

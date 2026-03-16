@@ -64,6 +64,7 @@
 .when-card {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
   padding: 12px 14px;
   border-radius: 8px;
@@ -74,6 +75,13 @@
     font-size: 22px;
     flex: 0 0 auto;
   }
+}
+
+.when-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
 }
 
 .when-copy {
@@ -93,6 +101,12 @@
   font-size: 15px;
   line-height: 1.25;
   color: var(--ion-color-step-700, var(--ion-text-color));
+}
+
+.calendar-button {
+  flex: 0 0 auto;
+  margin: 0;
+  --border-radius: 8px;
 }
 
 .meta-list {
@@ -233,4 +247,15 @@
 
 :host-context(.ion-palette-dark) ::ng-deep .desc {
   border-top-color: rgba(255, 255, 255, 0.12);
+}
+
+@media (max-width: 420px) {
+  .when-card {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .calendar-button {
+    align-self: stretch;
+  }
 }

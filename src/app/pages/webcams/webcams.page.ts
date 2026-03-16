@@ -63,6 +63,6 @@ export class WebcamsPage implements OnInit {
   }
 
   async openWebcam(webcam: WebcamStreamViewModel) {
-    return await this.globals.open_page(webcam.youtubeUrl);
+    return await this.globals.open_external_page(webcam.youtubeUrl);
   }
 }

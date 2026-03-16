@@ -117,7 +117,7 @@ export class LocationDetailComponent {
   }
 
   openTodayLine(loc: Location): string {
-    const todayException = this.exceptionForDate(loc, this.startOfDay(new Date()));
+    const todayException = this.exceptionForDate(loc, this.globals.easternDateString());
     if (todayException) {
       const exHours = (todayException.hours ?? '').toString().trim();
       const exReason = (todayException.reason ?? '').toString().trim();
@@ -140,7 +140,7 @@ export class LocationDetailComponent {
   }
 
   hasTodayException(loc: Location): boolean {
-    return !!this.exceptionForDate(loc, this.startOfDay(new Date()));
+    return !!this.exceptionForDate(loc, this.globals.easternDateString());
   }
 
   upcomingClosureRows(loc?: Location): UpcomingClosureRow[] {
@@ -194,7 +194,9 @@ export class LocationDetailComponent {
         return d;
       default:
         // fallback to real date if globals returns something unexpected
-        const idx = new Date().getDay(); // 0 sunday
+        const idxMap = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+        const eastern = this.globals.easternWeekdayKey(new Date());
+        const idx = idxMap.indexOf(eastern);
         return ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][idx];
     }
   }
@@ -213,32 +215,28 @@ export class LocationDetailComponent {
   ): AppLocationException[] {
     if (!loc) return [];
 
-    const start = this.startOfDay(new Date());
-    start.setDate(start.getDate() + 1); // Upcoming starts tomorrow, not today.
-    const end = this.startOfDay(new Date());
-    end.setDate(end.getDate() + daysAhead);
+    const start = this.globals.easternDateStringPlusDays(1); // Upcoming starts tomorrow, not today.
+    const end = this.globals.easternDateStringPlusDays(daysAhead);
 
     const exceptions = Array.isArray(loc.exceptions) ? loc.exceptions : [];
     return exceptions
       .filter((ex) => this.isClosureException(ex))
       .filter((ex) => {
-        const dt = this.parseLocalDate(ex?.date);
-        if (!dt) return false;
-        return dt.getTime() >= start.getTime() && dt.getTime() <= end.getTime();
+        const dateKey = (ex?.date ?? '').toString().trim();
+        if (!dateKey) return false;
+        return dateKey >= start && dateKey <= end;
       })
       .sort((a, b) => {
-        const aTime = this.parseLocalDate(a?.date)?.getTime() ?? Number.MAX_SAFE_INTEGER;
-        const bTime = this.parseLocalDate(b?.date)?.getTime() ?? Number.MAX_SAFE_INTEGER;
-        return aTime - bTime;
+        const aKey = (a?.date ?? '').toString().trim() || '9999-99-99';
+        const bKey = (b?.date ?? '').toString().trim() || '9999-99-99';
+        return aKey.localeCompare(bKey);
       });
   }
 
-  private exceptionForDate(loc: Location, date: Date): AppLocationException | null {
-    const target = this.startOfDay(date).getTime();
+  private exceptionForDate(loc: Location, dateKey: string): AppLocationException | null {
     const exceptions = Array.isArray(loc.exceptions) ? loc.exceptions : [];
     for (const ex of exceptions) {
-      const dt = this.parseLocalDate(ex?.date);
-      if (dt && dt.getTime() === target) return ex;
+      if ((ex?.date ?? '').toString().trim() === dateKey) return ex;
     }
     return null;
   }

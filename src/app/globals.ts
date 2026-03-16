@@ -27,6 +27,7 @@ type LinkMode = 'app' | 'browser';
 
 @Injectable({ providedIn: 'root' })
 export class Globals {
+  public readonly app_time_zone = 'America/New_York';
   private readonly theme_pref_key = 'app:theme_mode';
   private readonly link_pref_key = 'app:link_mode';
   private theme_initialized = false;
@@ -40,9 +41,9 @@ export class Globals {
   ) {}
 
   // ---- app identity / toggles ----
-  public app_version: string = '7.0.35';
-  public update_version: string = '20260314';
-  public build_num: string = '02';
+  public app_version: string = '7.0.39';
+  public update_version: string = '20260315';
+  public build_num: string = '05';
 
   public device_info: any;
   public system_color: any = window.matchMedia('(prefers-color-scheme: dark)');
@@ -270,7 +271,59 @@ export class Globals {
   }
 
   day_today() {
-    return format(new Date(), 'EEEE'); // e.g. "Monday"
+    return this.easternWeekdayKey(new Date()).replace(/^./, (ch) => ch.toUpperCase());
+  }
+
+  easternDateString(value: Date = new Date()): string {
+    const parts = this.easternDateParts(value);
+    return `${parts.year}-${parts.month}-${parts.day}`;
+  }
+
+  easternWeekdayKey(value: Date = new Date()): string {
+    return this.easternDateParts(value).weekday;
+  }
+
+  easternDateStringPlusDays(days: number, from: Date = new Date()): string {
+    const parts = this.easternDateParts(from);
+    const baseUtc = new Date(Date.UTC(parts.yearNum, parts.monthNum - 1, parts.dayNum));
+    baseUtc.setUTCDate(baseUtc.getUTCDate() + days);
+    const year = String(baseUtc.getUTCFullYear()).padStart(4, '0');
+    const month = String(baseUtc.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(baseUtc.getUTCDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  private easternDateParts(value: Date = new Date()): {
+    year: string;
+    month: string;
+    day: string;
+    weekday: string;
+    yearNum: number;
+    monthNum: number;
+    dayNum: number;
+  } {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: this.app_time_zone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      weekday: 'long',
+    }).formatToParts(value);
+
+    const year = parts.find((part) => part.type === 'year')?.value ?? '0000';
+    const month = parts.find((part) => part.type === 'month')?.value ?? '01';
+    const day = parts.find((part) => part.type === 'day')?.value ?? '01';
+    const weekday = (parts.find((part) => part.type === 'weekday')?.value ?? 'monday').toLowerCase();
+
+    return {
+      year,
+      month,
+      day,
+      weekday,
+      yearNum: Number(year),
+      monthNum: Number(month),
+      dayNum: Number(day),
+    };
   }
 
   async open_account_menu() {

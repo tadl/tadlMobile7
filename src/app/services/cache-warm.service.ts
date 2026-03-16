@@ -9,6 +9,7 @@ import { AccountPreferences, AccountPreferencesService } from './account-prefere
 import { AppCacheService } from './app-cache.service';
 import { Globals } from '../globals';
 import { AspenUserList } from './lists.service';
+import { LocationsService } from './locations.service';
 
 @Injectable({ providedIn: 'root' })
 export class CacheWarmService {
@@ -24,6 +25,7 @@ export class CacheWarmService {
     private lists: ListsService,
     private preferences: AccountPreferencesService,
     private cache: AppCacheService,
+    private locations: LocationsService,
   ) {}
 
   warmForActiveAccount(): void {
@@ -51,6 +53,7 @@ export class CacheWarmService {
       await lastValueFrom(this.auth.refreshActiveProfile());
       await lastValueFrom(this.lists.fetchUserLists());
       await this.warmPreferencesForActiveAccount();
+      await lastValueFrom(this.locations.getLocations());
     });
   }
 

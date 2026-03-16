@@ -39,6 +39,18 @@
     </ion-card-content>
   </ion-card>
 
+  <ion-card class="closure-notice-card" *ngIf="closureNotice as notice" button (click)="goToRoute('/locations')">
+    <ion-card-content>
+      <div class="closure-notice-header">
+        <div class="closure-notice-eyebrow">Service alert</div>
+      </div>
+      <div class="closure-notice-text">{{ notice.message }}</div>
+      <div class="closure-notice-action">
+        <span>{{ notice.actionLabel }} &gt;</span>
+      </div>
+    </ion-card-content>
+  </ion-card>
+
   <ion-card class="search-card">
     <ion-card-content class="search-card-content">
       <form (ngSubmit)="submitSearch()">

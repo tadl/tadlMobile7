@@ -77,7 +77,7 @@ export class LocationsPage {
   }
 
   today_hours(loc: Location): string {
-    const todayException = this.exceptionForDate(loc, this.startOfDay(new Date()));
+    const todayException = this.exceptionForDate(loc, this.globals.easternDateString());
     if (todayException) {
       const exHours = (todayException.hours ?? '').toString().trim();
       const exReason = (todayException.reason ?? '').toString().trim();
@@ -96,6 +96,10 @@ export class LocationsPage {
     if (lower.includes('closed')) return 'Closed today';
 
     return `Open ${raw} today`;
+  }
+
+  isTodayException(loc: Location): boolean {
+    return !!this.exceptionForDate(loc, this.globals.easternDateString());
   }
 
   addressLine(loc: Location): string {
@@ -131,30 +135,12 @@ export class LocationsPage {
     this.brokenLocationImages.add(loc);
   }
 
-  private exceptionForDate(loc: Location, date: Date): AppLocationException | null {
-    const target = this.startOfDay(date).getTime();
+  private exceptionForDate(loc: Location, dateKey: string): AppLocationException | null {
     const exceptions = Array.isArray(loc?.exceptions) ? loc.exceptions : [];
     for (const ex of exceptions) {
-      const dt = this.parseLocalDate(ex?.date);
-      if (dt && dt.getTime() === target) return ex;
+      if ((ex?.date ?? '').toString().trim() === dateKey) return ex;
     }
     return null;
-  }
-
-  private parseLocalDate(value: string | undefined): Date | null {
-    const raw = (value ?? '').toString().trim();
-    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
-    if (!m) return null;
-    const y = Number(m[1]);
-    const mon = Number(m[2]);
-    const d = Number(m[3]);
-    if (!Number.isFinite(y) || !Number.isFinite(mon) || !Number.isFinite(d)) return null;
-    const parsed = new Date(y, mon - 1, d);
-    return Number.isNaN(parsed.getTime()) ? null : this.startOfDay(parsed);
-  }
-
-  private startOfDay(value: Date): Date {
-    return new Date(value.getFullYear(), value.getMonth(), value.getDate());
   }
 
   async view_details(loc: Location) {

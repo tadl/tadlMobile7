@@ -31,4 +31,36 @@
     font-size: 1rem;
     max-width: 58%;
   }
+
+  .pref-item {
+    --min-height: auto;
+  }
+
+  .pref-item--stacked {
+    --padding-top: 14px;
+    --padding-bottom: 10px;
+    align-items: flex-start;
+  }
+
+  .pref-item--segment {
+    --padding-top: 0;
+    --padding-bottom: 14px;
+  }
+
+  .pref-item--segment ion-segment {
+    width: 100%;
+  }
+
+  .pref-label {
+    font-size: 1.02rem;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .pref-help {
+    margin-top: 6px;
+    font-size: 0.95rem;
+    line-height: 1.45;
+    color: rgba(var(--ion-text-color-rgb), 0.78);
+  }
 }

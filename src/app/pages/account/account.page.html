@@ -176,7 +176,7 @@
 
         <ion-item button (click)="goPrefs()">
           <ion-label class="menu-row-label menu-row-label--single">
-            <div class="menu-row-title">Account Preferences</div>
+            <div class="menu-row-title">Preferences</div>
           </ion-label>
         </ion-item>
       </ion-list>
@@ -188,31 +188,5 @@
     </div>
   </ng-template>
 
-  <div class="theme-section">
-    <div class="theme-label">Links</div>
-    <ion-segment [value]="linkMode()" (ionChange)="onLinkModeChange($event)">
-      <ion-segment-button value="app">
-        <ion-label>Use App</ion-label>
-      </ion-segment-button>
-      <ion-segment-button value="browser">
-        <ion-label>Use Browser</ion-label>
-      </ion-segment-button>
-    </ion-segment>
-  </div>
-
-  <div class="theme-section">
-    <div class="theme-label">Theme</div>
-    <ion-segment [value]="themeMode()" (ionChange)="onThemeChange($event)">
-      <ion-segment-button value="system">
-        <ion-label>System</ion-label>
-      </ion-segment-button>
-      <ion-segment-button value="light">
-        <ion-label>Light</ion-label>
-      </ion-segment-button>
-      <ion-segment-button value="dark">
-        <ion-label>Dark</ion-label>
-      </ion-segment-button>
-    </ion-segment>
-  </div>
 </ng-container>
 </ion-content>

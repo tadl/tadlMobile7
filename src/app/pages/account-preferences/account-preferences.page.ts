@@ -69,6 +69,26 @@ export class AccountPreferencesPage {
     this.loadPreferences();
   }
 
+  themeMode(): 'light' | 'dark' | 'system' {
+    return this.globals.theme_mode;
+  }
+
+  onThemeChange(ev: CustomEvent) {
+    const value = (ev.detail as { value?: string } | undefined)?.value;
+    if (value !== 'light' && value !== 'dark' && value !== 'system') return;
+    void this.globals.setTheme(value);
+  }
+
+  linkMode(): 'app' | 'browser' {
+    return this.globals.link_mode;
+  }
+
+  onLinkModeChange(ev: CustomEvent) {
+    const value = (ev.detail as { value?: string } | undefined)?.value;
+    if (value !== 'app' && value !== 'browser') return;
+    void this.globals.setLinkMode(value);
+  }
+
   onPickupLibraryChanged(ev: CustomEvent) {
     const next = (ev?.detail as any)?.value?.toString?.() ?? '';
     if (!this.preferences || !next || this.saving) return;

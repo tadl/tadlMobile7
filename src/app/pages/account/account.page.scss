@@ -202,18 +202,3 @@ ion-note {
   margin-top: 0;
   width: 100%;
 }
-
-.theme-section {
-  padding: 6px 16px 18px 16px;
-  border-top: 1px solid rgba(var(--ion-text-color-rgb), 0.08);
-}
-
-.theme-section:last-of-type {
-  padding-bottom: calc(28px + var(--ion-safe-area-bottom, 0px));
-}
-
-.theme-label {
-  font-size: 14px;
-  font-weight: 700;
-  margin-bottom: 10px;
-}

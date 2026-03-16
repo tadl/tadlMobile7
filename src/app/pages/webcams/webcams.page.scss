@@ -32,3 +32,19 @@
   font-size: 1.4rem;
   color: var(--ion-color-primary);
 }
+
+:host-context(.ion-palette-dark) {
+  ion-content {
+    --background: linear-gradient(180deg, #14161b 0%, #0f1116 100%);
+  }
+
+  .webcams-intro,
+  .webcams-state-card,
+  .webcams-list {
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3);
+  }
+
+  .webcams-list {
+    background: rgba(255, 255, 255, 0.04);
+  }
+}

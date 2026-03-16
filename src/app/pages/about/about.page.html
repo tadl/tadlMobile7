@@ -44,6 +44,16 @@
     </ion-item>
 
     <ion-item class="about-item">
+      <ion-label>Theme</ion-label>
+      <ion-note slot="end" color="dark" class="about-value">{{ themeModeLabel() }}</ion-note>
+    </ion-item>
+
+    <ion-item class="about-item">
+      <ion-label>Link Mode</ion-label>
+      <ion-note slot="end" color="dark" class="about-value">{{ linkModeLabel() }}</ion-note>
+    </ion-item>
+
+    <ion-item class="about-item">
       <ion-label>Credential Storage</ion-label>
       <ion-note slot="end" color="dark" class="about-value">{{ credentialStorage }}</ion-note>
     </ion-item>

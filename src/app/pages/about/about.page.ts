@@ -66,6 +66,32 @@ export class AboutPage implements OnInit {
     return 'secure-storage (unavailable)';
   }
 
+  themeModeLabel(): string {
+    const mode = (this.globals.theme_mode ?? '').toString().trim();
+    switch (mode) {
+      case 'light':
+        return 'Light';
+      case 'dark':
+        return 'Dark';
+      case 'system':
+        return 'System';
+      default:
+        return mode || '(unknown)';
+    }
+  }
+
+  linkModeLabel(): string {
+    const mode = (this.globals.link_mode ?? '').toString().trim();
+    switch (mode) {
+      case 'app':
+        return 'Use App';
+      case 'browser':
+        return 'Use Browser';
+      default:
+        return mode || '(unknown)';
+    }
+  }
+
   private async hasSecureStorage(): Promise<boolean> {
     try {
       const platform = await SecureStoragePlugin.getPlatform();

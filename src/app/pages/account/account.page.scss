@@ -192,6 +192,17 @@ ion-note {
   margin-top: 10px;
 }
 
+.actions--split {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.actions--split ion-button {
+  margin-top: 0;
+  width: 100%;
+}
+
 .theme-section {
   padding: 6px 16px 18px 16px;
   border-top: 1px solid rgba(var(--ion-text-color-rgb), 0.08);

@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { IonicModule, ModalController, ActionSheetController } from '@ionic/angular';
+import { IonicModule, ModalController } from '@ionic/angular';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -11,8 +11,6 @@ import { AuthState, AuthService } from '../../services/auth.service';
 import { PatronService } from '../../services/patron.service';
 import { ToastService } from '../../services/toast.service';
 import { ShowCardModalComponent } from '../../components/show-card-modal/show-card-modal.component';
-import { AccountStoreService } from '../../services/account-store.service';
-import { SwitchUserModalComponent } from '../../components/switch-user-modal/switch-user-modal.component';
 import { LocationsService, type AppLocation, type AppLocationException } from '../../services/locations.service';
 
 type HomeClosureNotice = {
@@ -37,9 +35,7 @@ export class HomePage {
     public patron: PatronService,
     private router: Router,
     private modal: ModalController,
-    private actionSheet: ActionSheetController,
     private toast: ToastService,
-    private accounts: AccountStoreService,
     private locationsService: LocationsService,
   ) {}
 
@@ -99,53 +95,6 @@ export class HomePage {
     });
     this.globals.modal_open = true;
     await m.present();
-  }
-
-  async showSwitchUser() {
-    const m = await this.modal.create({
-      component: SwitchUserModalComponent,
-    });
-    this.globals.modal_open = true;
-    await m.present();
-  }
-
-  async showLogoutActions() {
-    const snap = this.auth.snapshot();
-    const activeId = snap.activeAccountId;
-
-    const sheet = await this.actionSheet.create({
-      header: 'Logout',
-      buttons: [
-        {
-          text: 'Logout',
-          role: 'destructive',
-          handler: () => {
-            this.auth.logout().subscribe({
-              next: () => this.toast.presentToast('Logged out.'),
-              error: () => this.toast.presentToast('Logout failed.'),
-            });
-          },
-        },
-        {
-          text: 'Logout and remove saved account',
-          role: 'destructive',
-          handler: () => {
-            this.auth.logout().subscribe({
-              next: async () => {
-                try {
-                  if (activeId) await this.accounts.removeAccount(activeId);
-                } catch {}
-                this.toast.presentToast('Logged out and removed saved account.');
-              },
-              error: () => this.toast.presentToast('Logout failed.'),
-            });
-          },
-        },
-        { text: 'Close', role: 'cancel' },
-      ],
-    });
-
-    await sheet.present();
   }
 
   async submitSearch() {

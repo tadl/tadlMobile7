@@ -280,12 +280,17 @@ export class ItemDetailComponent implements OnInit {
 
     const lists = await this.getListsForAction();
     if (!lists.length) return;
+    const existingListIds = new Set(
+      this.knownListMemberships
+        .map((m) => (m?.listId ?? '').toString().trim())
+        .filter((id) => !!id),
+    );
 
     const sheet = await this.actionSheet.create({
       header: 'Add to which list?',
       buttons: [
         ...lists.map((list): ActionSheetButton => ({
-          text: this.actionListLabel(list),
+          text: this.actionListLabel(list, existingListIds),
           handler: () => this.addRecordToList(list, recordId),
         })),
         { text: 'Close', role: 'cancel' },
@@ -341,11 +346,12 @@ export class ItemDetailComponent implements OnInit {
     }
   }
 
-  private actionListLabel(list: AspenUserList): string {
+  private actionListLabel(list: AspenUserList, existingListIds?: Set<string>): string {
     const title = (list?.title ?? '').toString().trim() || 'Untitled list';
     const n = Number((list as any)?.numTitles ?? 0);
-    if (Number.isFinite(n) && n > 0) return `${title} (${n})`;
-    return title;
+    const listId = (list?.id ?? '').toString().trim();
+    const base = Number.isFinite(n) && n > 0 ? `${title} (${n})` : title;
+    return existingListIds?.has(listId) ? `${base} - already added` : base;
   }
 
   private addRecordToList(list: AspenUserList, recordId: string) {

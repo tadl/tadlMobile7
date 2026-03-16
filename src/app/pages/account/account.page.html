@@ -12,7 +12,7 @@
   </ion-toolbar>
 </ion-header>
 
-<ion-content>
+<ion-content class="account-content">
 <ng-container *ngIf="auth.authState() | async as s">
   <ng-container *ngIf="!s.isLoggedIn; else loggedInMenu">
     <ion-item *ngIf="storedAccounts.length > 0" lines="none" class="stored-accounts-header">

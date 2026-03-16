@@ -2,6 +2,10 @@
   display: block;
 }
 
+.account-content::part(scroll) {
+  padding-bottom: calc(28px + var(--ion-safe-area-bottom, 0px));
+}
+
 .full-list {
   margin: 0;
   padding: 0;
@@ -191,6 +195,10 @@ ion-note {
 .theme-section {
   padding: 6px 16px 18px 16px;
   border-top: 1px solid rgba(var(--ion-text-color-rgb), 0.08);
+}
+
+.theme-section:last-of-type {
+  padding-bottom: calc(28px + var(--ion-safe-area-bottom, 0px));
 }
 
 .theme-label {

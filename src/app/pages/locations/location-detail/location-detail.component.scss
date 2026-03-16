@@ -21,6 +21,10 @@
   --hours-row-today-bg: rgba(var(--ion-color-primary-rgb), 0.18);
 }
 
+.location-detail-content::part(scroll) {
+  padding-bottom: calc(28px + var(--ion-safe-area-bottom, 0px));
+}
+
 .hero-wrap {
   padding: 12px 12px 0 12px;
 }
@@ -35,7 +39,7 @@
 }
 
 .content {
-  padding: 12px 14px 24px 14px;
+  padding: 12px 14px calc(28px + var(--ion-safe-area-bottom, 0px)) 14px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -128,17 +132,62 @@
 }
 
 @media (max-width: 420px) {
-  .contact .contact-top {
-    flex-direction: column;
-    align-items: stretch;
+  .hero-wrap {
+    padding: 10px 10px 0 10px;
+  }
+
+  .content {
+    padding: 10px 10px calc(28px + var(--ion-safe-area-bottom, 0px)) 10px;
+    gap: 10px;
+  }
+
+  .details-card {
+    padding: 12px;
+  }
+
+  .title {
+    font-size: 28px;
+    line-height: 1.08;
+  }
+
+  .contact .contact-main {
+    flex: 0 0 auto;
   }
 
   .contact .navigate-button {
     align-self: flex-start;
+    margin-top: 2px;
   }
 
   .contact .contact-links {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .hours-row {
+    padding: 10px 12px;
+  }
+
+  .hours-row .day,
+  .hours-row .hours {
+    font-size: 16px;
+  }
+
+  .exception-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .exception-row .day {
+    padding-right: 0;
+    white-space: normal;
+  }
+
+  .exception-row .hours {
+    margin-left: 0;
+    text-align: left;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 }
 
@@ -217,6 +266,15 @@
       opacity: 1;
     }
   }
+}
+
+.exception-row {
+  align-items: flex-start;
+}
+
+.exception-row .hours {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 :host-context(.ion-palette-dark) {

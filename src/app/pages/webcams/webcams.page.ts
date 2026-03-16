@@ -1,11 +1,16 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { IonicModule, ModalController } from '@ionic/angular';
+import { IonicModule } from '@ionic/angular';
 import { finalize } from 'rxjs';
 
 import { Globals } from '../../globals';
 import { WebcamFeedItem, WebcamsService } from '../../services/webcams.service';
-import { WebcamDetailComponent, WebcamStreamViewModel } from './webcam-detail/webcam-detail.component';
+
+interface WebcamStreamViewModel {
+  title: string;
+  subtitle: string;
+  youtubeUrl: string;
+}
 
 @Component({
   standalone: true,
@@ -20,7 +25,6 @@ export class WebcamsPage implements OnInit {
 
   constructor(
     public globals: Globals,
-    private modalController: ModalController,
     private webcamsService: WebcamsService,
   ) {}
 
@@ -55,16 +59,10 @@ export class WebcamsPage implements OnInit {
       title: item.title,
       subtitle: (item.subtitle ?? '').toString().trim(),
       youtubeUrl: item.youtube_url,
-      embedUrl: item.embed_url,
     };
   }
 
   async openWebcam(webcam: WebcamStreamViewModel) {
-    const modal = await this.modalController.create({
-      component: WebcamDetailComponent,
-      componentProps: { webcam },
-    });
-    this.globals.modal_open = true;
-    return await modal.present();
+    return await this.globals.open_page(webcam.youtubeUrl);
   }
 }

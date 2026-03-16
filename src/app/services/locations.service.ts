@@ -59,9 +59,10 @@ export class LocationsService {
     return concat(cached$, network$);
   }
 
-  getLocationByShortname(shortname: string): Observable<AppLocation | null> {
+  getLocationByShortname(shortname: string, options?: { skipCache?: boolean }): Observable<AppLocation | null> {
     const s = (shortname ?? '').toString().trim();
     const cacheKey = `locations:detail:${s}`;
+    const skipCache = options?.skipCache === true;
 
     const cached$ = from(this.cache.read<AppLocation>(cacheKey)).pipe(
       filter((v): v is AppLocation => !!v && typeof v === 'object'),
@@ -76,6 +77,6 @@ export class LocationsService {
         }),
       );
 
-    return concat(cached$, network$);
+    return skipCache ? network$ : concat(cached$, network$);
   }
 }

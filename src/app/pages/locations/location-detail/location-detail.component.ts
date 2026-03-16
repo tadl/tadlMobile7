@@ -54,8 +54,9 @@ export class LocationDetailComponent {
 
   load_detail(shortname: string) {
     this.loading = true;
+    const skipCache = !!this.location;
 
-    this.locationsService.getLocationByShortname(shortname).subscribe({
+    this.locationsService.getLocationByShortname(shortname, { skipCache }).subscribe({
       next: (detail) => {
         this.location = detail ?? this.location;
         this.loading = false;

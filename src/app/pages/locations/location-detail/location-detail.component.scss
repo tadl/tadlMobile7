@@ -277,6 +277,26 @@
   overflow-wrap: anywhere;
 }
 
+.exception-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.exception-hours {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.exception-reason {
+  font-size: 14px;
+  line-height: 1.35;
+  font-weight: 500;
+  color: rgba(var(--ion-text-color-rgb), 0.82);
+}
+
 :host-context(.ion-palette-dark) {
   --hours-grid-text-color: var(--ion-text-color);
   --hours-subtitle-color: rgba(255, 255, 255, 0.9);
@@ -294,6 +314,10 @@
   --today-pill-ex-border: rgba(var(--ion-color-danger-rgb), 0.55);
   --hours-row-bg: rgba(255, 255, 255, 0.05);
   --hours-row-today-bg: rgba(var(--ion-color-primary-rgb), 0.22);
+}
+
+:host-context(.ion-palette-dark) .exception-reason {
+  color: rgba(255, 255, 255, 0.86);
 }
 
 .loading-overlay {

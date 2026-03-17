@@ -78,8 +78,9 @@
             <div class="hours-grid">
               <div class="hours-row exception-row" *ngFor="let row of upcomingRows">
                 <div class="day">{{ row.dateLabel }}</div>
-                <div class="hours">
-                  {{ row.hoursLabel }}<span *ngIf="row.reason"> • {{ row.reason }}</span>
+                <div class="hours exception-copy">
+                  <div class="exception-hours">{{ row.hoursLabel }}</div>
+                  <div class="exception-reason" *ngIf="row.reason">{{ row.reason }}</div>
                 </div>
               </div>
             </div>

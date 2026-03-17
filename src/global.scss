@@ -128,17 +128,25 @@ ion-searchbar {
 /* Slightly increase muted-text contrast in dark mode. */
 .ion-palette-dark {
   ion-note {
-    color: rgba(235, 240, 250, 0.82);
+    color: rgba(235, 240, 250, 0.9);
   }
 
   .muted {
-    opacity: 0.9;
+    color: rgba(235, 240, 250, 0.9) !important;
+    opacity: 1;
+  }
+
+  .sub,
+  .meta,
+  ion-label p {
+    color: rgba(235, 240, 250, 0.9) !important;
+    opacity: 1 !important;
   }
 }
 
 /* Dim "disabled" options rendered inside Ionic action sheets. */
 .action-sheet-button.action-sheet-disabled-option {
-  opacity: 0.52;
+  opacity: 0.72;
 }
 
 /* Search page select popovers: avoid truncating long option labels on iOS. */

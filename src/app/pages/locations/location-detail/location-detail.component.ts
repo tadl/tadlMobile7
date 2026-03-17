@@ -20,8 +20,9 @@ type HoursRow = {
   isToday: boolean;
 };
 
-type UpcomingClosureRow = {
+type UpcomingScheduleRow = {
   dateLabel: string;
+  hoursLabel: string;
   reason: string;
 };
 
@@ -144,10 +145,11 @@ export class LocationDetailComponent {
     return !!this.exceptionForDate(loc, this.globals.easternDateString());
   }
 
-  upcomingClosureRows(loc?: Location): UpcomingClosureRow[] {
-    const exceptions = this.upcomingClosureExceptions(loc, 30);
+  upcomingScheduleRows(loc?: Location): UpcomingScheduleRow[] {
+    const exceptions = this.upcomingExceptions(loc, 7);
     return exceptions.map((ex) => ({
       dateLabel: this.formatLongDate(ex.date),
+      hoursLabel: (ex.hours ?? '').toString().trim() || 'Hours updated',
       reason: (ex.reason ?? '').toString().trim(),
     }));
   }
@@ -210,7 +212,7 @@ export class LocationDetailComponent {
       .join(', ');
   }
 
-  private upcomingClosureExceptions(
+  private upcomingExceptions(
     loc: Location | undefined,
     daysAhead: number,
   ): AppLocationException[] {
@@ -221,7 +223,6 @@ export class LocationDetailComponent {
 
     const exceptions = Array.isArray(loc.exceptions) ? loc.exceptions : [];
     return exceptions
-      .filter((ex) => this.isClosureException(ex))
       .filter((ex) => {
         const dateKey = (ex?.date ?? '').toString().trim();
         if (!dateKey) return false;

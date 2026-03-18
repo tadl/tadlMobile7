@@ -22,47 +22,41 @@
       <ion-label>App Preferences</ion-label>
     </ion-item-divider>
 
-    <ion-item class="pref-item pref-item--stacked">
+    <ion-item class="pref-item pref-item--setting">
       <ion-label>
         <div class="pref-label">Links</div>
+        <ion-segment [value]="linkMode()" (ionChange)="onLinkModeChange($event)">
+          <ion-segment-button value="app">
+            <ion-label>Use App</ion-label>
+          </ion-segment-button>
+          <ion-segment-button value="browser">
+            <ion-label>Use Browser</ion-label>
+          </ion-segment-button>
+        </ion-segment>
         <div class="pref-help">
-          Select Use App to enable the app to intercept links to our catalog from other apps on your device.
+          Open discover.tadl.org links on your device in-app, or use your browser.
         </div>
       </ion-label>
     </ion-item>
 
-    <ion-item class="pref-item pref-item--segment">
-      <ion-segment [value]="linkMode()" (ionChange)="onLinkModeChange($event)">
-        <ion-segment-button value="app">
-          <ion-label>Use App</ion-label>
-        </ion-segment-button>
-        <ion-segment-button value="browser">
-          <ion-label>Use Browser</ion-label>
-        </ion-segment-button>
-      </ion-segment>
-    </ion-item>
-
-    <ion-item class="pref-item pref-item--stacked">
+    <ion-item class="pref-item pref-item--setting">
       <ion-label>
         <div class="pref-label">Theme</div>
+        <ion-segment [value]="themeMode()" (ionChange)="onThemeChange($event)">
+          <ion-segment-button value="system">
+            <ion-label>System</ion-label>
+          </ion-segment-button>
+          <ion-segment-button value="light">
+            <ion-label>Light</ion-label>
+          </ion-segment-button>
+          <ion-segment-button value="dark">
+            <ion-label>Dark</ion-label>
+          </ion-segment-button>
+        </ion-segment>
         <div class="pref-help">
           By default, the app will mirror your system theme. Use Light or Dark to override your system preference.
         </div>
       </ion-label>
-    </ion-item>
-
-    <ion-item class="pref-item pref-item--segment">
-      <ion-segment [value]="themeMode()" (ionChange)="onThemeChange($event)">
-        <ion-segment-button value="system">
-          <ion-label>System</ion-label>
-        </ion-segment-button>
-        <ion-segment-button value="light">
-          <ion-label>Light</ion-label>
-        </ion-segment-button>
-        <ion-segment-button value="dark">
-          <ion-label>Dark</ion-label>
-        </ion-segment-button>
-      </ion-segment>
     </ion-item>
   </ion-list>
 

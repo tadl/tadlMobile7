@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, concat, filter, from, map, tap } from 'rxjs';
+import { EMPTY, Observable, concat, distinctUntilChanged, filter, from, map, of, tap } from 'rxjs';
 
 import { Globals } from '../globals';
 import { AppCacheService } from './app-cache.service';
@@ -34,6 +34,8 @@ export interface AppLocationException {
 
 @Injectable({ providedIn: 'root' })
 export class LocationsService {
+  private latestLocations: AppLocation[] | null = null;
+
   constructor(
     private http: HttpClient,
     private globals: Globals,
@@ -42,9 +44,15 @@ export class LocationsService {
 
   getLocations(): Observable<AppLocation[]> {
     const cacheKey = `locations:list:${this.globals.locations_group}`;
+    const memory$ = Array.isArray(this.latestLocations)
+      ? of(this.latestLocations)
+      : EMPTY;
 
     const cached$ = from(this.cache.read<AppLocation[]>(cacheKey)).pipe(
       filter((v): v is AppLocation[] => Array.isArray(v)),
+      tap((locations) => {
+        this.latestLocations = locations;
+      }),
     );
 
     const network$ = this.http
@@ -52,11 +60,14 @@ export class LocationsService {
       .pipe(
         map((res) => Array.isArray(res?.locations) ? res.locations : []),
         tap((locations) => {
+          this.latestLocations = locations;
           this.cache.write(cacheKey, locations).catch(() => {});
         }),
       );
 
-    return concat(cached$, network$);
+    return concat(memory$, cached$, network$).pipe(
+      distinctUntilChanged((a, b) => JSON.stringify(a) === JSON.stringify(b)),
+    );
   }
 
   getLocationByShortname(shortname: string, options?: { skipCache?: boolean }): Observable<AppLocation | null> {

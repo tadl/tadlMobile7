@@ -74,9 +74,22 @@ function updateIosProject(versionName, buildNumber, appId) {
     `PRODUCT_BUNDLE_IDENTIFIER = ${appId};`,
     'PRODUCT_BUNDLE_IDENTIFIER',
   );
+  if (!pbx.includes('CODE_SIGN_ENTITLEMENTS = App/App.entitlements;')) {
+    pbx = pbx.replace(
+      /ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;\n/g,
+      'ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;\n\t\t\t\tCODE_SIGN_ENTITLEMENTS = App/App.entitlements;\n',
+    );
+  }
 
   writeText(pbxprojPath, pbx);
   console.log('[release-prep] Patched iOS project version/build/appId.');
+}
+
+function ensureIosEntitlements() {
+  const entitlementsPath = resolve('ios/App/App/App.entitlements');
+  const content = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n\t<key>com.apple.developer.associated-domains</key>\n\t<array>\n\t\t<string>applinks:discover.tadl.org</string>\n\t</array>\n</dict>\n</plist>\n`;
+  writeText(entitlementsPath, content);
+  console.log('[release-prep] Restored iOS entitlements.');
 }
 
 function updateIosInfoPlistDisplayName(appName) {
@@ -93,9 +106,35 @@ function updateIosInfoPlistDisplayName(appName) {
     `<key>CFBundleDisplayName</key>\n        <string>${appName}</string>`,
     'CFBundleDisplayName',
   );
+  if (!plist.includes('<key>LSApplicationQueriesSchemes</key>')) {
+    plist = plist.replace(
+      /<key>LSRequiresIPhoneOS<\/key>\s*<true\/>/,
+      `<key>LSApplicationQueriesSchemes</key>\n\t<array>\n\t\t<string>comgooglemaps</string>\n\t\t<string>waze</string>\n\t\t<string>maps</string>\n\t</array>\n\t<key>LSRequiresIPhoneOS</key>\n\t<true/>`,
+    );
+  }
+  if (!plist.includes('<key>NSCameraUsageDescription</key>')) {
+    plist = plist.replace(
+      /<key>UILaunchStoryboardName<\/key>/,
+      `<key>NSCameraUsageDescription</key>\n\t<string>Scan ISBN barcodes to search the catalog.</string>\n\t<key>UILaunchStoryboardName</key>`,
+    );
+  }
 
   writeText(plistPath, plist);
   console.log('[release-prep] Patched iOS display name.');
+}
+
+function ensureIosGitignore() {
+  const gitignorePath = resolve('ios/.gitignore');
+  if (!existsSync(gitignorePath)) return;
+  let content = readText(gitignorePath);
+  const wanted = ['*.xcuserstate', '*.xcscmblueprint', '*.xccheckout', '*.xcarchive', '*.ipa'];
+  for (const line of wanted) {
+    if (!content.includes(line)) {
+      content = content.replace(/xcuserdata\n/, `xcuserdata\n${line}\n`);
+    }
+  }
+  writeText(gitignorePath, content);
+  console.log('[release-prep] Restored iOS .gitignore entries.');
 }
 
 function updateAndroidGradle(versionName, buildNumber, appId) {
@@ -106,6 +145,35 @@ function updateAndroidGradle(versionName, buildNumber, appId) {
   }
 
   let gradle = readText(gradlePath);
+  if (!gradle.includes('def signingProps = new Properties()')) {
+    gradle = gradle.replace(
+      "apply plugin: 'com.android.application'\n\n",
+      `apply plugin: 'com.android.application'\n\n` +
+        `def signingProps = new Properties()\n` +
+        `def signingPropsFile = rootProject.file('signing.properties')\n` +
+        `if (signingPropsFile.exists()) {\n` +
+        `    signingProps.load(new FileInputStream(signingPropsFile))\n` +
+        `}\n\n` +
+        `def signingValue = { envKey, propKey ->\n` +
+        `    def envVal = System.getenv(envKey)\n` +
+        `    if (envVal != null && envVal.toString().trim()) return envVal.toString().trim()\n` +
+        `    def propVal = signingProps.getProperty(propKey)\n` +
+        `    return propVal != null && propVal.toString().trim() ? propVal.toString().trim() : null\n` +
+        `}\n\n` +
+        `def releaseStoreFile = signingValue('TADL_ANDROID_STORE_FILE', 'storeFile')\n` +
+        `def releaseStorePassword = signingValue('TADL_ANDROID_STORE_PASSWORD', 'storePassword')\n` +
+        `def releaseKeyAlias = signingValue('TADL_ANDROID_KEY_ALIAS', 'keyAlias')\n` +
+        `def releaseKeyPassword = signingValue('TADL_ANDROID_KEY_PASSWORD', 'keyPassword')\n` +
+        `def hasReleaseSigning = releaseStoreFile && releaseStorePassword && releaseKeyAlias && releaseKeyPassword\n\n`,
+    );
+  }
+
+  gradle = replaceAll(
+    gradle,
+    /namespace\s*=\s*"[^"]+"/,
+    `namespace = "${appId}"`,
+    'namespace',
+  );
 
   gradle = replaceAll(
     gradle,
@@ -125,9 +193,66 @@ function updateAndroidGradle(versionName, buildNumber, appId) {
     `versionName \"${versionName}\"`,
     'versionName',
   );
+  if (!gradle.includes('signingConfigs {')) {
+    gradle = gradle.replace(
+      /compileSdk = rootProject\.ext\.compileSdkVersion\n/,
+      `compileSdk = rootProject.ext.compileSdkVersion\n` +
+        `    signingConfigs {\n` +
+        `        release {\n` +
+        `            if (hasReleaseSigning) {\n` +
+        `                storeFile file(releaseStoreFile)\n` +
+        `                storePassword releaseStorePassword\n` +
+        `                keyAlias releaseKeyAlias\n` +
+        `                keyPassword releaseKeyPassword\n` +
+        `            }\n` +
+        `        }\n` +
+        `    }\n`,
+    );
+  }
+  if (!gradle.includes('signingConfig signingConfigs.release')) {
+    gradle = gradle.replace(
+      /proguardFiles getDefaultProguardFile\('proguard-android\.txt'\), 'proguard-rules\.pro'\n/,
+      `proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'\n` +
+        `            if (hasReleaseSigning) {\n` +
+        `                signingConfig signingConfigs.release\n` +
+        `            }\n`,
+    );
+  }
+  if (!gradle.includes('Android release signing is not configured.')) {
+    gradle = gradle.replace(
+      /\nrepositories \{/,
+      `\nif (!hasReleaseSigning) {\n` +
+        `    logger.lifecycle("Android release signing is not configured. Create android/signing.properties or set TADL_ANDROID_* env vars.")\n` +
+        `}\n\nrepositories {`,
+    );
+  }
 
   writeText(gradlePath, gradle);
   console.log('[release-prep] Patched Android applicationId/versionCode/versionName.');
+}
+
+function ensureAndroidManifestDeepLinks() {
+  const manifestPath = resolve('android/app/src/main/AndroidManifest.xml');
+  if (!existsSync(manifestPath)) return;
+  let manifest = readText(manifestPath);
+  if (!manifest.includes('android:autoVerify="true"')) {
+    manifest = manifest.replace(
+      /<\/intent-filter>\n\s*<\/activity>/,
+      `</intent-filter>\n` +
+        `            <intent-filter android:autoVerify="true">\n` +
+        `                <action android:name="android.intent.action.VIEW" />\n` +
+        `                <category android:name="android.intent.category.DEFAULT" />\n` +
+        `                <category android:name="android.intent.category.BROWSABLE" />\n\n` +
+        `                <data android:scheme="https" android:host="discover.tadl.org" android:pathPrefix="/GroupedWork/" />\n` +
+        `                <data android:scheme="https" android:host="discover.tadl.org" android:pathPrefix="/Record/" />\n` +
+        `                <data android:scheme="https" android:host="discover.tadl.org" android:pathPrefix="/Union/Search" />\n` +
+        `                <data android:scheme="https" android:host="discover.tadl.org" android:pathPrefix="/Search/" />\n` +
+        `                <data android:scheme="https" android:host="discover.tadl.org" android:pathPrefix="/MyAccount/Home" />\n` +
+        `            </intent-filter>\n        </activity>`,
+    );
+  }
+  writeText(manifestPath, manifest);
+  console.log('[release-prep] Restored Android app links intent filter.');
 }
 
 function updateAndroidStrings(appName) {
@@ -153,6 +278,67 @@ function updateAndroidStrings(appName) {
 
   writeText(stringsPath, strings);
   console.log('[release-prep] Patched Android display name.');
+}
+
+function ensureAndroidStyles() {
+  const stylesPath = resolve('android/app/src/main/res/values/styles.xml');
+  if (!existsSync(stylesPath)) return;
+  let styles = readText(stylesPath);
+  styles = styles.replace(
+    /<style name="AppTheme\.NoActionBarLaunch" parent="Theme\.SplashScreen">[\s\S]*?<\/style>/,
+    `<style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">\n` +
+      `        <!-- Android 12+ splash API: centered icon over solid background (no stretch) -->\n` +
+      `        <item name="windowSplashScreenBackground">#07153A</item>\n` +
+      `        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>\n` +
+      `        <item name="windowSplashScreenIconBackgroundColor">#00000000</item>\n` +
+      `        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>\n` +
+      `        <!-- Fallback for older Android versions -->\n` +
+      `        <item name="android:background">#07153A</item>\n` +
+      `    </style>`,
+  );
+  writeText(stylesPath, styles);
+  console.log('[release-prep] Restored Android splash theme.');
+}
+
+function ensureAndroidVariables() {
+  const varsPath = resolve('android/variables.gradle');
+  if (!existsSync(varsPath)) return;
+  let vars = readText(varsPath);
+  vars = replaceAll(
+    vars,
+    /minSdkVersion = \d+/,
+    'minSdkVersion = 26',
+    'minSdkVersion',
+  );
+  writeText(varsPath, vars);
+  console.log('[release-prep] Restored Android minSdkVersion.');
+}
+
+function ensureAndroidGitignore() {
+  const gitignorePath = resolve('android/.gitignore');
+  if (!existsSync(gitignorePath)) return;
+  let content = readText(gitignorePath);
+  const anchorLines = [
+    ['.gradle/\n', '.gradle-local/\n'],
+    ['local.properties\n', 'signing.properties\n'],
+    ['.idea/workspace.xml\n', '.idea/deviceManager.xml\n.idea/deploymentTargetSelector.xml\n'],
+  ];
+  for (const [anchor, insertion] of anchorLines) {
+    if (!content.includes(insertion.trim())) {
+      content = content.replace(anchor, `${anchor}${insertion}`);
+    }
+  }
+  writeText(gitignorePath, content);
+  console.log('[release-prep] Restored Android .gitignore entries.');
+}
+
+function ensureAndroidSigningExample() {
+  const examplePath = resolve('android/signing.properties.example');
+  writeText(
+    examplePath,
+    'storeFile=/Users/wjr/keystores/tadl/android/tadlandroid.keystore\nstorePassword=CHANGE_ME\nkeyAlias=CHANGE_ME\nkeyPassword=CHANGE_ME\n',
+  );
+  console.log('[release-prep] Restored Android signing.properties.example.');
 }
 
 function updateGlobalsVersion(versionName, updateDate, buildNum) {
@@ -325,10 +511,17 @@ function preparePlatform(platform, opts, appName) {
 
   if (platform === 'ios') {
     updateIosProject(opts.version, opts.build, appId);
+    ensureIosEntitlements();
     updateIosInfoPlistDisplayName(appName);
+    ensureIosGitignore();
   } else {
     updateAndroidGradle(opts.version, opts.build, appId);
     updateAndroidStrings(appName);
+    ensureAndroidManifestDeepLinks();
+    ensureAndroidStyles();
+    ensureAndroidVariables();
+    ensureAndroidGitignore();
+    ensureAndroidSigningExample();
   }
 
   if (!opts.skipAssets && existsSync(resolve('resources'))) {

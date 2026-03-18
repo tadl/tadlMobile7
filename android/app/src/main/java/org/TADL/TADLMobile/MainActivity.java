@@ -1,4 +1,4 @@
-package io.ionic.starter;
+package org.TADL.TADLMobile;
 
 import com.getcapacitor.BridgeActivity;
 

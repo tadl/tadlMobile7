@@ -70,6 +70,10 @@ export class LocationsService {
     );
   }
 
+  getLatestLocationsSnapshot(): AppLocation[] {
+    return Array.isArray(this.latestLocations) ? this.latestLocations.slice() : [];
+  }
+
   getLocationByShortname(shortname: string, options?: { skipCache?: boolean }): Observable<AppLocation | null> {
     const s = (shortname ?? '').toString().trim();
     const cacheKey = `locations:detail:${s}`;

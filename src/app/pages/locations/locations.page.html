@@ -37,7 +37,7 @@
     </ion-item>
   </ion-list>
 
-  <ion-item *ngIf="!globals.api_loading && locations.length === 0">
+  <ion-item *ngIf="!loadingLocations && hasLoadedLocations && locations.length === 0">
     <ion-label>No locations found.</ion-label>
   </ion-item>
 

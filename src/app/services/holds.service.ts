@@ -103,35 +103,7 @@ export class HoldsService {
       filter((v): v is AspenHold[] => Array.isArray(v)),
     );
 
-    const network$ = this.activeFetch$ ?? from(this.accounts.getPassword(snap.activeAccountId)).pipe(
-      switchMap(password => {
-        if (!password) return throwError(() => new Error('missing_password'));
-
-        const params = new HttpParams().set('method', 'getPatronHolds');
-
-        const body = new URLSearchParams();
-        body.set('username', snap.activeAccountMeta!.username);
-        body.set('password', password);
-
-        const headers = new HttpHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' });
-
-        return this.http
-          .post<any>(`${this.globals.aspen_api_base}/UserAPI`, body.toString(), { params, headers })
-          .pipe(
-            map(raw => (raw?.result ?? raw) as PatronHoldsResponse),
-            map(r => {
-              if (!r?.success) return [];
-              const all = [
-                ...this.normalizeHoldCollection(r?.holds?.available),
-                ...this.normalizeHoldCollection(r?.holds?.unavailable),
-              ];
-              return all.filter(h => (h?.type === 'ils' || h?.source === 'ils'));
-            }),
-            tap((holds) => {
-              this.cache.write(cacheKey, holds).catch(() => {});
-            }),
-          );
-      }),
+    const network$ = this.activeFetch$ ?? this.fetchHoldsNetwork(snap, cacheKey).pipe(
       finalize(() => {
         this.activeFetch$ = null;
       }),
@@ -141,6 +113,43 @@ export class HoldsService {
     this.activeFetch$ = network$;
 
     return concat(cached$, network$);
+  }
+
+  fetchFreshActiveHolds(): Observable<AspenHold[]> {
+    const snap = this.auth.snapshot();
+    if (!snap.isLoggedIn || !snap.activeAccountId || !snap.activeAccountMeta) {
+      return from([[]]);
+    }
+
+    const cacheKey = PREF_HOLDS_CACHE_PREFIX + snap.activeAccountId;
+    return this.fetchHoldsNetwork(snap, cacheKey);
+  }
+
+  async removeCachedHold(hold: AspenHold): Promise<void> {
+    const cacheKey = this.activeHoldsCacheKey();
+    if (!cacheKey) return;
+
+    const existing = await this.cache.read<AspenHold[]>(cacheKey);
+    const current = Array.isArray(existing) ? existing : [];
+    const next = current.filter((candidate) => !this.holdMatches(candidate, hold));
+    await this.cache.write(cacheKey, next);
+  }
+
+  async upsertCachedHold(hold: AspenHold): Promise<void> {
+    const cacheKey = this.activeHoldsCacheKey();
+    if (!cacheKey) return;
+
+    const existing = await this.cache.read<AspenHold[]>(cacheKey);
+    const current = Array.isArray(existing) ? existing : [];
+    let matched = false;
+    const next = current.map((candidate) => {
+      if (!this.holdMatches(candidate, hold)) return candidate;
+      matched = true;
+      return { ...(candidate as any), ...(hold as any) } as AspenHold;
+    });
+
+    if (!matched) next.unshift(hold);
+    await this.cache.write(cacheKey, next);
   }
 
   private normalizeHoldCollection(input: any): AspenHold[] {
@@ -288,6 +297,39 @@ export class HoldsService {
     return s;
   }
 
+  private fetchHoldsNetwork(snap: ReturnType<AuthService['snapshot']>, cacheKey: string): Observable<AspenHold[]> {
+    return from(this.accounts.getPassword(snap.activeAccountId!)).pipe(
+      switchMap(password => {
+        if (!password) return throwError(() => new Error('missing_password'));
+
+        const params = new HttpParams().set('method', 'getPatronHolds');
+
+        const body = new URLSearchParams();
+        body.set('username', snap.activeAccountMeta!.username);
+        body.set('password', password);
+
+        const headers = new HttpHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' });
+
+        return this.http
+          .post<any>(`${this.globals.aspen_api_base}/UserAPI`, body.toString(), { params, headers })
+          .pipe(
+            map(raw => (raw?.result ?? raw) as PatronHoldsResponse),
+            map(r => {
+              if (!r?.success) return [];
+              const all = [
+                ...this.normalizeHoldCollection(r?.holds?.available),
+                ...this.normalizeHoldCollection(r?.holds?.unavailable),
+              ];
+              return all.filter(h => (h?.type === 'ils' || h?.source === 'ils'));
+            }),
+            tap((holds) => {
+              this.cache.write(cacheKey, holds).catch(() => {});
+            }),
+          );
+      }),
+    );
+  }
+
   // ---------- Core mutation plumbing ----------
 
   private callUserApiMutation(method: string, extraParams: Record<string, string>): Observable<AspenMutationResult> {
@@ -382,6 +424,29 @@ export class HoldsService {
   private pickHoldIdForFreeze(hold: AspenHold): number | null {
     const n = Number((hold as any)?.cancelId ?? (hold as any)?.id);
     return Number.isFinite(n) && n > 0 ? n : null;
+  }
+
+  private activeHoldsCacheKey(): string | null {
+    const snap = this.auth.snapshot();
+    const accountId = (snap.activeAccountId ?? '').toString().trim();
+    return accountId ? PREF_HOLDS_CACHE_PREFIX + accountId : null;
+  }
+
+  private holdMatches(a: AspenHold | null | undefined, b: AspenHold | null | undefined): boolean {
+    if (!a || !b) return false;
+    const aCancelId = this.pickCancelId(a);
+    const bCancelId = this.pickCancelId(b);
+    if (aCancelId && bCancelId) return aCancelId === bCancelId;
+
+    const aId = this.pickHoldIdForFreeze(a);
+    const bId = this.pickHoldIdForFreeze(b);
+    if (aId && bId) return aId === bId;
+
+    const aRecordId = this.pickRecordId(a);
+    const bRecordId = this.pickRecordId(b);
+    const aGrouped = ((a as any)?.groupedWorkId ?? '').toString().trim();
+    const bGrouped = ((b as any)?.groupedWorkId ?? '').toString().trim();
+    return !!aRecordId && !!bRecordId && aRecordId === bRecordId && !!aGrouped && aGrouped === bGrouped;
   }
 
   /**

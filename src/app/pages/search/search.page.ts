@@ -281,10 +281,19 @@ export class SearchPage implements OnInit, OnDestroy {
         msg.includes('dismiss') ||
         msg.includes('close') ||
         msg.includes('back');
+      if (canceled) {
+        this.resetToKeywordSearchMode();
+        return;
+      }
       if (!canceled) this.toast.presentToast('Could not scan barcode.');
     } finally {
       this.scanningIsbn = false;
     }
+  }
+
+  private resetToKeywordSearchMode() {
+    this.searchIndex = 'Keyword';
+    this.showAdvanced = false;
   }
 
   clearSearch(syncUrl = true) {
@@ -956,6 +965,9 @@ export class SearchPage implements OnInit, OnDestroy {
     const groupedKey = (hit?.key ?? '').toString().trim();
     if (!groupedKey) return [];
 
+    const fromHit = this.resolveIlsHoldTargetsFromItemList(hit);
+    if (fromHit.length) return fromHit;
+
     try {
       const work = await lastValueFrom(this.itemService.getGroupedWork(groupedKey));
       const physicalById = new Map<string, HoldTargetOption>();
@@ -987,6 +999,78 @@ export class SearchPage implements OnInit, OnDestroy {
     } catch {
       return [];
     }
+  }
+
+  private resolveIlsHoldTargetsFromItemList(hit: AspenSearchHit): HoldTargetOption[] {
+    const physicalById = new Map<string, HoldTargetOption>();
+    const anyById = new Map<string, HoldTargetOption>();
+
+    const sourceItems = this.rawItemListEntries(hit);
+    for (const item of sourceItems) {
+      const source = (item?.source ?? item?.type ?? '').toString().trim().toLowerCase();
+      if (source && source !== 'ils') continue;
+
+      const recordId = this.extractIlsRecordIdFromItemLike(item);
+      if (!recordId) continue;
+
+      const formatLabel = (
+        item?.name ??
+        item?.label ??
+        item?.format ??
+        item?.title ??
+        ''
+      ).toString().trim() || 'Format';
+      const cls = this.formatFamily.classifyFormatLabel(formatLabel);
+      const target: HoldTargetOption = {
+        recordId,
+        label: formatLabel,
+        formatLabel,
+      };
+
+      if (!anyById.has(recordId)) anyById.set(recordId, target);
+      if (cls.physical && !physicalById.has(recordId)) physicalById.set(recordId, target);
+    }
+
+    const physical = Array.from(physicalById.values());
+    if (physical.length) return physical;
+    return Array.from(anyById.values());
+  }
+
+  private rawItemListEntries(hit: AspenSearchHit): any[] {
+    const rawInput = (hit?.raw as any)?.itemList;
+    const rawValues = Array.isArray(rawInput)
+      ? rawInput
+      : rawInput && typeof rawInput === 'object'
+        ? Object.values(rawInput)
+        : [];
+    const normalized = Array.isArray(hit?.itemList) ? hit.itemList : [];
+    return [...rawValues, ...normalized];
+  }
+
+  private extractIlsRecordIdFromItemLike(item: any): string {
+    const directId = this.extractIlsRecordIdFromValue(item?.id ?? item?.recordId ?? item?.itemId);
+    if (directId) return directId;
+
+    const onclickId = this.itemService.extractIlsIdFromOnclick((item?.onclick ?? '').toString());
+    if (onclickId) return onclickId;
+
+    return '';
+  }
+
+  private extractIlsRecordIdFromValue(raw: any): string {
+    const value = (raw ?? '').toString().trim();
+    if (!value) return '';
+
+    const stripped = this.itemService.stripIlsPrefix(value);
+    if (/^\d+$/.test(stripped)) return stripped;
+
+    const prefixedMatch = value.match(/(?:^|:)ils:(\d+)(?:$|:)/i);
+    if (prefixedMatch?.[1]) return prefixedMatch[1];
+
+    const digitsMatch = value.match(/\b(\d{5,})\b/);
+    if (digitsMatch?.[1]) return digitsMatch[1];
+
+    return '';
   }
 
   private async pickHoldTarget(options: HoldTargetOption[]): Promise<HoldTargetOption | null> {

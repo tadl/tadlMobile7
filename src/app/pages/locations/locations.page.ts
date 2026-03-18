@@ -23,6 +23,8 @@ type Location = AppLocation;
 export class LocationsPage {
   url: string;
   locations: Location[] = [];
+  loadingLocations = false;
+  hasLoadedLocations = false;
 
   readonly placeholderImage = 'assets/placeholder.png';
   private brokenLocationImages = new WeakSet<Location>();
@@ -36,25 +38,41 @@ export class LocationsPage {
     this.url = this.globals.locations_list_url;
   }
 
-  ionViewDidEnter() {
+  ionViewWillEnter() {
+    const latest = this.sortedLocations(this.locationsService.getLatestLocationsSnapshot());
+    if (latest.length) {
+      this.locations = latest;
+    }
     this.get_locations();
   }
 
   get_locations() {
-    this.globals.loading_show();
+    const hasVisibleLocations = this.locations.length > 0;
+    this.loadingLocations = true;
+    if (!hasVisibleLocations) {
+      this.globals.loading_show();
+    }
 
     this.locationsService.getLocations().subscribe({
       next: (locations) => {
         this.globals.api_loading = false;
-        this.locations = (locations ?? []).slice().sort((a, b) =>
-          (a.fullname || '').localeCompare(b.fullname || ''),
-        );
+        this.loadingLocations = false;
+        this.hasLoadedLocations = true;
+        this.locations = this.sortedLocations(locations ?? []);
       },
       error: () => {
         this.globals.api_loading = false;
+        this.loadingLocations = false;
+        this.hasLoadedLocations = true;
         this.toast.presentToast(this.globals.server_error_msg);
       },
     });
+  }
+
+  private sortedLocations(locations: Location[]): Location[] {
+    return (locations ?? []).slice().sort((a, b) =>
+      (a.fullname || '').localeCompare(b.fullname || ''),
+    );
   }
 
   private todayKey(): keyof Location | null {

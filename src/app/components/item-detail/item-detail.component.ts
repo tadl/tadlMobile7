@@ -644,6 +644,14 @@ export class ItemDetailComponent implements OnInit {
     return status.includes('ready to pickup') || status.includes('ready for pickup') || status.includes('ready');
   }
 
+  private holdHasManageableIdentity(hold?: AspenHold | null): boolean {
+    const h: any = hold ?? this.hold;
+    if (!h) return false;
+    const holdId = Number(h?.cancelId ?? h?.id ?? 0);
+    const recordId = Number(h?.recordId ?? 0);
+    return Number.isFinite(holdId) && holdId > 0 && Number.isFinite(recordId) && recordId > 0;
+  }
+
   holdStatusText(hold?: AspenHold | null): string {
     const h: any = hold ?? this.hold;
     if (!h) return '';
@@ -683,6 +691,7 @@ export class ItemDetailComponent implements OnInit {
   freezeHold() {
     if (!this.hold || this.holdActionBusy) return;
     if (this.holdIsReady()) return;
+    if (!this.holdHasManageableIdentity(this.hold)) return;
 
     this.holdActionBusy = true;
     this.holds
@@ -701,6 +710,7 @@ export class ItemDetailComponent implements OnInit {
           (this.hold as any).frozen = true;
           (this.hold as any).statusMessage = 'Suspended';
           this.syncHoldAcrossItemState(this.hold);
+          this.holds.upsertCachedHold(this.hold!).catch(() => {});
 
           this.toast.presentToast('Hold suspended.');
         },
@@ -711,6 +721,7 @@ export class ItemDetailComponent implements OnInit {
   thawHold() {
     if (!this.hold || this.holdActionBusy) return;
     if (this.holdIsReady()) return;
+    if (!this.holdHasManageableIdentity(this.hold)) return;
 
     this.holdActionBusy = true;
     this.holds
@@ -729,6 +740,7 @@ export class ItemDetailComponent implements OnInit {
           (this.hold as any).frozen = false;
           (this.hold as any).statusMessage = 'Active';
           this.syncHoldAcrossItemState(this.hold);
+          this.holds.upsertCachedHold(this.hold!).catch(() => {});
 
           this.toast.presentToast('Hold activated.');
         },
@@ -756,6 +768,7 @@ export class ItemDetailComponent implements OnInit {
 
   private cancelHoldNow() {
     if (!this.hold || this.holdActionBusy) return;
+    if (!this.holdHasManageableIdentity(this.hold)) return;
 
     const selected = this.hold;
     const canceledHoldId = Number((selected as any)?.cancelId ?? (selected as any)?.id ?? 0) || 0;
@@ -781,6 +794,7 @@ export class ItemDetailComponent implements OnInit {
           });
 
           this.toast.presentToast(res?.message || 'Hold cancelled.');
+          this.holds.removeCachedHold(selected).catch(() => {});
 
           // Keep modal open and update local state without re-fetching.
           this.holdsForItem = this.holdsForItem.filter((h) => {
@@ -801,6 +815,7 @@ export class ItemDetailComponent implements OnInit {
   async changePickupLocation() {
     if (!this.hold || this.holdActionBusy) return;
     if (this.holdIsReady()) return;
+    if (!this.holdHasManageableIdentity(this.hold)) return;
 
     const holdId = Number((this.hold as any)?.cancelId ?? (this.hold as any)?.id ?? 0) || 0;
     if (!holdId) {
@@ -854,6 +869,7 @@ export class ItemDetailComponent implements OnInit {
               this.globals.pickupNameForCode(parsed.code) ?? (this.hold as any).pickupLocationName;
           }
           this.syncHoldAcrossItemState(this.hold);
+          this.holds.upsertCachedHold(this.hold!).catch(() => {});
 
           this.toast.presentToast(res?.message || 'Pickup location updated.');
         },
@@ -888,6 +904,13 @@ export class ItemDetailComponent implements OnInit {
 
   private async openActionsForCurrentHold() {
     if (!this.hold) return;
+    if (!this.holdHasManageableIdentity(this.hold)) {
+      const refreshed = await this.refreshHoldForThisItemFromFreshFetch();
+      if (!refreshed || !this.hold || !this.holdHasManageableIdentity(this.hold)) {
+        this.toast.presentToast('Refreshing hold details. Please try again in a moment.');
+        return;
+      }
+    }
     const isReady = this.holdIsReady(this.hold);
     const isFrozen = this.holdIsFrozen(this.hold);
 
@@ -1321,6 +1344,7 @@ export class ItemDetailComponent implements OnInit {
           this.auth.adjustActiveProfileCounts({ holds: 1, holdsRequested: 1 });
           this.toast.presentToast(res?.message || 'Hold placed.');
           this.insertOptimisticPlacedHold(recordId, pickupBranch);
+          void this.refreshHoldForThisItemFromFreshFetch();
         },
         error: (err) => {
           const msg = (err?.message ?? '').toString().trim();
@@ -1672,6 +1696,36 @@ export class ItemDetailComponent implements OnInit {
         },
         error: () => {},
       });
+  }
+
+  private async refreshHoldForThisItemFromFreshFetch(): Promise<boolean> {
+    const key = (this.hit?.key ?? '').toString().trim();
+    if (!key || this.holdRefreshBusy) return false;
+
+    this.holdRefreshBusy = true;
+    try {
+      const list = await lastValueFrom(this.holds.fetchFreshActiveHolds());
+      const matches = (list ?? []).filter(
+        (h) => String((h as any)?.groupedWorkId ?? '').trim() === key,
+      );
+      this.holdsForItem = matches;
+
+      if (!matches.length) {
+        this.hold = null;
+        return false;
+      }
+
+      const currentId = Number((this.hold as any)?.cancelId ?? (this.hold as any)?.id ?? 0) || 0;
+      const keepCurrent = currentId
+        ? matches.find((h) => (Number((h as any)?.cancelId ?? (h as any)?.id ?? 0) || 0) === currentId) ?? null
+        : null;
+      this.hold = keepCurrent ?? matches[0];
+      return true;
+    } catch {
+      return false;
+    } finally {
+      this.holdRefreshBusy = false;
+    }
   }
 
   private refreshCheckoutForThisItem(force = false) {

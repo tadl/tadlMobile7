@@ -129,6 +129,11 @@ export class CacheWarmService {
       );
     }
 
+    const locationsRaw = raw?.locations;
+    if (Array.isArray(locationsRaw)) {
+      await this.locations.hydrateLocations(locationsRaw);
+    }
+
     return true;
   }
 }

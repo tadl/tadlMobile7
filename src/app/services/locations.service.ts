@@ -35,20 +35,22 @@ export interface AppLocationException {
 @Injectable({ providedIn: 'root' })
 export class LocationsService {
   private latestLocations: AppLocation[] | null = null;
+  private readonly listCacheKey: string;
 
   constructor(
     private http: HttpClient,
     private globals: Globals,
     private cache: AppCacheService,
-  ) {}
+  ) {
+    this.listCacheKey = `locations:list:${this.globals.locations_group}`;
+  }
 
   getLocations(): Observable<AppLocation[]> {
-    const cacheKey = `locations:list:${this.globals.locations_group}`;
     const memory$ = Array.isArray(this.latestLocations)
       ? of(this.latestLocations)
       : EMPTY;
 
-    const cached$ = from(this.cache.read<AppLocation[]>(cacheKey)).pipe(
+    const cached$ = from(this.cache.read<AppLocation[]>(this.listCacheKey)).pipe(
       filter((v): v is AppLocation[] => Array.isArray(v)),
       tap((locations) => {
         this.latestLocations = locations;
@@ -60,8 +62,7 @@ export class LocationsService {
       .pipe(
         map((res) => Array.isArray(res?.locations) ? res.locations : []),
         tap((locations) => {
-          this.latestLocations = locations;
-          this.cache.write(cacheKey, locations).catch(() => {});
+          void this.hydrateLocations(locations);
         }),
       );
 
@@ -72,6 +73,20 @@ export class LocationsService {
 
   getLatestLocationsSnapshot(): AppLocation[] {
     return Array.isArray(this.latestLocations) ? this.latestLocations.slice() : [];
+  }
+
+  async hydrateLocations(locations: AppLocation[]): Promise<void> {
+    const normalized = Array.isArray(locations) ? locations : [];
+    this.latestLocations = normalized;
+    await this.cache.write(this.listCacheKey, normalized);
+
+    await Promise.all(
+      normalized.map((location) => {
+        const shortname = (location?.shortname ?? '').toString().trim();
+        if (!shortname) return Promise.resolve();
+        return this.cache.write(`locations:detail:${shortname}`, location);
+      }),
+    );
   }
 
   getLocationByShortname(shortname: string, options?: { skipCache?: boolean }): Observable<AppLocation | null> {

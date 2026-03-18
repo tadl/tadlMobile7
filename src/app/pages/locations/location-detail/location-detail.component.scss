@@ -19,6 +19,7 @@
   --today-pill-ex-border: #d66a62;
   --hours-row-bg: rgba(var(--ion-text-color-rgb), 0.06);
   --hours-row-today-bg: rgba(var(--ion-color-primary-rgb), 0.18);
+  --exception-reason-color: rgba(var(--ion-text-color-rgb), 0.82);
 }
 
 .location-detail-content::part(scroll) {
@@ -159,10 +160,6 @@
     margin-top: 2px;
   }
 
-  .contact .contact-links {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .hours-row {
     padding: 10px 12px;
   }
@@ -198,10 +195,6 @@
   background: var(--surface-bg);
 }
 
-.hours-card ion-card-header {
-  padding-bottom: 8px;
-}
-
 .exceptions-subtitle {
   margin-top: 0;
   font-size: 14px;
@@ -209,10 +202,6 @@
   color: var(--ion-color-danger, #b42318);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-}
-
-.hours-card ion-card-content {
-  padding-top: 4px;
 }
 
 .hours-subtitle {
@@ -284,17 +273,11 @@
   gap: 4px;
 }
 
-.exception-hours {
-  font-size: 17px;
-  font-weight: 600;
-  line-height: 1.2;
-}
-
 .exception-reason {
   font-size: 14px;
   line-height: 1.35;
   font-weight: 500;
-  color: rgba(var(--ion-text-color-rgb), 0.82);
+  color: var(--exception-reason-color);
 }
 
 :host-context(.ion-palette-dark) {
@@ -314,17 +297,5 @@
   --today-pill-ex-border: rgba(var(--ion-color-danger-rgb), 0.55);
   --hours-row-bg: rgba(255, 255, 255, 0.05);
   --hours-row-today-bg: rgba(var(--ion-color-primary-rgb), 0.22);
-}
-
-:host-context(.ion-palette-dark) .exception-reason {
-  color: rgba(255, 255, 255, 0.86);
-}
-
-.loading-overlay {
-  position: fixed;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  pointer-events: none;
-  background: rgba(0, 0, 0, 0.18);
+  --exception-reason-color: rgba(255, 255, 255, 0.86);
 }

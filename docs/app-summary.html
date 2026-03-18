@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TADL Mobile App Summary</title>
+    <style>
+      @page {
+        size: Letter;
+        margin: 0.55in;
+      }
+
+      :root {
+        --text: #111827;
+        --muted: #4b5563;
+        --line: #d1d5db;
+        --brand: #1d4ed8;
+        --surface: #f8fafc;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 10.5pt;
+        line-height: 1.35;
+      }
+
+      .page {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      header {
+        border-bottom: 2px solid var(--brand);
+        padding-bottom: 10px;
+      }
+
+      h1 {
+        margin: 0 0 4px;
+        font-size: 22pt;
+        line-height: 1.1;
+      }
+
+      .subtitle {
+        margin: 0;
+        color: var(--muted);
+        font-size: 11pt;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        gap: 12px;
+      }
+
+      section {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px 12px;
+        background: white;
+      }
+
+      .full {
+        grid-column: 1 / -1;
+      }
+
+      h2 {
+        margin: 0 0 6px;
+        color: var(--brand);
+        font-size: 11pt;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+
+      p {
+        margin: 0 0 6px;
+      }
+
+      ul {
+        margin: 6px 0 0 18px;
+        padding: 0;
+      }
+
+      li {
+        margin: 0 0 4px;
+      }
+
+      .surface {
+        background: var(--surface);
+      }
+
+      .twocol {
+        columns: 2;
+        column-gap: 18px;
+      }
+
+      .small {
+        color: var(--muted);
+        font-size: 9.5pt;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header>
+        <h1>TADL Mobile</h1>
+        <p class="subtitle">
+          A native-feeling mobile app for Traverse Area District Library cardholders, built with Ionic,
+          Angular, and Capacitor.
+        </p>
+      </header>
+
+      <div class="grid">
+        <section>
+          <h2>Overview</h2>
+          <p>
+            TADL Mobile gives patrons quick access to account tools, catalog discovery, library news,
+            events, locations, and utility features from a single mobile app experience.
+          </p>
+          <p>
+            The app is designed around practical patron tasks: searching the catalog, placing and
+            managing holds, checking due dates, browsing events, viewing service alerts, and getting
+            to the right branch information fast.
+          </p>
+        </section>
+
+        <section class="surface">
+          <h2>Audience</h2>
+          <ul>
+            <li>TADL cardholders using iPhone or Android</li>
+            <li>Patrons who want faster account access than the mobile web</li>
+            <li>Staff supporting patrons with account, hold, and location questions</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>Core Features</h2>
+          <ul>
+            <li>Account access for checkouts, holds, fines, lists, card display, and preferences</li>
+            <li>Catalog search with filters, ISBN barcode scan, MeLCat shortcut, and item detail modals</li>
+            <li>Hold placement and management, including suspend, cancel, and pickup-location changes</li>
+            <li>Event browsing with detailed views and “Add to calendar” support</li>
+            <li>Newsletter feed, webcams page, and branch/location detail screens</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>Data Sources</h2>
+          <ul>
+            <li>Aspen Discovery APIs for search, holds, checkouts, and grouped work details</li>
+            <li>TADL feed proxies for newsletters and webcams</li>
+            <li>Locations JSON with service exceptions and branch metadata</li>
+            <li>Cached local data for faster repeat loads and smoother navigation</li>
+          </ul>
+        </section>
+
+        <section class="full">
+          <h2>Recent Enhancements</h2>
+          <div class="twocol">
+            <ul>
+              <li>Newsletter page moved to feed-backed content with richer detail rendering</li>
+              <li>Webcams page moved to feed-backed entries and safer external playback</li>
+              <li>Location service alerts now support Eastern-time same-day and next-day exceptions</li>
+              <li>Homepage now surfaces upcoming branch closures and modified hours</li>
+              <li>Item detail views now support calendar export, stronger list feedback, and better hold-state handling</li>
+              <li>Preferences page was clarified with link-mode and theme explanations</li>
+              <li>Small-screen layout issues were addressed on Account and Location detail pages</li>
+              <li>Contrast, spacing, and corner-radius polish improved readability and consistency</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="full">
+          <h2>Technical Summary</h2>
+          <p>
+            The app uses Ionic Angular for the UI, Capacitor for native packaging and device features,
+            and a mix of live API calls plus local caching to keep the interface responsive. It is
+            optimized for both logged-in patron workflows and quick public browsing tasks.
+          </p>
+          <p class="small">
+            Current release focus: polish, performance, and dependable real-world patron flows rather
+            than major new feature development.
+          </p>
+        </section>
+      </div>
+    </main>
+  </body>
+</html>

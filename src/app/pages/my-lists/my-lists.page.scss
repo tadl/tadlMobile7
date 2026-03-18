@@ -3,37 +3,11 @@
   line-height: 1.2;
 }
 
-.lists-header-card {
-  margin-bottom: 10px;
-}
-
 .lists-header-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.lists-sync-group {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.lists-help-btn {
-  --padding-start: 6px;
-  --padding-end: 6px;
-  min-width: 44px;
-  min-height: 44px;
-}
-
-.lists-help-btn ion-icon {
-  font-size: 1.3rem;
-}
-
-.lists-header-note {
-  margin-top: 8px;
-  display: block;
+  justify-content: flex-end;
+  margin: 0 0 6px;
 }
 
 .sub {

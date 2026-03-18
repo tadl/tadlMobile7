@@ -23,11 +23,11 @@ import { SearchService, AspenSearchHit, AspenSearchIndex, AspenSearchSort } from
 import { ItemDetailComponent } from '../../components/item-detail/item-detail.component';
 import { FormatFamilyService } from '../../services/format-family.service';
 import { ListsService, AspenUserList } from '../../services/lists.service';
-import { ListMembershipIndexService } from '../../services/list-membership-index.service';
 import { ItemService } from '../../services/item.service';
 import { HoldsService } from '../../services/holds.service';
 import { AccountPreferencesService } from '../../services/account-preferences.service';
 import { AuthService } from '../../services/auth.service';
+import { ListLookupService } from '../../services/list-lookup.service';
 
 interface SearchFacetOption {
   filter: string;
@@ -115,7 +115,7 @@ export class SearchPage implements OnInit, OnDestroy {
     private actionSheetController: ActionSheetController,
     private formatFamily: FormatFamilyService,
     private listsService: ListsService,
-    private membershipIndex: ListMembershipIndexService,
+    private listLookup: ListLookupService,
     private itemService: ItemService,
     private holds: HoldsService,
     private accountPreferences: AccountPreferencesService,
@@ -798,6 +798,7 @@ export class SearchPage implements OnInit, OnDestroy {
 
   private async addHitToList(hit: AspenSearchHit): Promise<void> {
     const recordId = (hit?.key ?? '').toString().trim();
+    const recordKey = recordId.toLowerCase();
     if (!recordId) {
       this.toast.presentToast('This record is missing an id.');
       return;
@@ -809,8 +810,17 @@ export class SearchPage implements OnInit, OnDestroy {
     }
 
     let lists: AspenUserList[] = [];
+    let lastListUsed: string | null = null;
+    let existingListIds = new Set<string>();
     try {
-      lists = await lastValueFrom(this.listsService.fetchUserLists());
+      const lookup = await this.listLookup.lookup([recordId]);
+      lists = this.orderListsForAction(lookup.lists, lookup.lastListUsed);
+      lastListUsed = lookup.lastListUsed;
+      existingListIds = new Set(
+        (lookup.membershipsByRecordId[recordKey] ?? [])
+          .map((m) => (m?.listId ?? '').toString().trim())
+          .filter((id) => !!id),
+      );
     } catch {
       this.toast.presentToast('Could not load your lists.');
       return;
@@ -820,14 +830,10 @@ export class SearchPage implements OnInit, OnDestroy {
       this.toast.presentToast('You do not have any lists yet.');
       return;
     }
-    const existingListIds = new Set(
-      (await this.membershipIndex.membershipsForRecord(recordId))
-        .map((m) => (m?.listId ?? '').toString().trim())
-        .filter((id) => !!id),
-    );
 
     const sheet = await this.actionSheetController.create({
       header: 'Add to which list?',
+      subHeader: lastListUsed ? 'Most recently used list is shown first.' : undefined,
       buttons: [
         ...lists.map((list): ActionSheetButton => ({
           text: this.actionListLabel(list, existingListIds),
@@ -863,11 +869,24 @@ export class SearchPage implements OnInit, OnDestroy {
             return;
           }
           const listTitle = (list?.title ?? '').toString().trim() || 'Untitled list';
-          this.membershipIndex.upsertMembership(recordId, listId, listTitle).catch(() => {});
+          this.listLookup.upsertMembership(recordId, listId, listTitle);
           this.toast.presentToast(res?.message || 'Added to list.');
         },
         error: () => this.toast.presentToast('Could not add to list.'),
       });
+  }
+
+  private orderListsForAction(lists: AspenUserList[], lastListUsed: string | null): AspenUserList[] {
+    const preferred = (lastListUsed ?? '').toString().trim();
+    if (!preferred) return (lists ?? []).slice();
+
+    return (lists ?? []).slice().sort((a, b) => {
+      const aId = (a?.id ?? '').toString().trim();
+      const bId = (b?.id ?? '').toString().trim();
+      if (aId === preferred && bId !== preferred) return -1;
+      if (bId === preferred && aId !== preferred) return 1;
+      return 0;
+    });
   }
 
   private async placeHoldFromHit(hit: AspenSearchHit, precomputedTargets?: HoldTargetOption[]): Promise<void> {

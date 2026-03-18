@@ -27,8 +27,8 @@ import type { AspenCheckout } from '../../services/checkouts.service';
 import { ListsService, type AspenUserList } from '../../services/lists.service';
 import { AuthService } from '../../services/auth.service';
 import { CopyDetailsPopoverComponent } from '../copy-details-popover/copy-details-popover.component';
-import { ListMembershipIndexService } from '../../services/list-membership-index.service';
 import { AccountPreferencesService } from '../../services/account-preferences.service';
+import { ListLookupService } from '../../services/list-lookup.service';
 
 interface ItemDetailListContext {
   listId: string;
@@ -129,7 +129,7 @@ export class ItemDetailComponent implements OnInit {
     private holds: HoldsService,
     private checkouts: CheckoutsService,
     private lists: ListsService,
-    private membershipIndex: ListMembershipIndexService,
+    private listLookup: ListLookupService,
     private accountPreferences: AccountPreferencesService,
     private router: Router,
     private modalCtrl: ModalController, // ✅ renamed from "modal"
@@ -334,7 +334,8 @@ export class ItemDetailComponent implements OnInit {
     if (!loggedIn) return [];
 
     try {
-      const lists = await lastValueFrom(this.lists.fetchUserLists());
+      const lookup = await this.listLookup.lookup([this.listRecordId()]);
+      const lists = this.orderListsForAction(lookup.lists, lookup.lastListUsed);
       if (!lists?.length) {
         this.toast.presentToast('You do not have any lists yet.');
         return [];
@@ -369,9 +370,7 @@ export class ItemDetailComponent implements OnInit {
             return;
           }
           this.upsertKnownListMembership(listId, (list?.title ?? '').toString().trim() || 'Untitled list');
-          this.membershipIndex
-            .upsertMembership(recordId, listId, (list?.title ?? '').toString().trim() || 'Untitled list')
-            .catch(() => {});
+          this.listLookup.upsertMembership(recordId, listId, (list?.title ?? '').toString().trim() || 'Untitled list');
           this.needsListRefresh = true;
           this.toast.presentToast(res?.message || 'Added to list.');
         },
@@ -415,7 +414,7 @@ export class ItemDetailComponent implements OnInit {
 
           this.needsListRefresh = true;
           this.removeKnownListMembership(listId);
-          this.membershipIndex.removeMembership(recordId, listId).catch(() => {});
+          this.listLookup.removeMembership(recordId, listId);
           this.toast.presentToast(res?.message || 'Removed from list.');
         },
         error: () => this.toast.presentToast('Could not remove from list.'),
@@ -433,32 +432,45 @@ export class ItemDetailComponent implements OnInit {
       .filter((x): x is KnownListMembership => !!x);
 
     if (fromHit.length) {
-      this.knownListMemberships = fromHit;
-      return;
+      this.mergeKnownListMemberships(fromHit);
     }
 
     const listId = (this.listContext?.listId ?? '').toString().trim();
     if (listId) {
       const listTitle = (this.listContext?.listTitle ?? '').toString().trim() || 'This list';
-      this.knownListMemberships = [{ listId, listTitle }];
-      return;
+      this.mergeKnownListMemberships([{ listId, listTitle }]);
     }
 
     try {
       const recordId = this.listRecordId();
       if (!recordId) return;
-      const indexed = await this.membershipIndex.membershipsForRecord(recordId);
+      const indexed = await this.listLookup.membershipsForRecord(recordId);
       if (indexed.length) {
-        this.knownListMemberships = indexed
+        this.mergeKnownListMemberships(
+          indexed
           .map((x) => ({
             listId: (x?.listId ?? '').toString().trim(),
             listTitle: (x?.listTitle ?? '').toString().trim() || 'List',
           }))
-          .filter((x) => !!x.listId);
+          .filter((x) => !!x.listId),
+        );
       }
     } catch {
       // Keep UI stable if index read fails/unavailable.
     }
+  }
+
+  private orderListsForAction(lists: AspenUserList[], lastListUsed: string | null): AspenUserList[] {
+    const preferred = (lastListUsed ?? '').toString().trim();
+    if (!preferred) return (lists ?? []).slice();
+
+    return (lists ?? []).slice().sort((a, b) => {
+      const aId = (a?.id ?? '').toString().trim();
+      const bId = (b?.id ?? '').toString().trim();
+      if (aId === preferred && bId !== preferred) return -1;
+      if (bId === preferred && aId !== preferred) return 1;
+      return 0;
+    });
   }
 
   private upsertKnownListMembership(listId: string, listTitle: string) {
@@ -478,6 +490,21 @@ export class ItemDetailComponent implements OnInit {
     const id = (listId ?? '').toString().trim();
     if (!id) return;
     this.knownListMemberships = this.knownListMemberships.filter(x => x.listId !== id);
+  }
+
+  private mergeKnownListMemberships(entries: KnownListMembership[]) {
+    const byId = new Map<string, KnownListMembership>();
+    for (const entry of this.knownListMemberships) {
+      const listId = (entry?.listId ?? '').toString().trim();
+      if (!listId) continue;
+      byId.set(listId, { listId, listTitle: entry.listTitle || 'List' });
+    }
+    for (const entry of entries ?? []) {
+      const listId = (entry?.listId ?? '').toString().trim();
+      if (!listId) continue;
+      byId.set(listId, { listId, listTitle: (entry?.listTitle ?? '').toString().trim() || 'List' });
+    }
+    this.knownListMemberships = Array.from(byId.values());
   }
 
   async openListMembershipActions(m: KnownListMembership, ev?: Event) {

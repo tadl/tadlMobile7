@@ -7,7 +7,7 @@ import { finalize } from 'rxjs';
 import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
 import { ListsService, type AspenUserList } from '../../services/lists.service';
-import { ListMembershipIndexService } from '../../services/list-membership-index.service';
+import { ListLookupService } from '../../services/list-lookup.service';
 
 @Component({
   standalone: true,
@@ -19,10 +19,7 @@ import { ListMembershipIndexService } from '../../services/list-membership-index
 export class MyListsPage {
   loading = false;
   mutating = false;
-  syncingMemberships = false;
   lists: AspenUserList[] = [];
-  membershipsLastSynced: number | null = null;
-  membershipsIndexedRecords = 0;
 
   constructor(
     public globals: Globals,
@@ -31,12 +28,11 @@ export class MyListsPage {
     private router: Router,
     private actionSheetCtrl: ActionSheetController,
     private alertCtrl: AlertController,
-    private membershipIndex: ListMembershipIndexService,
+    private listLookup: ListLookupService,
   ) {}
 
   async ionViewWillEnter() {
     this.refresh();
-    await this.refreshMembershipStatus();
   }
 
   refresh(ev?: any) {
@@ -179,7 +175,7 @@ export class MyListsPage {
             this.toast.presentToast(res?.message || 'Could not update list.');
             return;
           }
-          this.membershipIndex.renameList(listId, basics.title).catch(() => {});
+          this.listLookup.renameList(listId, basics.title);
           this.toast.presentToast(res?.message || 'List updated.');
           this.refresh();
         },
@@ -214,22 +210,6 @@ export class MyListsPage {
     await alert.present();
   }
 
-  async showMembershipHelp() {
-    const alert = await this.alertCtrl.create({
-      header: 'What is list membership sync?',
-      message: [
-        'List membership shows which of your lists an item belongs to when you open item details.',
-        '',
-        'Sync memberships builds a local index from your lists so that information appears quickly without checking every list during browsing.',
-        '',
-        'Run sync after large list changes (adding/removing many items) if membership labels seem out of date.',
-      ].join('\n'),
-      buttons: [{ text: 'Close', role: 'cancel' }],
-    });
-
-    await alert.present();
-  }
-
   private deleteList(list: AspenUserList) {
     const listId = (list?.id ?? '').toString().trim();
     if (!listId) {
@@ -248,7 +228,7 @@ export class MyListsPage {
             return;
           }
           this.lists = this.lists.filter(x => (x?.id ?? '').toString().trim() !== listId);
-          this.membershipIndex.removeList(listId).catch(() => {});
+          this.listLookup.removeList(listId);
           this.toast.presentToast(res?.message || 'List deleted.');
         },
         error: () => this.toast.presentToast('Could not delete list.'),
@@ -338,38 +318,5 @@ export class MyListsPage {
 
   trackByList(_idx: number, list: AspenUserList): string {
     return (list?.id ?? '').toString();
-  }
-
-  membershipsSyncSummary(): string {
-    if (!this.membershipsLastSynced) return 'List memberships not synced yet.';
-    const dt = new Date(this.membershipsLastSynced);
-    const when = dt.toLocaleString();
-    return `Last synced: ${when} • ${this.membershipsIndexedRecords} indexed item${this.membershipsIndexedRecords === 1 ? '' : 's'}`;
-  }
-
-  async syncMemberships() {
-    if (this.syncingMemberships || this.loading || this.mutating) return;
-    this.syncingMemberships = true;
-    try {
-      const result = await this.membershipIndex.syncAllForCurrentUser();
-      this.membershipsLastSynced = result.updatedAt;
-      this.membershipsIndexedRecords = result.recordsIndexed;
-      this.toast.presentToast(`Synced ${result.listsSynced} list${result.listsSynced === 1 ? '' : 's'}.`);
-    } catch {
-      this.toast.presentToast('Could not sync list memberships.');
-    } finally {
-      this.syncingMemberships = false;
-    }
-  }
-
-  private async refreshMembershipStatus() {
-    try {
-      const status = await this.membershipIndex.getStatusForCurrentUser();
-      this.membershipsLastSynced = status.updatedAt;
-      this.membershipsIndexedRecords = status.records;
-    } catch {
-      this.membershipsLastSynced = null;
-      this.membershipsIndexedRecords = 0;
-    }
   }
 }

@@ -17,41 +17,15 @@
     <ion-refresher-content></ion-refresher-content>
   </ion-refresher>
 
-  <ion-card class="lists-header-card">
-    <ion-card-content>
-      <div class="lists-header-actions">
-        <div class="lists-sync-group">
-          <ion-button
-            size="small"
-            fill="outline"
-            (click)="syncMemberships()"
-            [disabled]="loading || mutating || syncingMemberships"
-          >
-            {{ syncingMemberships ? 'Syncing...' : 'Sync memberships' }}
-          </ion-button>
-          <ion-button
-            size="small"
-            fill="clear"
-            class="lists-help-btn"
-            aria-label="What does sync memberships do?"
-            (click)="showMembershipHelp()"
-          >
-            <ion-icon name="help-circle-outline" slot="icon-only"></ion-icon>
-          </ion-button>
-        </div>
-
-        <ion-button
-          size="small"
-          (click)="createList()"
-          [disabled]="loading || mutating || syncingMemberships"
-        >
-          + New list
-        </ion-button>
-      </div>
-
-      <ion-note class="lists-header-note">{{ membershipsSyncSummary() }}</ion-note>
-    </ion-card-content>
-  </ion-card>
+  <div class="lists-header-actions">
+    <ion-button
+      size="small"
+      (click)="createList()"
+      [disabled]="loading || mutating"
+    >
+      + New list
+    </ion-button>
+  </div>
 
   <ion-list *ngIf="lists.length > 0" lines="full" class="full-list">
     <ion-item

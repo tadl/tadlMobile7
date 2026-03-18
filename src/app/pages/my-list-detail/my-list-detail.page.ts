@@ -11,12 +11,12 @@ import { ToastService } from '../../services/toast.service';
 import { ListsService, type AspenListTitle } from '../../services/lists.service';
 import { ItemDetailComponent } from '../../components/item-detail/item-detail.component';
 import { AspenSearchHit } from '../../services/search.service';
-import { ListMembershipIndexService } from '../../services/list-membership-index.service';
 import { AuthService } from '../../services/auth.service';
 import { ItemService } from '../../services/item.service';
 import { HoldsService } from '../../services/holds.service';
 import { AccountPreferencesService } from '../../services/account-preferences.service';
 import { FormatFamilyService } from '../../services/format-family.service';
+import { ListLookupService } from '../../services/list-lookup.service';
 
 interface HoldTargetOption {
   recordId: string;
@@ -57,7 +57,7 @@ export class MyListDetailPage {
     private actionSheetCtrl: ActionSheetController,
     private alertCtrl: AlertController,
     private router: Router,
-    private membershipIndex: ListMembershipIndexService,
+    private listLookup: ListLookupService,
     private auth: AuthService,
     private itemService: ItemService,
     private holds: HoldsService,
@@ -664,7 +664,7 @@ export class MyListDetailPage {
           }
 
           this.titles = this.titles.filter(x => this.recordIdForEntry(x) !== recordId);
-          this.membershipIndex.removeMembership(recordId, this.listId).catch(() => {});
+          this.listLookup.removeMembership(recordId, this.listId);
           this.toast.presentToast(res?.message || 'Removed from list.');
         },
         error: () => this.toast.presentToast('Could not remove title from list.'),
@@ -788,7 +788,7 @@ export class MyListDetailPage {
             return;
           }
 
-          this.membershipIndex.removeList(listId).catch(() => {});
+          this.listLookup.removeList(listId);
           this.toast.presentToast(res?.message || 'List deleted.');
           this.router.navigate(['/my-lists']);
         },

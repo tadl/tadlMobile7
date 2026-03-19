@@ -1,7 +1,7 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { IonicModule, ModalController, ActionSheetController, type ActionSheetButton } from '@ionic/angular';
+import { IonicModule, ModalController, ActionSheetController, AlertController, type ActionSheetButton } from '@ionic/angular';
 import { ActivatedRoute, ParamMap } from '@angular/router';
 import { Router } from '@angular/router';
 import { finalize } from 'rxjs';
@@ -113,6 +113,7 @@ export class SearchPage implements OnInit, OnDestroy {
     private searchService: SearchService,
     private modalController: ModalController,
     private actionSheetController: ActionSheetController,
+    private alertCtrl: AlertController,
     private formatFamily: FormatFamilyService,
     private listsService: ListsService,
     private listLookup: ListLookupService,
@@ -598,9 +599,10 @@ export class SearchPage implements OnInit, OnDestroy {
       { text: 'Close', role: 'cancel' },
     );
 
-    if (this.auth.snapshot()?.isLoggedIn && await this.canAddToList()) {
+    if (this.auth.snapshot()?.isLoggedIn) {
+      const hasLists = await this.canAddToList();
       buttons.splice(buttons.length - 2, 0, {
-        text: 'Add to List',
+        text: hasLists ? 'Add to List' : 'New List',
         handler: () => this.addHitToList(hit),
       });
     }
@@ -811,7 +813,7 @@ export class SearchPage implements OnInit, OnDestroy {
     }
 
     if (!lists.length) {
-      this.toast.presentToast('You do not have any lists yet.');
+      await this.createListAndAddHit(hit);
       return;
     }
 
@@ -887,6 +889,114 @@ export class SearchPage implements OnInit, OnDestroy {
     } catch {
       return false;
     }
+  }
+
+  private async createListAndAddHit(hit: AspenSearchHit): Promise<void> {
+    const basics = await this.promptListBasics('Create List');
+    if (!basics) return;
+
+    const isPublic = await this.promptVisibility(false);
+    if (isPublic === null) return;
+
+    if (this.rowActionBusy(hit)) return;
+    this.setRowBusy(hit, true);
+    this.listsService.createList(basics.title, basics.description, isPublic)
+      .pipe(finalize(() => this.setRowBusy(hit, false)))
+      .subscribe({
+        next: (res) => {
+          if (!res?.success || !res?.listId) {
+            this.toast.presentToast(res?.message || 'Could not create list.');
+            return;
+          }
+          const createdList: AspenUserList = {
+            id: res.listId,
+            title: res.listTitle || basics.title,
+            description: basics.description,
+            public: isPublic,
+            numTitles: 0,
+          };
+          this.listLookup.replaceLists([createdList]);
+          this.addRecordToNamedList(createdList, hit);
+        },
+        error: () => this.toast.presentToast('Could not create list.'),
+      });
+  }
+
+  private async promptListBasics(
+    header: string,
+    initialTitle = '',
+    initialDescription = '',
+  ): Promise<{ title: string; description: string } | null> {
+    return new Promise(async (resolve) => {
+      const alert = await this.alertCtrl.create({
+        header,
+        inputs: [
+          {
+            name: 'title',
+            type: 'text',
+            placeholder: 'List title',
+            value: initialTitle,
+          },
+          {
+            name: 'description',
+            type: 'textarea',
+            placeholder: 'Description (optional)',
+            value: initialDescription,
+          },
+        ],
+        buttons: [
+          { text: 'Cancel', role: 'cancel', handler: () => resolve(null) },
+          {
+            text: 'Continue',
+            handler: (data) => {
+              const title = (data?.title ?? '').toString().trim();
+              const description = (data?.description ?? '').toString().trim();
+              if (!title) {
+                this.toast.presentToast('List title is required.');
+                return false;
+              }
+              resolve({ title, description });
+              return true;
+            },
+          },
+        ],
+      });
+      await alert.present();
+    });
+  }
+
+  private async promptVisibility(initialPublic: boolean): Promise<boolean | null> {
+    return new Promise(async (resolve) => {
+      const alert = await this.alertCtrl.create({
+        header: 'List Visibility',
+        message: 'Choose whether this list is private or public.',
+        inputs: [
+          {
+            type: 'radio',
+            label: 'Private',
+            value: 'private',
+            checked: !initialPublic,
+          },
+          {
+            type: 'radio',
+            label: 'Public',
+            value: 'public',
+            checked: initialPublic,
+          },
+        ],
+        buttons: [
+          { text: 'Cancel', role: 'cancel', handler: () => resolve(null) },
+          {
+            text: 'Save',
+            handler: (value) => {
+              resolve((value ?? 'private').toString() === 'public');
+              return true;
+            },
+          },
+        ],
+      });
+      await alert.present();
+    });
   }
 
   private async placeHoldFromHit(hit: AspenSearchHit, precomputedTargets?: HoldTargetOption[]): Promise<void> {

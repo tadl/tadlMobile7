@@ -254,7 +254,11 @@ export class ItemDetailComponent implements OnInit {
   // ----------------------------
 
   canManageLists(): boolean {
-    return !!this.listRecordId() && this.availableLists.length > 0;
+    return !!this.listRecordId() && this.auth.snapshot()?.isLoggedIn === true;
+  }
+
+  listPrimaryActionLabel(): string {
+    return this.availableLists.length === 0 ? 'New list' : 'Add to list';
   }
 
   hasKnownListMembership(): boolean {
@@ -281,7 +285,10 @@ export class ItemDetailComponent implements OnInit {
     if (!recordId) return;
 
     const lists = await this.getListsForAction();
-    if (!lists.length) return;
+    if (!lists.length) {
+      await this.createListAndAddRecord(recordId);
+      return;
+    }
 
     if (lists.length === 1) {
       this.addRecordToList(lists[0], recordId);
@@ -569,6 +576,116 @@ export class ItemDetailComponent implements OnInit {
     } catch {
       this.availableLists = [];
     }
+  }
+
+  private async createListAndAddRecord(recordId: string): Promise<void> {
+    const basics = await this.promptListBasics('Create List');
+    if (!basics) return;
+
+    const isPublic = await this.promptVisibility(false);
+    if (isPublic === null) return;
+
+    if (this.listActionBusy) return;
+    this.listActionBusy = true;
+    this.lists.createList(basics.title, basics.description, isPublic)
+      .pipe(finalize(() => (this.listActionBusy = false)))
+      .subscribe({
+        next: (res) => {
+          if (!res?.success || !res?.listId) {
+            this.toast.presentToast(res?.message || 'Could not create list.');
+            return;
+          }
+
+          const createdList: AspenUserList = {
+            id: res.listId,
+            title: res.listTitle || basics.title,
+            description: basics.description,
+            public: isPublic,
+            numTitles: 0,
+          };
+          this.availableLists = this.orderListsForAction([createdList, ...this.availableLists], res.listId);
+          this.listLookup.replaceLists(this.availableLists);
+          this.addRecordToList(createdList, recordId);
+        },
+        error: () => this.toast.presentToast('Could not create list.'),
+      });
+  }
+
+  private async promptListBasics(
+    header: string,
+    initialTitle = '',
+    initialDescription = '',
+  ): Promise<{ title: string; description: string } | null> {
+    return new Promise(async (resolve) => {
+      const alert = await this.alertCtrl.create({
+        header,
+        inputs: [
+          {
+            name: 'title',
+            type: 'text',
+            placeholder: 'List title',
+            value: initialTitle,
+          },
+          {
+            name: 'description',
+            type: 'textarea',
+            placeholder: 'Description (optional)',
+            value: initialDescription,
+          },
+        ],
+        buttons: [
+          { text: 'Cancel', role: 'cancel', handler: () => resolve(null) },
+          {
+            text: 'Continue',
+            handler: (data) => {
+              const title = (data?.title ?? '').toString().trim();
+              const description = (data?.description ?? '').toString().trim();
+              if (!title) {
+                this.toast.presentToast('List title is required.');
+                return false;
+              }
+              resolve({ title, description });
+              return true;
+            },
+          },
+        ],
+      });
+      await alert.present();
+    });
+  }
+
+  private async promptVisibility(initialPublic: boolean): Promise<boolean | null> {
+    return new Promise(async (resolve) => {
+      const alert = await this.alertCtrl.create({
+        header: 'List Visibility',
+        message: 'Choose whether this list is private or public.',
+        inputs: [
+          {
+            type: 'radio',
+            label: 'Private',
+            value: 'private',
+            checked: !initialPublic,
+          },
+          {
+            type: 'radio',
+            label: 'Public',
+            value: 'public',
+            checked: initialPublic,
+          },
+        ],
+        buttons: [
+          { text: 'Cancel', role: 'cancel', handler: () => resolve(null) },
+          {
+            text: 'Save',
+            handler: (value) => {
+              resolve((value ?? 'private').toString() === 'public');
+              return true;
+            },
+          },
+        ],
+      });
+      await alert.present();
+    });
   }
 
   // ----------------------------

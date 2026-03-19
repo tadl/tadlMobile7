@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 const IOS_APP_ID = 'org.tadl.tadl';
@@ -39,6 +39,43 @@ function readText(path) {
 
 function writeText(path, content) {
   writeFileSync(path, content, 'utf8');
+}
+
+function preserveFiles(paths) {
+  const preserved = [];
+  const preserveRoot = resolve('.release-prep-preserve');
+  rmSync(preserveRoot, { recursive: true, force: true });
+
+  for (const relPath of paths) {
+    const absPath = resolve(relPath);
+    if (!existsSync(absPath)) continue;
+    const destPath = resolve(preserveRoot, relPath);
+    mkdirSync(dirname(destPath), { recursive: true });
+    copyFileSync(absPath, destPath);
+    preserved.push(relPath);
+  }
+
+  return {
+    root: preserveRoot,
+    files: preserved,
+  };
+}
+
+function restorePreservedFiles(bundle) {
+  if (!bundle?.files?.length) return [];
+  const restored = [];
+
+  for (const relPath of bundle.files) {
+    const srcPath = resolve(bundle.root, relPath);
+    const destPath = resolve(relPath);
+    if (!existsSync(srcPath)) continue;
+    mkdirSync(dirname(destPath), { recursive: true });
+    copyFileSync(srcPath, destPath);
+    restored.push(relPath);
+  }
+
+  rmSync(bundle.root, { recursive: true, force: true });
+  return restored;
 }
 
 function replaceAll(content, pattern, replacement, label) {
@@ -498,6 +535,10 @@ function preparePlatform(platform, opts, appName) {
   console.log(`[release-prep] Build: ${opts.build}`);
 
   const platformDir = resolve(platform);
+  const preserved =
+    opts.recreate && platform === 'android'
+      ? preserveFiles(['android/signing.properties', 'android/google-services.json'])
+      : { root: '', files: [] };
   if (opts.recreate && existsSync(platformDir)) {
     console.log(`[release-prep] Removing ./${platform} for clean re-add...`);
     rmSync(platformDir, { recursive: true, force: true });
@@ -505,6 +546,11 @@ function preparePlatform(platform, opts, appName) {
 
   if (!existsSync(platformDir)) {
     run('npx', ['cap', 'add', platform], env);
+  }
+
+  const restoredLocalFiles = restorePreservedFiles(preserved);
+  if (restoredLocalFiles.length) {
+    console.log(`[release-prep] Restored local ${platform} files: ${restoredLocalFiles.join(', ')}`);
   }
 
   run('npx', ['cap', 'sync', platform], env);

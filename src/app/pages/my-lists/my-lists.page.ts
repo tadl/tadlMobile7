@@ -57,6 +57,7 @@ export class MyListsPage {
             const tb = new Date((b?.dateUpdated ?? '').toString()).getTime() || 0;
             return tb - ta;
           });
+          this.listLookup.replaceLists(this.lists);
         },
         error: () => {
           this.lists = [];

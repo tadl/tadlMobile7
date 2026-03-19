@@ -105,7 +105,9 @@ export class ItemDetailComponent implements OnInit {
   holdActionBusy = false;
   checkoutActionBusy = false;
   listActionBusy = false;
+  availableLists: AspenUserList[] = [];
   private ownedListIds = new Set<string>();
+  private ownedListIdsLoaded = false;
 
   /** set to true when we mutate holds so HoldsPage can refresh on dismiss */
   private needsHoldsRefresh = false;
@@ -142,7 +144,7 @@ export class ItemDetailComponent implements OnInit {
     this.hold = this.extractHoldFromHit(this.hit);
     this.holdsForItem = this.hold ? [this.hold] : [];
     this.checkout = this.extractCheckoutFromHit(this.hit);
-    void this.refreshOwnedListIds();
+    void this.refreshAvailableLists();
     void this.seedKnownListMemberships();
 
     const key = (this.hit?.key ?? '').toString().trim();
@@ -252,7 +254,7 @@ export class ItemDetailComponent implements OnInit {
   // ----------------------------
 
   canManageLists(): boolean {
-    return !!this.listRecordId();
+    return !!this.listRecordId() && this.availableLists.length > 0;
   }
 
   hasKnownListMembership(): boolean {
@@ -280,17 +282,17 @@ export class ItemDetailComponent implements OnInit {
 
     const lists = await this.getListsForAction();
     if (!lists.length) return;
-    const existingListIds = new Set(
-      this.knownListMemberships
-        .map((m) => (m?.listId ?? '').toString().trim())
-        .filter((id) => !!id),
-    );
+
+    if (lists.length === 1) {
+      this.addRecordToList(lists[0], recordId);
+      return;
+    }
 
     const sheet = await this.actionSheet.create({
       header: 'Add to which list?',
       buttons: [
         ...lists.map((list): ActionSheetButton => ({
-          text: this.actionListLabel(list, existingListIds),
+          text: this.actionListLabel(list),
           handler: () => this.addRecordToList(list, recordId),
         })),
         { text: 'Close', role: 'cancel' },
@@ -334,12 +336,13 @@ export class ItemDetailComponent implements OnInit {
     if (!loggedIn) return [];
 
     try {
-      const lookup = await this.listLookup.lookup([this.listRecordId()]);
+      const lookup = await this.listLookup.lookup([]);
+      if (!lookup) return [];
       const lists = this.orderListsForAction(lookup.lists, lookup.lastListUsed);
       if (!lists?.length) {
-        this.toast.presentToast('You do not have any lists yet.');
         return [];
       }
+      this.availableLists = lists.slice();
       return lists;
     } catch {
       this.toast.presentToast('Could not load your lists.');
@@ -347,18 +350,21 @@ export class ItemDetailComponent implements OnInit {
     }
   }
 
-  private actionListLabel(list: AspenUserList, existingListIds?: Set<string>): string {
+  private actionListLabel(list: AspenUserList): string {
     const title = (list?.title ?? '').toString().trim() || 'Untitled list';
     const n = Number((list as any)?.numTitles ?? 0);
-    const listId = (list?.id ?? '').toString().trim();
     const base = Number.isFinite(n) && n > 0 ? `${title} (${n})` : title;
-    return existingListIds?.has(listId) ? `${base} - already added` : base;
+    return base;
   }
 
   private addRecordToList(list: AspenUserList, recordId: string) {
     const listId = (list?.id ?? '').toString().trim();
     if (!listId || !recordId) return;
     if (this.listActionBusy) return;
+    if (this.listLookup.cachedMembershipsForRecord(recordId).some((m) => m.listId === listId)) {
+      this.toast.presentToast('Already on this list.');
+      return;
+    }
 
     this.listActionBusy = true;
     this.lists.addTitlesToList(listId, [recordId])
@@ -422,19 +428,6 @@ export class ItemDetailComponent implements OnInit {
   }
 
   private async seedKnownListMemberships() {
-    const fromHit = (this.hit?.appearsOnLists ?? [])
-      .map((x) => {
-        const listId = (x?.id ?? '').toString().trim();
-        const listTitle = (x?.title ?? '').toString().trim() || 'List';
-        if (!listId) return null;
-        return { listId, listTitle } as KnownListMembership;
-      })
-      .filter((x): x is KnownListMembership => !!x);
-
-    if (fromHit.length) {
-      this.mergeKnownListMemberships(fromHit);
-    }
-
     const listId = (this.listContext?.listId ?? '').toString().trim();
     if (listId) {
       const listTitle = (this.listContext?.listTitle ?? '').toString().trim() || 'This list';
@@ -445,18 +438,17 @@ export class ItemDetailComponent implements OnInit {
       const recordId = this.listRecordId();
       if (!recordId) return;
       const indexed = await this.listLookup.membershipsForRecord(recordId);
-      if (indexed.length) {
-        this.mergeKnownListMemberships(
-          indexed
+      if (!indexed.length) return;
+      this.mergeKnownListMemberships(
+        indexed
           .map((x) => ({
             listId: (x?.listId ?? '').toString().trim(),
             listTitle: (x?.listTitle ?? '').toString().trim() || 'List',
           }))
           .filter((x) => !!x.listId),
-        );
-      }
+      );
     } catch {
-      // Keep UI stable if index read fails/unavailable.
+      // Best-effort session cache only.
     }
   }
 
@@ -511,6 +503,7 @@ export class ItemDetailComponent implements OnInit {
     ev?.stopPropagation?.();
     if (!m?.listId) return;
 
+    await this.ensureOwnedListIdsLoaded();
     const canEdit = this.canEditKnownListMembership(m.listId);
     const buttons: ActionSheetButton[] = [
       {
@@ -557,8 +550,24 @@ export class ItemDetailComponent implements OnInit {
           .map((x) => (x?.id ?? '').toString().trim())
           .filter((x) => !!x),
       );
+      this.ownedListIdsLoaded = true;
     } catch {
       this.ownedListIds = new Set<string>();
+      this.ownedListIdsLoaded = false;
+    }
+  }
+
+  private async ensureOwnedListIdsLoaded(): Promise<void> {
+    if (this.ownedListIdsLoaded) return;
+    await this.refreshOwnedListIds();
+  }
+
+  private async refreshAvailableLists(): Promise<void> {
+    try {
+      const lookup = await this.listLookup.lookup([]);
+      this.availableLists = this.orderListsForAction(lookup.lists, lookup.lastListUsed);
+    } catch {
+      this.availableLists = [];
     }
   }
 

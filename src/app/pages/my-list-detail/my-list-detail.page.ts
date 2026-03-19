@@ -104,6 +104,7 @@ export class MyListDetailPage {
         this.listTitle = (res?.listTitle ?? '').toString().trim() || this.listTitle;
         this.listDescription = (res?.listDescription ?? '').toString().trim();
         this.titles = Array.isArray(res?.titles) ? res.titles : [];
+        this.listLookup.observeListPage(this.listId, this.listTitle, this.titles);
         this.page = Number(res?.page_current ?? 1) || 1;
         this.totalPages = Number(res?.page_total ?? 1) || 1;
         this.infiniteDisabled = !(this.page < this.totalPages);
@@ -156,6 +157,7 @@ export class MyListDetailPage {
             return true;
           });
           this.titles = [...this.titles, ...deduped];
+          this.listLookup.observeListPage(this.listId, this.listTitle, deduped);
         }
 
         this.page = Number(res?.page_current ?? nextPage) || nextPage;
@@ -768,6 +770,7 @@ export class MyListDetailPage {
 
           this.listTitle = title;
           this.listDescription = description;
+          this.listLookup.renameList(this.listId, title);
           this.toast.presentToast(res?.message || 'List updated.');
         },
         error: () => this.toast.presentToast('Could not update list.'),

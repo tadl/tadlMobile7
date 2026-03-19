@@ -592,15 +592,18 @@ export class SearchPage implements OnInit, OnDestroy {
 
     buttons.push(
       {
-        text: 'Add to List',
-        handler: () => this.addHitToList(hit),
-      },
-      {
         text: 'View Details',
         handler: () => this.openDetail(hit),
       },
       { text: 'Close', role: 'cancel' },
     );
+
+    if (this.auth.snapshot()?.isLoggedIn && await this.canAddToList()) {
+      buttons.splice(buttons.length - 2, 0, {
+        text: 'Add to List',
+        handler: () => this.addHitToList(hit),
+      });
+    }
 
     const sheet = await this.actionSheetController.create({
       header: hit.title || 'Search Result',
@@ -640,18 +643,6 @@ export class SearchPage implements OnInit, OnDestroy {
 
   trackFacetOption(_idx: number, o: SearchFacetOption) {
     return o.filter;
-  }
-
-  listCountLabel(hit: AspenSearchHit): string {
-    const count = hit.appearsOnLists?.length ?? 0;
-    return count === 1 ? 'In list' : 'In lists';
-  }
-
-  listTitles(hit: AspenSearchHit): string {
-    return (hit.appearsOnLists ?? [])
-      .map(x => x.title)
-      .filter(Boolean)
-      .join(', ');
   }
 
   formatLastCheckOut(value?: string | number | null): string {
@@ -798,7 +789,6 @@ export class SearchPage implements OnInit, OnDestroy {
 
   private async addHitToList(hit: AspenSearchHit): Promise<void> {
     const recordId = (hit?.key ?? '').toString().trim();
-    const recordKey = recordId.toLowerCase();
     if (!recordId) {
       this.toast.presentToast('This record is missing an id.');
       return;
@@ -811,16 +801,10 @@ export class SearchPage implements OnInit, OnDestroy {
 
     let lists: AspenUserList[] = [];
     let lastListUsed: string | null = null;
-    let existingListIds = new Set<string>();
     try {
-      const lookup = await this.listLookup.lookup([recordId]);
+      const lookup = await this.listLookup.lookup([]);
       lists = this.orderListsForAction(lookup.lists, lookup.lastListUsed);
       lastListUsed = lookup.lastListUsed;
-      existingListIds = new Set(
-        (lookup.membershipsByRecordId[recordKey] ?? [])
-          .map((m) => (m?.listId ?? '').toString().trim())
-          .filter((id) => !!id),
-      );
     } catch {
       this.toast.presentToast('Could not load your lists.');
       return;
@@ -831,12 +815,17 @@ export class SearchPage implements OnInit, OnDestroy {
       return;
     }
 
+    if (lists.length === 1) {
+      this.addRecordToNamedList(lists[0], hit);
+      return;
+    }
+
     const sheet = await this.actionSheetController.create({
       header: 'Add to which list?',
       subHeader: lastListUsed ? 'Most recently used list is shown first.' : undefined,
       buttons: [
         ...lists.map((list): ActionSheetButton => ({
-          text: this.actionListLabel(list, existingListIds),
+          text: this.actionListLabel(list),
           handler: () => this.addRecordToNamedList(list, hit),
         })),
         { text: 'Close', role: 'cancel' },
@@ -845,12 +834,11 @@ export class SearchPage implements OnInit, OnDestroy {
     await sheet.present();
   }
 
-  private actionListLabel(list: AspenUserList, existingListIds?: Set<string>): string {
+  private actionListLabel(list: AspenUserList): string {
     const title = (list?.title ?? '').toString().trim() || 'Untitled list';
     const n = Number((list as any)?.numTitles ?? 0);
-    const listId = (list?.id ?? '').toString().trim();
     const base = Number.isFinite(n) && n > 0 ? `${title} (${n})` : title;
-    return existingListIds?.has(listId) ? `${base} - already added` : base;
+    return base;
   }
 
   private addRecordToNamedList(list: AspenUserList, hit: AspenSearchHit): void {
@@ -858,6 +846,10 @@ export class SearchPage implements OnInit, OnDestroy {
     const recordId = (hit?.key ?? '').toString().trim();
     if (!listId || !recordId) return;
     if (this.rowActionBusy(hit)) return;
+    if (this.listLookup.cachedMembershipsForRecord(recordId).some((m) => m.listId === listId)) {
+      this.toast.presentToast('Already on this list.');
+      return;
+    }
 
     this.setRowBusy(hit, true);
     this.listsService.addTitlesToList(listId, [recordId])
@@ -887,6 +879,14 @@ export class SearchPage implements OnInit, OnDestroy {
       if (bId === preferred && aId !== preferred) return 1;
       return 0;
     });
+  }
+
+  private async canAddToList(): Promise<boolean> {
+    try {
+      return await this.listLookup.hasLists();
+    } catch {
+      return false;
+    }
   }
 
   private async placeHoldFromHit(hit: AspenSearchHit, precomputedTargets?: HoldTargetOption[]): Promise<void> {

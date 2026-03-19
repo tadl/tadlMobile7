@@ -12,6 +12,7 @@ import { PatronService } from '../../services/patron.service';
 import { ShowCardModalComponent } from '../../components/show-card-modal/show-card-modal.component';
 import { SwitchUserModalComponent } from '../../components/switch-user-modal/switch-user-modal.component';
 import { PasswordResetModalComponent } from '../../components/password-reset-modal/password-reset-modal.component';
+import { ListLookupService } from '../../services/list-lookup.service';
 
 @Component({
   standalone: true,
@@ -38,14 +39,19 @@ export class AccountPage implements OnInit {
     private toast: ToastService,
     private actionSheet: ActionSheetController,
     private modal: ModalController,
+    private listLookup: ListLookupService,
   ) {}
 
   ngOnInit() {
     this.refreshStoredAccounts();
-    this.refreshMyListsCount();
+    void this.refreshMyListsCount();
     this.auth.authState().subscribe((s) => {
-      this.myListsCount = this.listCountFromProfile(s?.profile);
+      void this.refreshMyListsCount(s?.profile);
     });
+  }
+
+  ionViewWillEnter() {
+    void this.refreshMyListsCount();
   }
 
   refreshStoredAccounts() {
@@ -240,8 +246,20 @@ export class AccountPage implements OnInit {
   }
   goPrefs() { this.goAccountPage('/account-preferences'); }
 
-  private refreshMyListsCount() {
-    this.myListsCount = this.listCountFromProfile(this.auth.snapshot()?.profile);
+  private async refreshMyListsCount(profile?: any) {
+    const snap = this.auth.snapshot();
+    if (!snap.isLoggedIn) {
+      this.myListsCount = 0;
+      return;
+    }
+
+    const cachedCount = await this.listLookup.cachedListCount();
+    if (cachedCount !== null) {
+      this.myListsCount = cachedCount;
+      return;
+    }
+
+    this.myListsCount = this.listCountFromProfile(profile ?? snap.profile);
   }
 
   private goAccountPage(url: string) {

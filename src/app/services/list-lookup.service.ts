@@ -1,11 +1,9 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { lastValueFrom } from 'rxjs';
 
-import { Globals } from '../globals';
 import { AuthService } from './auth.service';
-import { AccountStoreService } from './account-store.service';
-import { AspenUserList } from './lists.service';
+import { AspenListTitle, AspenUserList, ListsService } from './lists.service';
+import { AppCacheService } from './app-cache.service';
 
 export interface ListMembershipRef {
   listId: string;
@@ -14,19 +12,10 @@ export interface ListMembershipRef {
 
 interface ListLookupState {
   lists: AspenUserList[];
+  listsLoaded: boolean;
   membershipsByRecordId: Record<string, ListMembershipRef[]>;
-  loadedRecordIds: Set<string>;
   lastListUsed: string | null;
   membershipIndexUpdatedAt: number | null;
-}
-
-interface ListLookupResponse {
-  ok: boolean;
-  backend?: string;
-  lists?: AspenUserList[];
-  membershipsByRecordId?: Record<string, ListMembershipRef[]>;
-  lastListUsed?: string | number | null;
-  membershipIndexUpdatedAt?: string | number | null;
 }
 
 export interface ListLookupResult {
@@ -41,35 +30,77 @@ export class ListLookupService {
   private readonly stateByAccountId = new Map<string, ListLookupState>();
 
   constructor(
-    private http: HttpClient,
-    private globals: Globals,
     private auth: AuthService,
-    private accounts: AccountStoreService,
+    private listsService: ListsService,
+    private cache: AppCacheService,
   ) {}
 
   async lookup(recordIds: string[], options?: { refresh?: boolean }): Promise<ListLookupResult> {
     const accountId = this.currentAccountId();
     if (!accountId) throw new Error('not_logged_in');
 
-    const state = this.ensureState(accountId);
-    const normalizedIds = this.normalizeRecordIds(recordIds);
-    const refresh = options?.refresh === true;
-    const missingIds = refresh
-      ? normalizedIds
-      : normalizedIds.filter((id) => !state.loadedRecordIds.has(id));
-
-    if (missingIds.length || !state.lists.length || refresh) {
-      await this.fetchAndMerge(accountId, missingIds.length ? missingIds : normalizedIds, refresh);
-    }
-
-    return this.filteredResult(this.ensureState(accountId), normalizedIds);
+    await this.ensureListsLoaded(accountId, options?.refresh === true);
+    return this.filteredResult(this.ensureState(accountId), this.normalizeRecordIds(recordIds));
   }
 
-  async membershipsForRecord(recordId: string, options?: { refresh?: boolean }): Promise<ListMembershipRef[]> {
+  async membershipsForRecord(recordId: string): Promise<ListMembershipRef[]> {
     const normalized = this.normalizeRecordId(recordId);
     if (!normalized) return [];
-    const result = await this.lookup([normalized], options);
+    const result = await this.lookup([normalized]);
     return (result.membershipsByRecordId[normalized] ?? []).slice();
+  }
+
+  cachedMembershipsForRecord(recordId: string): ListMembershipRef[] {
+    const state = this.activeState();
+    const normalized = this.normalizeRecordId(recordId);
+    if (!state || !normalized) return [];
+    return (state.membershipsByRecordId[normalized] ?? []).slice();
+  }
+
+  async hasLists(options?: { refresh?: boolean }): Promise<boolean> {
+    const result = await this.lookup([], options);
+    return result.lists.length > 0;
+  }
+
+  async cachedListCount(): Promise<number | null> {
+    const accountId = this.currentAccountId();
+    if (!accountId) return 0;
+
+    const state = this.ensureState(accountId);
+    if (state.listsLoaded) return state.lists.length;
+
+    const cached = await this.cache.read<AspenUserList[]>(`lists:user:${accountId}`);
+    if (!Array.isArray(cached)) return null;
+
+    state.lists = cached.slice();
+    state.listsLoaded = true;
+    return state.lists.length;
+  }
+
+  replaceLists(lists: AspenUserList[]): void {
+    const state = this.activeState();
+    if (!state) return;
+    state.lists = (lists ?? []).slice();
+    state.listsLoaded = true;
+  }
+
+  observeListPage(listId: string, listTitle: string, titles: AspenListTitle[]): void {
+    const state = this.activeState();
+    const normalizedListId = (listId ?? '').toString().trim();
+    const normalizedTitle = (listTitle ?? '').toString().trim() || 'List';
+    if (!state || !normalizedListId) return;
+
+    for (const title of titles ?? []) {
+      const recordId = this.normalizeRecordId((title?.id ?? title?.shortId ?? '').toString().trim());
+      if (!recordId) continue;
+      const existing = state.membershipsByRecordId[recordId] ?? [];
+      if (existing.some((entry) => entry.listId === normalizedListId)) continue;
+      state.membershipsByRecordId[recordId] = [
+        ...existing,
+        { listId: normalizedListId, listTitle: normalizedTitle },
+      ];
+    }
+    state.membershipIndexUpdatedAt = Date.now();
   }
 
   upsertMembership(recordId: string, listId: string, listTitle: string): void {
@@ -89,8 +120,8 @@ export class ListLookupService {
         { listId: normalizedListId, listTitle: normalizedTitle },
       ];
     }
-    state.loadedRecordIds.add(recordKey);
     state.lastListUsed = normalizedListId;
+    state.membershipIndexUpdatedAt = Date.now();
   }
 
   removeMembership(recordId: string, listId: string): void {
@@ -99,11 +130,10 @@ export class ListLookupService {
     const normalizedListId = (listId ?? '').toString().trim();
     if (!state || !recordKey || !normalizedListId) return;
 
-    const next = (state.membershipsByRecordId[recordKey] ?? []).filter(
+    state.membershipsByRecordId[recordKey] = (state.membershipsByRecordId[recordKey] ?? []).filter(
       (entry) => entry.listId !== normalizedListId,
     );
-    state.membershipsByRecordId[recordKey] = next;
-    state.loadedRecordIds.add(recordKey);
+    state.membershipIndexUpdatedAt = Date.now();
   }
 
   renameList(listId: string, listTitle: string): void {
@@ -136,10 +166,8 @@ export class ListLookupService {
         (entry) => entry.listId !== normalizedListId,
       );
     }
-
-    if (state.lastListUsed === normalizedListId) {
-      state.lastListUsed = null;
-    }
+    if (state.lastListUsed === normalizedListId) state.lastListUsed = null;
+    state.membershipIndexUpdatedAt = Date.now();
   }
 
   private currentAccountId(): string | null {
@@ -160,8 +188,8 @@ export class ListLookupService {
 
     const created: ListLookupState = {
       lists: [],
+      listsLoaded: false,
       membershipsByRecordId: {},
-      loadedRecordIds: new Set<string>(),
       lastListUsed: null,
       membershipIndexUpdatedAt: null,
     };
@@ -169,67 +197,13 @@ export class ListLookupService {
     return created;
   }
 
-  private normalizeRecordIds(recordIds: string[]): string[] {
-    return Array.from(
-      new Set(
-        (recordIds ?? [])
-          .map((recordId) => this.normalizeRecordId(recordId))
-          .filter((recordId): recordId is string => !!recordId),
-      ),
-    );
-  }
-
-  private normalizeRecordId(recordId: string): string {
-    return (recordId ?? '').toString().trim().toLowerCase();
-  }
-
-  private async fetchAndMerge(accountId: string, recordIds: string[], refresh: boolean): Promise<void> {
-    const snap = this.auth.snapshot();
-    const username = (snap?.activeAccountMeta?.username ?? '').toString().trim();
-    if (!username) throw new Error('missing_username');
-
-    const password = await this.accounts.getPassword(accountId);
-    if (!password) throw new Error('missing_password');
-
-    let params = new HttpParams().set('api', this.globals.aspen_api_param_api);
-    if (recordIds.length) params = params.set('recordIds', recordIds.join(','));
-    if (refresh) params = params.set('refresh', 'true');
-
-    const body = new URLSearchParams();
-    body.set('username', username);
-    body.set('password', password);
-    const headers = new HttpHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' });
-
-    const raw = await lastValueFrom(
-      this.http.post<ListLookupResponse>(
-        `${this.globals.aspen_api_base}/ListLookup`,
-        body.toString(),
-        { params, headers },
-      ),
-    );
-
-    if (!raw?.ok) throw new Error('list_lookup_failed');
-
+  private async ensureListsLoaded(accountId: string, refresh: boolean): Promise<void> {
     const state = this.ensureState(accountId);
-    const nextLists = Array.isArray(raw?.lists)
-      ? raw.lists.map((list) => ({
-          ...list,
-          cover: this.normalizeDiscoveryUrl(list?.cover),
-        }))
-      : [];
+    if (state.listsLoaded && !refresh) return;
 
-    state.lists = nextLists;
-    state.lastListUsed = this.normalizeNullableString(raw?.lastListUsed);
-    state.membershipIndexUpdatedAt = this.normalizeNullableNumber(raw?.membershipIndexUpdatedAt);
-
-    const memberships = raw?.membershipsByRecordId ?? {};
-    for (const recordId of recordIds) {
-      const normalizedRecordId = this.normalizeRecordId(recordId);
-      state.loadedRecordIds.add(normalizedRecordId);
-      state.membershipsByRecordId[normalizedRecordId] = this.normalizeMembershipRefs(
-        memberships[recordId] ?? memberships[normalizedRecordId] ?? [],
-      );
-    }
+    const lists = await lastValueFrom(this.listsService.fetchUserLists());
+    state.lists = (lists ?? []).slice();
+    state.listsLoaded = true;
   }
 
   private filteredResult(state: ListLookupState, recordIds: string[]): ListLookupResult {
@@ -246,49 +220,17 @@ export class ListLookupService {
     };
   }
 
-  private normalizeMembershipRefs(input: any): ListMembershipRef[] {
-    const values = Array.isArray(input) ? input : [];
-    const refs = values
-      .map((entry) => {
-        const listId = (entry?.listId ?? '').toString().trim();
-        const listTitle = (entry?.listTitle ?? '').toString().trim() || 'List';
-        if (!listId) return null;
-        return { listId, listTitle } as ListMembershipRef;
-      })
-      .filter((entry): entry is ListMembershipRef => !!entry);
-
-    const byId = new Map<string, ListMembershipRef>();
-    for (const ref of refs) byId.set(ref.listId, ref);
-    return Array.from(byId.values());
+  private normalizeRecordIds(recordIds: string[]): string[] {
+    return Array.from(
+      new Set(
+        (recordIds ?? [])
+          .map((recordId) => this.normalizeRecordId(recordId))
+          .filter((recordId): recordId is string => !!recordId),
+      ),
+    );
   }
 
-  private normalizeNullableString(value: any): string | null {
-    const normalized = (value ?? '').toString().trim();
-    return normalized || null;
-  }
-
-  private normalizeNullableNumber(value: any): number | null {
-    const normalized = Number(value ?? 0);
-    return Number.isFinite(normalized) && normalized > 0 ? normalized : null;
-  }
-
-  private normalizeDiscoveryUrl(input: any): string | undefined {
-    const raw = (input ?? '').toString().trim();
-    if (!raw) return undefined;
-    if (raw.startsWith('/')) return `${this.globals.aspen_discovery_base}${raw}`;
-    if (!/^https?:\/\//i.test(raw)) return `${this.globals.aspen_discovery_base}/${raw}`;
-
-    try {
-      const url = new URL(raw);
-      const apiHost = new URL(this.globals.aspen_api_host).host;
-      if (url.host === apiHost) {
-        url.protocol = 'https:';
-        url.host = new URL(this.globals.aspen_discovery_base).host;
-        return url.toString();
-      }
-      return raw;
-    } catch {
-      return raw;
-    }
+  private normalizeRecordId(recordId: string): string {
+    return (recordId ?? '').toString().trim().toLowerCase();
   }
 }

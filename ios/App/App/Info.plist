@@ -32,6 +32,12 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Scan ISBN barcodes to search the catalog.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Add library events to your calendar.</string>
+	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
+	<string>Add library events to your calendar.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Let TADL Mobile access your calendar so you can add library events.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

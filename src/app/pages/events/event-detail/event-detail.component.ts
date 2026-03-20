@@ -17,11 +17,14 @@ import { DomSanitizer } from '@angular/platform-browser';
 import { ActionSheetController, IonicModule } from '@ionic/angular';
 import { ModalController } from '@ionic/angular/standalone';
 import { ActivatedRoute } from '@angular/router';
+import { Capacitor } from '@capacitor/core';
+import { CapacitorCalendar } from '@ebarooni/capacitor-calendar';
 import { Subscription, isObservable, lastValueFrom } from 'rxjs';
 
 import { EventsService } from '../../../services/events.service';
 import { Globals } from '../../../globals';
 import { DiscoveryLinkRouterService } from '../../../services/discovery-link-router.service';
+import { ToastService } from '../../../services/toast.service';
 
 type EventLike = {
   id?: string | number;
@@ -104,6 +107,7 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
     private globals: Globals,
     private sanitizer: DomSanitizer,
     private discoveryLinks: DiscoveryLinkRouterService,
+    private toast: ToastService,
     @Inject(DOCUMENT) private document: Document,
   ) {}
 
@@ -150,27 +154,40 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
 
   async addToCalendar() {
     if (!this.startsAtDate) return;
+    const nativeCalendarLabel = this.nativeCalendarLabel();
+    const buttons: Array<{ text: string; role?: 'cancel'; handler?: () => void }> = [];
+
+    if (nativeCalendarLabel) {
+      buttons.push({
+        text: nativeCalendarLabel,
+        handler: () => {
+          void this.openNativeCalendarPrompt();
+        },
+      });
+    }
+
+    buttons.push(
+      {
+        text: 'Google Calendar',
+        handler: () => {
+          void this.openGoogleCalendar();
+        },
+      },
+      {
+        text: nativeCalendarLabel ? 'Other calendars (.ics)' : 'Calendar file (.ics)',
+        handler: () => {
+          void this.shareCalendarFile();
+        },
+      },
+      {
+        text: 'Cancel',
+        role: 'cancel',
+      },
+    );
 
     const actionSheet = await this.actionSheetController.create({
       header: 'Add to calendar',
-      buttons: [
-        {
-          text: 'Google Calendar',
-          handler: () => {
-            void this.openGoogleCalendar();
-          },
-        },
-        {
-          text: 'Calendar file (.ics)',
-          handler: () => {
-            void this.shareCalendarFile();
-          },
-        },
-        {
-          text: 'Cancel',
-          role: 'cancel',
-        },
-      ],
+      buttons,
     });
 
     await actionSheet.present();
@@ -443,6 +460,32 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
     );
   }
 
+  private async openNativeCalendarPrompt(): Promise<void> {
+    const start = this.startsAtDate;
+    if (!start) return;
+
+    try {
+      const permission = await CapacitorCalendar.requestWriteOnlyCalendarAccess();
+      if (permission?.result !== 'granted') {
+        this.toast.presentToast('Calendar access was not granted. You can still use the .ics option.');
+        return;
+      }
+
+      const end = this.calendarEndDate(start);
+      await CapacitorCalendar.createEventWithPrompt({
+        title: this.title,
+        startDate: start.getTime(),
+        endDate: end.getTime(),
+        isAllDay: this.event?.allDay === true,
+        description: this.calendarDetailsText(),
+        location: this.calendarLocation || undefined,
+        url: this.externalUrl || undefined,
+      });
+    } catch {
+      this.toast.presentToast('Could not open the calendar app. You can still use the .ics option.');
+    }
+  }
+
   private async shareCalendarFile(): Promise<void> {
     const start = this.startsAtDate;
     if (!start) return;
@@ -633,6 +676,15 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-+|-+$/g, '') || 'event'
     );
+  }
+
+  private nativeCalendarLabel(): string | null {
+    if (!Capacitor.isNativePlatform()) return null;
+
+    const platform = Capacitor.getPlatform();
+    if (platform === 'ios') return 'Apple Calendar';
+    if (platform === 'android') return 'Calendar app';
+    return null;
   }
 
   private resolveLinkUrl(url?: string): string {

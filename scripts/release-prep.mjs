@@ -155,6 +155,24 @@ function updateIosInfoPlistDisplayName(appName) {
       `<key>NSCameraUsageDescription</key>\n\t<string>Scan ISBN barcodes to search the catalog.</string>\n\t<key>UILaunchStoryboardName</key>`,
     );
   }
+  if (!plist.includes('<key>NSCalendarsUsageDescription</key>')) {
+    plist = plist.replace(
+      /<key>UILaunchStoryboardName<\/key>/,
+      `<key>NSCalendarsUsageDescription</key>\n\t<string>Add library events to your calendar.</string>\n\t<key>UILaunchStoryboardName</key>`,
+    );
+  }
+  if (!plist.includes('<key>NSCalendarsWriteOnlyAccessUsageDescription</key>')) {
+    plist = plist.replace(
+      /<key>UILaunchStoryboardName<\/key>/,
+      `<key>NSCalendarsWriteOnlyAccessUsageDescription</key>\n\t<string>Add library events to your calendar.</string>\n\t<key>UILaunchStoryboardName</key>`,
+    );
+  }
+  if (!plist.includes('<key>NSCalendarsFullAccessUsageDescription</key>')) {
+    plist = plist.replace(
+      /<key>UILaunchStoryboardName<\/key>/,
+      `<key>NSCalendarsFullAccessUsageDescription</key>\n\t<string>Let TADL Mobile access your calendar so you can add library events.</string>\n\t<key>UILaunchStoryboardName</key>`,
+    );
+  }
 
   writeText(plistPath, plist);
   console.log('[release-prep] Patched iOS display name.');

@@ -188,7 +188,12 @@
       </ng-template>
 
       <div class="hold-actions">
-        <ion-button expand="block" fill="outline" (click)="openHoldManager()">Manage hold{{ hasMultipleHoldsForItem() ? 's' : '' }}</ion-button>
+        <ion-button class="hold-action-btn" expand="block" fill="outline" (click)="openHoldManager()">
+          Manage hold{{ hasMultipleHoldsForItem() ? 's' : '' }}
+        </ion-button>
+        <ion-button class="hold-action-btn" expand="block" fill="outline" (click)="openHoldsPage()">
+          View holds
+        </ion-button>
       </div>
     </ion-card-content>
   </ion-card>

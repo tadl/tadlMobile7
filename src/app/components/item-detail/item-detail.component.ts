@@ -29,6 +29,7 @@ import { AuthService } from '../../services/auth.service';
 import { CopyDetailsPopoverComponent } from '../copy-details-popover/copy-details-popover.component';
 import { AccountPreferencesService } from '../../services/account-preferences.service';
 import { ListLookupService } from '../../services/list-lookup.service';
+import { SwitchUserModalComponent } from '../switch-user-modal/switch-user-modal.component';
 
 interface ItemDetailListContext {
   listId: string;
@@ -172,16 +173,7 @@ export class ItemDetailComponent implements OnInit {
 
   close() {
     this.copyDetailsModalOpen = false;
-    const payload: any = {};
-    if (this.needsHoldsRefresh) {
-      payload.refreshHolds = true;
-      payload.groupedWorkId = (this.hit?.key ?? '').toString().trim();
-      payload.holdsForItem = [...(this.holdsForItem ?? [])];
-    }
-    if (this.needsCheckoutsRefresh) payload.refreshCheckouts = true;
-    if (this.needsListRefresh) payload.refreshList = true;
-
-    this.modalCtrl.dismiss(Object.keys(payload).length ? payload : undefined);
+    this.modalCtrl.dismiss(this.dismissPayload());
     this.globals.modal_open = false;
   }
 
@@ -277,6 +269,12 @@ export class ItemDetailComponent implements OnInit {
     this.router.navigate(['/my-lists', listId], {
       queryParams: { title: listTitle },
     });
+  }
+
+  async openHoldsPage() {
+    await this.modalCtrl.dismiss(this.dismissPayload());
+    this.globals.modal_open = false;
+    await this.router.navigate(['/holds']);
   }
 
   async addToAnyList() {
@@ -1535,74 +1533,17 @@ export class ItemDetailComponent implements OnInit {
   private async ensureLoggedInForInteractiveAction(header: string): Promise<boolean> {
     const snap = this.auth.snapshot();
     if (snap?.isLoggedIn && snap?.activeAccountId && snap?.activeAccountMeta) return true;
-
-    const alert = await this.alertCtrl.create({
-      header,
-      message: 'Enter your library card / username and password.',
-      inputs: [
-        {
-          name: 'username',
-          type: 'text',
-          value: (snap?.activeAccountMeta?.username ?? '').toString(),
-          placeholder: 'Library card / username',
-          attributes: {
-            autocapitalize: 'off',
-            autocorrect: 'off',
-            autocomplete: 'off',
-            spellcheck: 'false',
-          },
-        },
-        {
-          name: 'password',
-          type: 'password',
-          placeholder: 'Password',
-          attributes: {
-            autocapitalize: 'off',
-            autocorrect: 'off',
-            autocomplete: 'off',
-            spellcheck: 'false',
-          },
-        },
-      ],
-      buttons: [
-        { text: 'Cancel', role: 'cancel' },
-        {
-          text: 'Log in',
-          role: 'confirm',
-          handler: (v) => ({
-            username: (v?.username ?? '').toString().trim(),
-            password: (v?.password ?? '').toString(),
-          }),
-        },
-      ],
+    const priorModalState = this.globals.modal_open;
+    const modal = await this.modalCtrl.create({
+      component: SwitchUserModalComponent,
     });
+    this.globals.modal_open = true;
+    await modal.present();
+    await modal.onDidDismiss();
+    this.globals.modal_open = priorModalState || this.globals.modal_open;
 
-    await alert.present();
-    const { role, data } = await alert.onDidDismiss<{
-      username: string;
-      password: string;
-    }>();
-    if (role !== 'confirm') return false;
-
-    const username = (data?.username ?? '').toString().trim();
-    const password = (data?.password ?? '').toString();
-    if (!username || !password) {
-      this.toast.presentToast('Username and password are required.');
-      return false;
-    }
-
-    try {
-      await lastValueFrom(this.auth.login(username, password));
-      return true;
-    } catch (e: any) {
-      const msg = (e?.message ?? '').toString();
-      if (msg === 'invalid_login') {
-        this.toast.presentToast('Login failed. Check your username/password and try again.');
-      } else {
-        this.toast.presentToast('Login failed. Please try again.');
-      }
-      return false;
-    }
+    const next = this.auth.snapshot();
+    return !!(next?.isLoggedIn && next?.activeAccountId && next?.activeAccountMeta);
   }
 
   private loadHoldingsCountsForWork(work: AspenGroupedWork | null) {
@@ -2070,5 +2011,17 @@ export class ItemDetailComponent implements OnInit {
       .replace(/\s*\/+\s*$/, '')
       .replace(/\s+:\s+/g, ': ')
       .trim();
+  }
+
+  private dismissPayload(): any {
+    const payload: any = {};
+    if (this.needsHoldsRefresh) {
+      payload.refreshHolds = true;
+      payload.groupedWorkId = (this.hit?.key ?? '').toString().trim();
+      payload.holdsForItem = [...(this.holdsForItem ?? [])];
+    }
+    if (this.needsCheckoutsRefresh) payload.refreshCheckouts = true;
+    if (this.needsListRefresh) payload.refreshList = true;
+    return Object.keys(payload).length ? payload : undefined;
   }
 }

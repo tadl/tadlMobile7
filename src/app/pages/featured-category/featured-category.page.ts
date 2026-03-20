@@ -16,6 +16,7 @@ import { AccountPreferencesService } from '../../services/account-preferences.se
 import { AuthService } from '../../services/auth.service';
 import { FormatFamilyService } from '../../services/format-family.service';
 import { ListLookupService } from '../../services/list-lookup.service';
+import { SwitchUserModalComponent } from '../../components/switch-user-modal/switch-user-modal.component';
 
 interface HoldTargetOption {
   recordId: string;
@@ -502,10 +503,8 @@ export class FeaturedCategoryPage {
   }
 
   private async placeHoldFromHit(hit: AspenSearchHit, precomputedTargets?: HoldTargetOption[]): Promise<void> {
-    if (!this.auth.snapshot()?.isLoggedIn) {
-      this.toast.presentToast('Log in to place holds.');
-      return;
-    }
+    const loggedIn = await this.ensureLoggedInForHoldAction();
+    if (!loggedIn) return;
     const groupedKey = (hit?.key ?? '').toString().trim();
     if (this.rowActionBusyForKey(groupedKey)) return;
 
@@ -541,6 +540,23 @@ export class FeaturedCategoryPage {
       buttons,
     });
     await sheet.present();
+  }
+
+  private async ensureLoggedInForHoldAction(): Promise<boolean> {
+    const snap = this.auth.snapshot();
+    if (snap?.isLoggedIn && snap?.activeAccountId && snap?.activeAccountMeta) return true;
+
+    const priorModalState = this.globals.modal_open;
+    const modal = await this.modalCtrl.create({
+      component: SwitchUserModalComponent,
+    });
+    this.globals.modal_open = true;
+    await modal.present();
+    await modal.onDidDismiss();
+    this.globals.modal_open = priorModalState || this.globals.modal_open;
+
+    const next = this.auth.snapshot();
+    return !!(next?.isLoggedIn && next?.activeAccountId && next?.activeAccountMeta);
   }
 
   private placeHoldNow(

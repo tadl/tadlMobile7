@@ -28,6 +28,7 @@ import { HoldsService } from '../../services/holds.service';
 import { AccountPreferencesService } from '../../services/account-preferences.service';
 import { AuthService } from '../../services/auth.service';
 import { ListLookupService } from '../../services/list-lookup.service';
+import { SwitchUserModalComponent } from '../../components/switch-user-modal/switch-user-modal.component';
 
 interface SearchFacetOption {
   filter: string;
@@ -1000,10 +1001,8 @@ export class SearchPage implements OnInit, OnDestroy {
   }
 
   private async placeHoldFromHit(hit: AspenSearchHit, precomputedTargets?: HoldTargetOption[]): Promise<void> {
-    if (!this.auth.snapshot()?.isLoggedIn) {
-      this.toast.presentToast('Log in to place holds.');
-      return;
-    }
+    const loggedIn = await this.ensureLoggedInForHoldAction();
+    if (!loggedIn) return;
     if (!this.canPlaceHoldFromHit(hit)) {
       this.toast.presentToast('No physical holdable format found for this result.');
       return;
@@ -1042,6 +1041,23 @@ export class SearchPage implements OnInit, OnDestroy {
       buttons,
     });
     await sheet.present();
+  }
+
+  private async ensureLoggedInForHoldAction(): Promise<boolean> {
+    const snap = this.auth.snapshot();
+    if (snap?.isLoggedIn && snap?.activeAccountId && snap?.activeAccountMeta) return true;
+
+    const priorModalState = this.globals.modal_open;
+    const modal = await this.modalController.create({
+      component: SwitchUserModalComponent,
+    });
+    this.globals.modal_open = true;
+    await modal.present();
+    await modal.onDidDismiss();
+    this.globals.modal_open = priorModalState || this.globals.modal_open;
+
+    const next = this.auth.snapshot();
+    return !!(next?.isLoggedIn && next?.activeAccountId && next?.activeAccountMeta);
   }
 
   private placeHoldNow(

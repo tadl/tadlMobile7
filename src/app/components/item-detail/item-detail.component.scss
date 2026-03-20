@@ -170,6 +170,13 @@
 
 .hold-actions {
   margin-top: 12px;
+  display: flex;
+  gap: 10px;
+}
+
+.hold-action-btn {
+  flex: 1 1 0;
+  margin: 0;
 }
 
 .formats-list {

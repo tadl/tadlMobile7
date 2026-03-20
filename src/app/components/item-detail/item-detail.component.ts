@@ -1,4 +1,4 @@
-import { Component, Input, OnInit } from '@angular/core';
+import { Component, Input, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule, KeyValue } from '@angular/common';
 import {
   IonicModule,
@@ -8,7 +8,7 @@ import {
   type ActionSheetButton,
 } from '@ionic/angular';
 import { Router } from '@angular/router';
-import { forkJoin, of } from 'rxjs';
+import { Subscription, forkJoin, of } from 'rxjs';
 import { catchError, finalize } from 'rxjs/operators';
 import { lastValueFrom } from 'rxjs';
 
@@ -76,7 +76,7 @@ interface DetailFact {
   styleUrls: ['./item-detail.component.scss'],
   imports: [CommonModule, IonicModule],
 })
-export class ItemDetailComponent implements OnInit {
+export class ItemDetailComponent implements OnInit, OnDestroy {
   @Input() hit!: AspenSearchHit;
   @Input() listContext: ItemDetailListContext | null = null;
 
@@ -102,6 +102,9 @@ export class ItemDetailComponent implements OnInit {
   private copyDetailsModalOpen = false;
   private readonly descriptionPreviewChars = 320;
   descriptionExpanded = false;
+  private authStateSub?: Subscription;
+  private listsHydrated = false;
+  private listsAccountId: string | null = null;
 
   holdActionBusy = false;
   checkoutActionBusy = false;
@@ -147,6 +150,20 @@ export class ItemDetailComponent implements OnInit {
     this.checkout = this.extractCheckoutFromHit(this.hit);
     void this.refreshAvailableLists();
     void this.seedKnownListMemberships();
+    this.authStateSub = this.auth.authState().subscribe((state) => {
+      const accountId = state?.isLoggedIn ? (state?.activeAccountId ?? '').toString().trim() || null : null;
+      if (!accountId) {
+        this.availableLists = [];
+        this.listsHydrated = false;
+        this.listsAccountId = null;
+        return;
+      }
+
+      if (accountId !== this.listsAccountId || !this.listsHydrated) {
+        this.listsAccountId = accountId;
+        void this.refreshAvailableLists();
+      }
+    });
 
     const key = (this.hit?.key ?? '').toString().trim();
     this.displayCoverUrl = this.normalizeCoverUrl(this.hit?.coverUrl);
@@ -169,6 +186,10 @@ export class ItemDetailComponent implements OnInit {
       },
       error: () => this.toast.presentToast('Could not load item details.'),
     });
+  }
+
+  ngOnDestroy() {
+    this.authStateSub?.unsubscribe();
   }
 
   close() {
@@ -571,8 +592,11 @@ export class ItemDetailComponent implements OnInit {
     try {
       const lookup = await this.listLookup.lookup([]);
       this.availableLists = this.orderListsForAction(lookup.lists, lookup.lastListUsed);
+      this.listsHydrated = true;
+      this.listsAccountId = (this.auth.snapshot()?.activeAccountId ?? '').toString().trim() || null;
     } catch {
       this.availableLists = [];
+      this.listsHydrated = false;
     }
   }
 

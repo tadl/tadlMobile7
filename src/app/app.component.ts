@@ -1,7 +1,13 @@
 import { Component, NgZone, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
-import { IonicModule } from '@ionic/angular';
+import {
+  AnimationBuilder,
+  IonicModule,
+  createAnimation,
+  iosTransitionAnimation,
+  mdTransitionAnimation,
+} from '@ionic/angular';
 import {
   ActionSheetController,
   AlertController,
@@ -48,6 +54,14 @@ export class AppComponent implements OnInit {
 
   // Bind in templates: *ngIf="isLoading$ | async"
   isLoading$: Observable<boolean>;
+  readonly menuRouterAnimation: AnimationBuilder = (baseEl, opts) => {
+    if (opts?.direction === 'back') {
+      return opts?.mode === 'ios'
+        ? iosTransitionAnimation(baseEl, opts)
+        : mdTransitionAnimation(baseEl, opts);
+    }
+    return createAnimation().duration(0);
+  };
   private lastWarmedAccountId: string | null = null;
   private lastResumeWarmAt = 0;
   private readonly resumeWarmThrottleMs = 5 * 60 * 1000;

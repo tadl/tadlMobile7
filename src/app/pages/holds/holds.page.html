@@ -42,7 +42,7 @@
         <ion-label class="ion-text-wrap">
           <div class="title">{{ holdTitle(h) }}</div>
           <div class="sub" *ngIf="holdAuthor(h)">{{ holdAuthor(h) }}</div>
-          <ion-note class="status" [ngClass]="holdStatusClass(h)">{{ holdStatus(h) }}</ion-note>
+          <ion-note class="status" [ngClass]="holdStatusClass(h)">{{ readyPickupDeadline(h) || holdStatus(h) }}</ion-note>
           <ion-note *ngIf="h.pickupLocationName" class="pickup">{{ h.pickupLocationName }}</ion-note>
         </ion-label>
 

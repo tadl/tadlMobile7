@@ -167,8 +167,8 @@
           <div class="hold-entry-format">{{ holdFormatText(h) }}</div>
           <div class="hold-line" *ngIf="holdPositionText(h)">{{ holdPositionText(h) }}</div>
           <div class="hold-line" *ngIf="holdPickupText(h)">{{ holdPickupText(h) }}</div>
-          <div class="hold-line" *ngIf="holdStatusText(h)">
-            Status:
+        <div class="hold-line" *ngIf="holdStatusText(h)">
+            {{ holdStatusLabel(h) }}:
             <span class="hold-status" [ngClass]="holdStatusClass(h)">
               {{ holdStatusText(h) }}
             </span>
@@ -180,7 +180,7 @@
         <div class="hold-line" *ngIf="holdPositionText()">{{ holdPositionText() }}</div>
         <div class="hold-line" *ngIf="holdPickupText()">{{ holdPickupText() }}</div>
         <div class="hold-line" *ngIf="holdStatusText()">
-          Status:
+          {{ holdStatusLabel() }}:
           <span class="hold-status" [ngClass]="holdStatusClass()">
             {{ holdStatusText() }}
           </span>

@@ -172,6 +172,25 @@ export class HoldsPage {
     return this.holdDisplayState(h) === 'frozen';
   }
 
+  holdCanFreeze(h: AspenHold): boolean {
+    if (!h || this.holdIsReady(h)) return false;
+    if (h?.canFreeze === true) return true;
+    if (h?.freezable === true) return true;
+    return (h?.allowFreezeHolds ?? '').toString().trim() === '1';
+  }
+
+  readyPickupDeadline(h: AspenHold): string {
+    if (!this.holdIsReady(h)) return '';
+
+    const raw = Number((h as any)?.expirationDate ?? (h as any)?.expire ?? 0);
+    if (!Number.isFinite(raw) || raw <= 0) return '';
+
+    const date = new Date(raw > 1e12 ? raw : raw * 1000);
+    if (Number.isNaN(date.getTime())) return '';
+
+    return `Pick up by ${this.formatDeadlineDate(date)}`;
+  }
+
   showMelcatPlaceholder(h: AspenHold): boolean {
     return !h?.coverUrl && this.isMelcatHold(h);
   }
@@ -249,16 +268,16 @@ export class HoldsPage {
     const buttons: ActionSheetButton[] = [];
 
     if (!this.holdIsReady(h)) {
-      buttons.push(
-        {
+      if (frozen || this.holdCanFreeze(h)) {
+        buttons.push({
           text: frozen ? 'Activate hold' : 'Suspend hold',
           handler: () => this.toggleHoldFrozen(h),
-        },
-        {
-          text: 'Change pickup location',
-          handler: () => this.changePickupLocation(h),
-        },
-      );
+        });
+      }
+      buttons.push({
+        text: 'Change pickup location',
+        handler: () => this.changePickupLocation(h),
+      });
     }
 
     buttons.push(
@@ -292,6 +311,7 @@ export class HoldsPage {
   private toggleHoldFrozen(h: AspenHold) {
     if (this.isHoldActionBusy(h)) return;
     if (this.holdIsReady(h)) return;
+    if (!this.holdIsFrozen(h) && !this.holdCanFreeze(h)) return;
 
     const key = this.holdActionKey(h);
     if (!key) return;
@@ -579,5 +599,26 @@ export class HoldsPage {
   private toCount(value: any): number {
     const n = Number(value ?? 0);
     return Number.isFinite(n) && n >= 0 ? n : 0;
+  }
+
+  private formatDeadlineDate(date: Date): string {
+    const month = new Intl.DateTimeFormat(undefined, { month: 'long' }).format(date);
+    const day = date.getDate();
+    return `${month} ${day}${this.ordinalSuffix(day)}`;
+  }
+
+  private ordinalSuffix(day: number): string {
+    const mod100 = day % 100;
+    if (mod100 >= 11 && mod100 <= 13) return 'th';
+    switch (day % 10) {
+      case 1:
+        return 'st';
+      case 2:
+        return 'nd';
+      case 3:
+        return 'rd';
+      default:
+        return 'th';
+    }
   }
 }

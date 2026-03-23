@@ -819,6 +819,14 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     return status.includes('ready to pickup') || status.includes('ready for pickup') || status.includes('ready');
   }
 
+  holdCanFreeze(hold?: AspenHold | null): boolean {
+    const h: any = hold ?? this.hold;
+    if (!h || this.holdIsReady(h)) return false;
+    if (h?.canFreeze === true) return true;
+    if (h?.freezable === true) return true;
+    return (h?.allowFreezeHolds ?? '').toString().trim() === '1';
+  }
+
   private holdHasManageableIdentity(hold?: AspenHold | null): boolean {
     const h: any = hold ?? this.hold;
     if (!h) return false;
@@ -831,8 +839,12 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     const h: any = hold ?? this.hold;
     if (!h) return '';
     const raw = (h?.statusMessage ?? h?.status ?? '').toString().trim();
-    if (raw && /ready/i.test(raw)) return raw;
+    if (raw && /ready/i.test(raw)) return this.readyHoldPickupText(h) || raw;
     return this.holdIsFrozen(h) ? 'Suspended' : 'Active';
+  }
+
+  holdStatusLabel(hold?: AspenHold | null): string {
+    return this.holdIsReady(hold ?? this.hold) ? 'Ready' : 'Status';
   }
 
   holdStatusClass(hold?: AspenHold | null): string {
@@ -863,9 +875,44 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     return '';
   }
 
+  private readyHoldPickupText(hold?: AspenHold | null): string {
+    const h: any = hold ?? this.hold;
+    if (!h || !this.holdIsReady(h)) return '';
+
+    const raw = Number(h?.expirationDate ?? h?.expire ?? 0);
+    if (!Number.isFinite(raw) || raw <= 0) return '';
+
+    const date = new Date(raw > 1e12 ? raw : raw * 1000);
+    if (Number.isNaN(date.getTime())) return '';
+
+    return `Pick up by ${this.formatDeadlineDate(date)}`;
+  }
+
+  private formatDeadlineDate(date: Date): string {
+    const month = new Intl.DateTimeFormat(undefined, { month: 'long' }).format(date);
+    const day = date.getDate();
+    return `${month} ${day}${this.ordinalSuffix(day)}`;
+  }
+
+  private ordinalSuffix(day: number): string {
+    const mod100 = day % 100;
+    if (mod100 >= 11 && mod100 <= 13) return 'th';
+    switch (day % 10) {
+      case 1:
+        return 'st';
+      case 2:
+        return 'nd';
+      case 3:
+        return 'rd';
+      default:
+        return 'th';
+    }
+  }
+
   freezeHold() {
     if (!this.hold || this.holdActionBusy) return;
     if (this.holdIsReady()) return;
+    if (!this.holdCanFreeze(this.hold)) return;
     if (!this.holdHasManageableIdentity(this.hold)) return;
 
     this.holdActionBusy = true;
@@ -1093,7 +1140,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     if (!isReady && isFrozen) {
       buttons.push({ text: 'Activate', handler: () => this.thawHold() });
     }
-    if (!isReady && !isFrozen) {
+    if (!isReady && !isFrozen && this.holdCanFreeze(this.hold)) {
       buttons.push({ text: 'Suspend', handler: () => this.freezeHold() });
     }
     if (!isReady) {

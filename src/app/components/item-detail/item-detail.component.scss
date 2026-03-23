@@ -20,8 +20,13 @@
   margin-bottom: 12px;
 }
 
-.cover img {
+.cover {
+  flex: 0 0 clamp(112px, 32vw, 148px);
   width: clamp(112px, 32vw, 148px);
+}
+
+.cover img {
+  width: 100%;
   height: auto;
   border-radius: 8px;
   display: block;

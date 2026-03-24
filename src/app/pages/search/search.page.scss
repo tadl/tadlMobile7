@@ -38,14 +38,6 @@
   text-transform: uppercase;
 }
 
-.advanced-toggle {
-  --padding-start: 0;
-  --padding-end: 0;
-  --inner-padding-start: 0;
-  --inner-padding-end: 0;
-  margin-top: 2px;
-}
-
 .quick-actions-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -66,8 +58,29 @@
   letter-spacing: 0.01em;
 }
 
+.quick-action-filters {
+  --background: var(--ion-color-primary);
+  --color: #fff;
+}
+
+.quick-filters-badge {
+  margin-left: 6px;
+}
+
+.advanced-launch-row {
+  margin-top: 6px;
+}
+
+.advanced-launch {
+  margin: 0;
+  --padding-start: 4px;
+  --padding-end: 0;
+  font-weight: 600;
+  text-transform: none;
+}
+
 .advanced {
-  margin-top: 10px;
+  margin-top: 8px;
   border-radius: 8px;
   overflow: hidden;
 }
@@ -83,20 +96,14 @@
 }
 
 .filters-summary {
-  margin-top: 10px;
+  margin-top: 8px;
 }
 
 .filters-toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 8px;
-}
-
-.filters-launch {
-  --padding-start: 12px;
-  --padding-end: 12px;
-  margin: 0;
 }
 
 .filters-count-badge {
@@ -148,5 +155,58 @@
 .result-title ion-icon {
   font-size: 1.05rem;
   opacity: 0.9;
+  flex: 0 0 auto;
+}
+
+.suggest-item-cta-wrap {
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--ion-color-step-150, rgba(0, 0, 0, 0.08));
+}
+
+.suggest-item-cta {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 10px;
+  border: 1px solid rgba(var(--ion-color-primary-rgb), 0.14);
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, rgba(var(--ion-color-primary-rgb), 0.06), rgba(var(--ion-color-primary-rgb), 0.015));
+  color: inherit;
+  text-align: left;
+  appearance: none;
+}
+
+.suggest-item-cta-logo {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  border-radius: 10px;
+  display: block;
+}
+
+.suggest-item-cta-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.suggest-item-cta-title {
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: 2px;
+  color: var(--ion-text-color);
+}
+
+.suggest-item-cta-subtitle {
+  color: var(--ion-color-primary);
+  font-weight: 600;
+}
+
+.suggest-item-cta-arrow {
+  font-size: 20px;
+  color: rgba(var(--ion-text-color-rgb), 0.45);
   flex: 0 0 auto;
 }

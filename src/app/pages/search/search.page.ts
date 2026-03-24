@@ -155,6 +155,16 @@ export class SearchPage implements OnInit, OnDestroy {
     await this.globals.open_page(this.globals.suggest_item_url);
   }
 
+  showSuggestItemCta(): boolean {
+    return !!this.lastExecutedQuery && this.hits.length > 0;
+  }
+
+  shouldInsertSuggestItemAfter(index: number): boolean {
+    if (!this.showSuggestItemCta()) return false;
+    const insertAfter = Math.min(this.pageSize, this.hits.length) - 1;
+    return index === insertAfter;
+  }
+
   private async dismissKeyboard() {
     if (!Capacitor.isNativePlatform()) return;
     try {

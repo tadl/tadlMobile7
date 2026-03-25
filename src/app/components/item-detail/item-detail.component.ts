@@ -1746,20 +1746,28 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     for (const [label, variation] of Object.entries(result.variations)) {
       const source = (variation?.source ?? '').toString().trim().toLowerCase();
       const providerLabel = (label ?? '').toString().trim();
+      const status = variation?.statusIndicator;
+      const hasOnlineAvailability = !!status?.isAvailableOnline;
+      const isEContent = !!status?.isEContent;
+      const hasProviderActions = Array.isArray(variation?.actions) && variation.actions.some((action: any) => {
+        const url = (action?.url ?? action?.redirectUrl ?? '').toString().trim();
+        return !!url && !this.isPreviewAction(action);
+      });
       const isDigitalProvider =
-        source === 'overdrive' ||
-        source === 'hoopla' ||
-        providerLabel.toLowerCase().includes('libby') ||
-        providerLabel.toLowerCase().includes('hoopla');
+        !!source ||
+        !!providerLabel ||
+        hasOnlineAvailability ||
+        isEContent ||
+        hasProviderActions;
 
       if (!isDigitalProvider) continue;
 
       out.push({
-        providerLabel: providerLabel || source || 'Provider',
+        providerLabel: providerLabel || (variation?.source ?? '').toString().trim() || 'Provider',
         source,
-        groupedStatus: (variation?.statusIndicator?.groupedStatus ?? '').toString().trim(),
-        numCopiesMessage: (variation?.statusIndicator?.numCopiesMessage ?? '').toString().trim(),
-        isAvailable: !!variation?.statusIndicator?.isAvailable,
+        groupedStatus: (status?.groupedStatus ?? '').toString().trim(),
+        numCopiesMessage: (status?.numCopiesMessage ?? '').toString().trim(),
+        isAvailable: !!(status?.isAvailableOnline ?? status?.isAvailable),
       });
     }
 
@@ -1788,16 +1796,18 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     const category = ((fmt as any)?.category ?? '').toString().toLowerCase();
     const actions: any[] = Array.isArray((fmt as any)?.actions) ? (fmt as any).actions : [];
 
+    if (key.startsWith('e')) return true;
     if (key.includes('kindle') || key.includes('ebook') || key.includes('eaudiobook')) return true;
-    if (category.includes('ebook')) return true;
+    if (category.startsWith('e') || category.includes('ebook') || category.includes('stream')) return true;
 
     for (const a of actions) {
       const title = (a?.title ?? '').toString().toLowerCase();
       const type = (a?.type ?? '').toString().toLowerCase();
-      const url = (a?.url ?? '').toString().toLowerCase();
+      const url = (a?.url ?? a?.redirectUrl ?? '').toString().toLowerCase();
       if (title.includes('libby') || title.includes('hoopla')) return true;
       if (type.includes('overdrive') || type.includes('hoopla')) return true;
       if (url.includes('overdrive.com') || url.includes('hoopladigital.com')) return true;
+      if ((title === 'access online' || title === 'open online') && !!url) return true;
     }
 
     return false;
@@ -1807,18 +1817,27 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     if (!result?.variations || typeof result.variations !== 'object') return [];
 
     const out: FormatProviderAction[] = [];
-    for (const variation of Object.values(result.variations)) {
+    for (const [label, variation] of Object.entries(result.variations)) {
       const source = (variation?.source ?? '').toString().trim().toLowerCase();
-      if (source !== 'overdrive' && source !== 'hoopla') continue;
+      const providerLabel = (label ?? '').toString().trim() || (variation?.source ?? '').toString().trim() || 'Provider';
+      const status = variation?.statusIndicator;
+      const isDigitalProvider =
+        !!source ||
+        !!status?.isEContent ||
+        !!status?.isAvailableOnline ||
+        (Array.isArray(variation?.actions) && variation.actions.length > 0);
+      if (!isDigitalProvider) continue;
 
       for (const action of variation?.actions ?? []) {
         if (this.isPreviewAction(action)) continue;
-        const url = (action?.url ?? '').toString().trim();
+        const url = (action?.url ?? action?.redirectUrl ?? '').toString().trim();
         if (!url) continue;
 
         let title = (action?.title ?? '').toString().trim() || 'Open';
         if (this.isGenericAccessAction(action)) {
-          title = source === 'overdrive' ? 'Access in Libby' : 'Access in Hoopla';
+          if (source === 'overdrive') title = 'Access in Libby';
+          else if (source === 'hoopla') title = 'Access in Hoopla';
+          else title = `Open in ${providerLabel}`;
         }
 
         out.push({ title, url, source });

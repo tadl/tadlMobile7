@@ -466,18 +466,20 @@ Release prep is handled by [scripts/release-prep.mjs](./scripts/release-prep.mjs
 Available scripts:
 
 ```bash
-npm run prep:ios -- --version 7.0.10 --build 70010 --update-date 20260325 --build-num 00
-npm run prep:android -- --version 7.0.10 --build 70010 --update-date 20260325 --build-num 00
-npm run prep:both -- --version 7.0.10 --build 70010 --update-date 20260325 --build-num 00
+npm run prep:ios -- --version 7.0.10
+npm run prep:android -- --version 7.0.10
+npm run prep:both -- --version 7.0.10
 ```
 
 Clean/recreate variants:
 
 ```bash
-npm run prep:ios:clean -- --version 7.0.10 --build 70010 --update-date 20260325 --build-num 00
-npm run prep:android:clean -- --version 7.0.10 --build 70010 --update-date 20260325 --build-num 00
-npm run prep:both:clean -- --version 7.0.10 --build 70010 --update-date 20260325 --build-num 00
+npm run prep:ios:clean -- --version 7.0.10
+npm run prep:android:clean -- --version 7.0.10
+npm run prep:both:clean -- --version 7.0.10
 ```
+
+Optional release-prep flags still exist for override cases such as custom build numbers, skipping the web build, or recreating native projects, but the normal workflow only requires `--version`.
 
 The release prep script handles platform-specific release tasks such as:
 

@@ -23,14 +23,14 @@ The app is designed to work primarily against TADL’s Aspen Discovery installat
 - Location data host: `https://locations.tools.tadl.org`
 - Feed host: `https://feeds.tools.tadl.org`
 
-Primary runtime configuration lives in [src/app/globals.ts](/Users/wjr/dev/tadlMobile7/src/app/globals.ts).
+Primary runtime configuration lives in [src/app/globals.ts](./src/app/globals.ts).
 
 ## Feature Inventory
 
 ### App Shell and Navigation
 
 - Standalone Angular routing with lazy-loaded pages
-- Split-pane layout with right-side menu on larger screens
+- Split-pane layout with left-side menu on larger screens
 - Top-level menu entries for:
   - Home
   - Account
@@ -143,12 +143,6 @@ Primary runtime configuration lives in [src/app/globals.ts](/Users/wjr/dev/tadlM
 - Overdue / due-date handling
 - MeLCat manager handoff for MeLCat-style items
 
-### Fines
-
-- Fine list
-- Outstanding total
-- Payment handoff to the TADL fines payment site
-
 ### Checkout History
 
 - Paginated reading history
@@ -250,7 +244,7 @@ Important behavior:
 - RxJS 7
 - SCSS
 
-Main package definitions live in [package.json](/Users/wjr/dev/tadlMobile7/package.json).
+Main package definitions live in [package.json](./package.json).
 
 ## Native / Capacitor Plugins in Use
 
@@ -308,23 +302,23 @@ Current feed-backed content includes:
 
 ### Important Services
 
-- [src/app/services/auth.service.ts](/Users/wjr/dev/tadlMobile7/src/app/services/auth.service.ts)
+- [src/app/services/auth.service.ts](./src/app/services/auth.service.ts)
   - auth state, saved-account restore, active-account state
-- [src/app/services/account-store.service.ts](/Users/wjr/dev/tadlMobile7/src/app/services/account-store.service.ts)
+- [src/app/services/account-store.service.ts](./src/app/services/account-store.service.ts)
   - saved account metadata and password handling
-- [src/app/services/cache-warm.service.ts](/Users/wjr/dev/tadlMobile7/src/app/services/cache-warm.service.ts)
+- [src/app/services/cache-warm.service.ts](./src/app/services/cache-warm.service.ts)
   - startup/resume warm-up for profile, lists, preferences, and locations
-- [src/app/services/holds.service.ts](/Users/wjr/dev/tadlMobile7/src/app/services/holds.service.ts)
+- [src/app/services/holds.service.ts](./src/app/services/holds.service.ts)
   - holds fetch and mutation logic
-- [src/app/services/hold-support.service.ts](/Users/wjr/dev/tadlMobile7/src/app/services/hold-support.service.ts)
+- [src/app/services/hold-support.service.ts](./src/app/services/hold-support.service.ts)
   - shared hold-target resolution and optimistic hold cache helpers
-- [src/app/services/locations.service.ts](/Users/wjr/dev/tadlMobile7/src/app/services/locations.service.ts)
+- [src/app/services/locations.service.ts](./src/app/services/locations.service.ts)
   - cached + live location loading
-- [src/app/services/discovery-link-router.service.ts](/Users/wjr/dev/tadlMobile7/src/app/services/discovery-link-router.service.ts)
+- [src/app/services/discovery-link-router.service.ts](./src/app/services/discovery-link-router.service.ts)
   - app/browser routing for supported discovery links
-- [src/app/services/loading.interceptor.ts](/Users/wjr/dev/tadlMobile7/src/app/services/loading.interceptor.ts)
+- [src/app/services/loading.interceptor.ts](./src/app/services/loading.interceptor.ts)
   - global loading bar integration and default request timeout
-- [src/app/services/toast.service.ts](/Users/wjr/dev/tadlMobile7/src/app/services/toast.service.ts)
+- [src/app/services/toast.service.ts](./src/app/services/toast.service.ts)
   - shared toast behavior, including hold-success “Manage” actions
 
 ## Caching and Local State
@@ -457,7 +451,7 @@ npx cap open android
 
 ### Capacitor Config
 
-Capacitor configuration lives in [capacitor.config.ts](/Users/wjr/dev/tadlMobile7/capacitor.config.ts).
+Capacitor configuration lives in [capacitor.config.ts](./capacitor.config.ts).
 
 Notable behaviors:
 
@@ -467,7 +461,7 @@ Notable behaviors:
 
 ## Release Prep Workflow
 
-Release prep is handled by [scripts/release-prep.mjs](/Users/wjr/dev/tadlMobile7/scripts/release-prep.mjs).
+Release prep is handled by [scripts/release-prep.mjs](./scripts/release-prep.mjs).
 
 Available scripts:
 
@@ -528,7 +522,7 @@ Important operational notes:
 ## Project Structure
 
 - `src/app/app.component.*`
-  - application shell and right-side menu
+  - application shell and left-side menu
 - `src/app/app.routes.ts`
   - route table
 - `src/app/globals.ts`
@@ -577,4 +571,4 @@ Current top-level routes include:
 - `/my-lists`
 - `/my-lists/:id`
 
-Route definitions live in [src/app/app.routes.ts](/Users/wjr/dev/tadlMobile7/src/app/app.routes.ts).
+Route definitions live in [src/app/app.routes.ts](./src/app/app.routes.ts).

@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { IonicModule, ModalController } from '@ionic/angular';
-import { finalize } from 'rxjs';
+import { concatMap, finalize, of } from 'rxjs';
 
 import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
@@ -62,17 +62,26 @@ export class CheckoutHistoryPage {
     this.infiniteDisabled = true;
 
     this.history.fetchReadingHistoryPage(this.page, this.pageSize, this.sort, '', true)
-      .pipe(finalize(() => {
-        this.loading = false;
-        ev?.target?.complete?.();
-      }))
+      .pipe(
+        concatMap((res) => {
+          if (!res?.success || !this.isLoginUnsuccessful(res?.message)) {
+            return of(res);
+          }
+
+          // Aspen occasionally responds with a transient "login unsuccessful"
+          // on the first history request right after entering the page.
+          // Retry once without the cached pass, but keep the page in loading
+          // state until that retry finishes so we do not flash the empty state.
+          return this.history.fetchReadingHistoryPage(this.page, this.pageSize, this.sort, '', false);
+        }),
+        finalize(() => {
+          this.loading = false;
+          ev?.target?.complete?.();
+        }),
+      )
       .subscribe({
         next: (res) => {
           if (!res?.success) {
-            if (this.isLoginUnsuccessful(res?.message)) {
-              this.retryRefreshAfterAuthGlitch();
-              return;
-            }
             this.items = [];
             this.toast.presentToast(res?.message || 'Could not load checkout history.');
             return;
@@ -81,28 +90,6 @@ export class CheckoutHistoryPage {
           this.page = Number(res.pageCurrent || 1);
           this.totalPages = Number(res.pageTotal || 1);
           this.items = this.normalizeHistoryItems(res.items ?? []);
-          this.infiniteDisabled = !(this.page < this.totalPages);
-        },
-        error: () => {
-          this.items = [];
-          this.toast.presentToast('Could not load checkout history.');
-        },
-      });
-  }
-
-  private retryRefreshAfterAuthGlitch() {
-    this.history.fetchReadingHistoryPage(1, this.pageSize, this.sort, '', false)
-      .subscribe({
-        next: (res) => {
-          if (!res?.success) {
-            this.items = [];
-            this.toast.presentToast(res?.message || 'Could not load checkout history.');
-            return;
-          }
-
-          this.page = Number(res.pageCurrent || 1);
-          this.totalPages = Number(res.pageTotal || 1);
-          this.items = (res.items ?? []).slice();
           this.infiniteDisabled = !(this.page < this.totalPages);
         },
         error: () => {

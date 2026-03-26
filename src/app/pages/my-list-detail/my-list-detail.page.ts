@@ -12,18 +12,10 @@ import { ListsService, type AspenListTitle } from '../../services/lists.service'
 import { ItemDetailComponent } from '../../components/item-detail/item-detail.component';
 import { AspenSearchHit } from '../../services/search.service';
 import { AuthService } from '../../services/auth.service';
-import { ItemService } from '../../services/item.service';
 import { HoldsService } from '../../services/holds.service';
-import { AccountPreferencesService } from '../../services/account-preferences.service';
 import { FormatFamilyService } from '../../services/format-family.service';
 import { ListLookupService } from '../../services/list-lookup.service';
-
-interface HoldTargetOption {
-  recordId: string;
-  label: string;
-  formatLabel: string;
-  isOnHold?: boolean;
-}
+import { HoldSupportService, HoldTargetOption } from '../../services/hold-support.service';
 
 @Component({
   standalone: true,
@@ -59,10 +51,9 @@ export class MyListDetailPage {
     private router: Router,
     private listLookup: ListLookupService,
     private auth: AuthService,
-    private itemService: ItemService,
     private holds: HoldsService,
-    private accountPreferences: AccountPreferencesService,
     private formatFamily: FormatFamilyService,
+    private holdSupport: HoldSupportService,
   ) {}
 
   ionViewWillEnter() {
@@ -207,7 +198,7 @@ export class MyListDetailPage {
       summary: (t?.description ?? '').toString().trim() || undefined,
       language: (t?.language ?? '').toString().trim() || undefined,
       format: t?.format,
-      itemList: [],
+      itemList: Array.isArray((t as any)?.itemList) ? (t as any).itemList : [],
       catalogUrl: `${this.globals.aspen_discovery_base}/GroupedWork/${encodeURIComponent(key)}`,
       raw: t,
     };
@@ -300,16 +291,11 @@ export class MyListDetailPage {
       title: this.titleText(t),
       author: this.authorText(t) || undefined,
       format: t?.format,
-      itemList: [],
+      itemList: Array.isArray((t as any)?.itemList) ? (t as any).itemList : [],
       catalogUrl: '',
       raw: t,
     };
-
-    const family = this.formatFamily.primaryFamilyForHit(hit);
-    if (family === 'book') return 'book-outline';
-    if (family === 'music') return 'disc-outline';
-    if (family === 'video') return 'videocam-outline';
-    return 'albums-outline';
+    return this.formatFamily.iconNameForHit(hit);
   }
 
   private async placeHoldFromTitle(t: AspenListTitle, precomputedTargets?: HoldTargetOption[]): Promise<void> {
@@ -339,7 +325,7 @@ export class MyListDetailPage {
       selectedTarget = picked;
     }
 
-    const defaultPickup = await this.defaultPickupBranchCode();
+    const defaultPickup = await this.holdSupport.defaultPickupBranchCode();
     if (defaultPickup) {
       this.placeHoldNowForTitle(t, selectedTarget.recordId, defaultPickup, selectedTarget.formatLabel || selectedTarget.label);
       return;
@@ -377,12 +363,23 @@ export class MyListDetailPage {
             return;
           }
           this.auth.adjustActiveProfileCounts({ holds: 1, holdsRequested: 1 });
-          this.cacheOptimisticPlacedHoldForTitle(t, recordId, selectedFormatLabel);
+          void this.holdSupport.cacheOptimisticPlacedHold({
+            groupedKey,
+            itemList: Array.isArray((t as any)?.itemList) ? (t as any).itemList : [],
+            rawItemList: (t as any)?.itemList,
+            title: this.titleText(t),
+            author: this.authorText(t) || undefined,
+            coverUrl: this.coverUrl(t) || undefined,
+          }, recordId, selectedFormatLabel);
           if (selectedFormatLabel) {
-            this.toast.presentToast(`Hold placed on format ${selectedFormatLabel}.`);
+            void this.toast.presentHoldPlacedToast(`Hold placed on format ${selectedFormatLabel}.`, () => {
+              void this.router.navigate(['/holds']);
+            });
             return;
           }
-          this.toast.presentToast(res?.message || 'Hold placed.');
+          void this.toast.presentHoldPlacedToast(res?.message || 'Hold placed.', () => {
+            void this.router.navigate(['/holds']);
+          });
         },
         error: () => this.toast.presentToast('Could not place hold.'),
       });
@@ -393,57 +390,14 @@ export class MyListDetailPage {
 
     const groupedKey = this.recordIdForEntry(t);
     if (!groupedKey) return [];
-
-    const holdTargets = await this.resolveIlsHoldTargetsForTitle(t);
-    if (!holdTargets.length) return [];
-    if (!this.auth.snapshot()?.isLoggedIn) return holdTargets;
-
-    const heldRecordIds = await this.heldRecordIdsForGroupedKey(groupedKey);
-    const heldFormatKeys = await this.heldFormatKeysForGroupedKey(groupedKey);
-
-    return holdTargets.map((target) => {
-      const isOnHold =
-        heldRecordIds.has(target.recordId) ||
-        heldFormatKeys.has(this.normalizeFormatKey(target.formatLabel));
-      return { ...target, isOnHold };
+    return this.holdSupport.holdTargetsWithStatus({
+      groupedKey,
+      itemList: Array.isArray((t as any)?.itemList) ? (t as any).itemList : [],
+      rawItemList: (t as any)?.itemList,
+      title: this.titleText(t),
+      author: this.authorText(t) || undefined,
+      coverUrl: this.coverUrl(t) || undefined,
     });
-  }
-
-  private async resolveIlsHoldTargetsForTitle(t: AspenListTitle): Promise<HoldTargetOption[]> {
-    const groupedKey = this.recordIdForEntry(t);
-    if (!groupedKey) return [];
-
-    try {
-      const work = await lastValueFrom(this.itemService.getGroupedWork(groupedKey));
-      const physicalById = new Map<string, HoldTargetOption>();
-      const anyById = new Map<string, HoldTargetOption>();
-
-      for (const [formatKey, fmt] of Object.entries(work?.formats ?? {})) {
-        const formatLabel =
-          (fmt?.label ?? '').toString().trim() ||
-          (formatKey ?? '').toString().trim() ||
-          'Format';
-
-        for (const action of fmt?.actions ?? []) {
-          const id = this.itemService.extractIlsIdFromOnclick((action as any)?.onclick);
-          if (!id) continue;
-
-          const actionTitle = ((action as any)?.title ?? '').toString().trim();
-          const isPlaceHold = actionTitle.toLowerCase() === 'place hold';
-          const label = actionTitle && !isPlaceHold ? `${formatLabel} (${actionTitle})` : formatLabel;
-          const target: HoldTargetOption = { recordId: id, label, formatLabel };
-
-          if (!anyById.has(id)) anyById.set(id, target);
-          if (isPlaceHold && !physicalById.has(id)) physicalById.set(id, target);
-        }
-      }
-
-      const physical = Array.from(physicalById.values());
-      if (physical.length) return physical;
-      return Array.from(anyById.values());
-    } catch {
-      return [];
-    }
   }
 
   private async pickHoldTarget(options: HoldTargetOption[]): Promise<HoldTargetOption | null> {
@@ -484,131 +438,8 @@ export class MyListDetailPage {
     });
   }
 
-  private async heldRecordIdsForGroupedKey(groupedKey: string): Promise<Set<string>> {
-    const normalized = (groupedKey ?? '').toString().trim().toLowerCase();
-    if (!normalized) return new Set<string>();
-
-    try {
-      const holds = await this.cachedHoldsForLookup();
-      const ids = new Set<string>();
-      for (const hold of holds ?? []) {
-        const holdGrouped = (hold?.groupedWorkId ?? '').toString().trim().toLowerCase();
-        if (!holdGrouped || holdGrouped !== normalized) continue;
-        const rid = (hold?.recordId ?? '').toString().trim();
-        if (rid) ids.add(rid);
-      }
-      return ids;
-    } catch {
-      return new Set<string>();
-    }
-  }
-
   private async hasCachedHoldForGroupedKey(groupedKey: string): Promise<boolean> {
-    const normalized = (groupedKey ?? '').toString().trim().toLowerCase();
-    if (!normalized) return false;
-
-    try {
-      const holds = await this.cachedHoldsForLookup();
-      return (holds ?? []).some((hold) => {
-        const holdGrouped = (hold?.groupedWorkId ?? '').toString().trim().toLowerCase();
-        return !!holdGrouped && holdGrouped === normalized;
-      });
-    } catch {
-      return false;
-    }
-  }
-
-  private async heldFormatKeysForGroupedKey(groupedKey: string): Promise<Set<string>> {
-    const normalized = (groupedKey ?? '').toString().trim().toLowerCase();
-    if (!normalized) return new Set<string>();
-
-    try {
-      const holds = await this.cachedHoldsForLookup();
-      const keys = new Set<string>();
-      for (const hold of holds ?? []) {
-        const holdGrouped = (hold?.groupedWorkId ?? '').toString().trim().toLowerCase();
-        if (!holdGrouped || holdGrouped !== normalized) continue;
-
-        const f = (hold as any)?.format;
-        if (Array.isArray(f)) {
-          for (const x of f) {
-            const key = this.normalizeFormatKey((x ?? '').toString());
-            if (key) keys.add(key);
-          }
-        } else if (typeof f === 'string') {
-          const key = this.normalizeFormatKey(f);
-          if (key) keys.add(key);
-        }
-      }
-      return keys;
-    } catch {
-      return new Set<string>();
-    }
-  }
-
-  private normalizeFormatKey(value: string): string {
-    return (value ?? '')
-      .toString()
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, ' ');
-  }
-
-  private async cachedHoldsForLookup(): Promise<any[]> {
-    const snap = this.auth.snapshot();
-    const activeId = (snap?.activeAccountId ?? '').toString().trim();
-    if (!activeId) return [];
-
-    try {
-      const cached = await this.holds.getCachedHolds(activeId);
-      return Array.isArray(cached?.holds) ? cached!.holds : [];
-    } catch {
-      return [];
-    }
-  }
-
-  private cacheOptimisticPlacedHoldForTitle(
-    t: AspenListTitle,
-    recordId: string,
-    selectedFormatLabel?: string,
-  ): void {
-    const groupedKey = this.recordIdForEntry(t);
-    if (!groupedKey) return;
-    const snap = this.auth.snapshot();
-    const activeId = (snap?.activeAccountId ?? '').toString().trim();
-    if (!activeId) return;
-
-    void (async () => {
-      try {
-        const cached = await this.holds.getCachedHolds(activeId);
-        const current = Array.isArray(cached?.holds) ? cached!.holds : [];
-        current.push({
-          source: 'ils',
-          type: 'ils',
-          groupedWorkId: groupedKey,
-          recordId: Number(recordId),
-          format: selectedFormatLabel ? [selectedFormatLabel] : undefined,
-        } as any);
-        await this.holds.setCachedHolds(activeId, current);
-      } catch {
-        // ignore cache failures
-      }
-    })();
-  }
-
-  private async defaultPickupBranchCode(): Promise<string | null> {
-    const activeId = (this.auth.snapshot()?.activeAccountId ?? '').toString().trim();
-    if (!activeId) return null;
-
-    try {
-      const prefs = await this.accountPreferences.getCachedPreferences(activeId);
-      const legacyCode = (prefs?.pickup_library ?? '').toString().trim();
-      if (!legacyCode) return null;
-      const loc = this.globals.pickupLocationFromLegacyPreferencesCode(legacyCode);
-      return loc?.code ?? null;
-    } catch {
-      return null;
-    }
+    return this.holdSupport.hasCachedHoldForGroupedKey(groupedKey);
   }
 
   private async confirmRemoveFromList(t: AspenListTitle) {

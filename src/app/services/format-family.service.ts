@@ -56,6 +56,17 @@ const DIGITAL_HINTS = [
 
 @Injectable({ providedIn: 'root' })
 export class FormatFamilyService {
+  iconNameForFamily(family: FormatFamily): string {
+    if (family === 'book') return 'book-outline';
+    if (family === 'music') return 'disc-outline';
+    if (family === 'video') return 'videocam-outline';
+    return 'albums-outline';
+  }
+
+  iconNameForHit(hit: AspenSearchHit): string {
+    return this.iconNameForFamily(this.primaryFamilyForHit(hit));
+  }
+
   familyLabel(family: FormatFamily): string {
     if (family === 'book') return 'Book';
     if (family === 'music') return 'Music';

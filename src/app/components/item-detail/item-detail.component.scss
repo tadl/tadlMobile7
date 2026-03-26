@@ -218,7 +218,8 @@
   line-height: 1.2;
 }
 
-.format-sub {
+.format-sub,
+.provider-copies {
   display: block;
   font-size: 13px;
   opacity: 0.75;
@@ -261,11 +262,6 @@
 
 .provider-name {
   font-weight: 600;
-}
-
-.provider-copies {
-  display: block;
-  margin-top: 2px;
 }
 
 .dot {

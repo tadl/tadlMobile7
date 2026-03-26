@@ -20,57 +20,57 @@
 
     <ion-item class="about-item">
       <ion-label>App Version</ion-label>
-      <ion-note slot="end" color="dark" class="about-value">{{ globals.app_version }}</ion-note>
+      <ion-note slot="end" class="about-value">{{ globals.app_version }}</ion-note>
     </ion-item>
 
     <ion-item class="about-item">
       <ion-label>Update Version</ion-label>
-      <ion-note slot="end" color="dark" class="about-value">{{ globals.update_version }}</ion-note>
+      <ion-note slot="end" class="about-value">{{ globals.update_version }}</ion-note>
     </ion-item>
 
     <ion-item class="about-item">
       <ion-label>Build Number</ion-label>
-      <ion-note slot="end" color="dark" class="about-value">{{ globals.build_num }}</ion-note>
+      <ion-note slot="end" class="about-value">{{ globals.build_num }}</ion-note>
     </ion-item>
 
     <ion-item class="about-item">
       <ion-label>Screen</ion-label>
-      <ion-note slot="end" color="dark" class="about-value">{{ screenSize }}</ion-note>
+      <ion-note slot="end" class="about-value">{{ screenSize }}</ion-note>
     </ion-item>
 
     <ion-item class="about-item">
       <ion-label>Storage Driver</ion-label>
-      <ion-note slot="end" color="dark" class="about-value">{{ storageDriver }}</ion-note>
+      <ion-note slot="end" class="about-value">{{ storageDriver }}</ion-note>
     </ion-item>
 
     <ion-item class="about-item">
       <ion-label>Theme</ion-label>
-      <ion-note slot="end" color="dark" class="about-value">{{ themeModeLabel() }}</ion-note>
+      <ion-note slot="end" class="about-value">{{ themeModeLabel() }}</ion-note>
     </ion-item>
 
     <ion-item class="about-item">
       <ion-label>Link Mode</ion-label>
-      <ion-note slot="end" color="dark" class="about-value">{{ linkModeLabel() }}</ion-note>
+      <ion-note slot="end" class="about-value">{{ linkModeLabel() }}</ion-note>
     </ion-item>
 
     <ion-item class="about-item">
       <ion-label>Credential Storage</ion-label>
-      <ion-note slot="end" color="dark" class="about-value">{{ credentialStorage }}</ion-note>
+      <ion-note slot="end" class="about-value">{{ credentialStorage }}</ion-note>
     </ion-item>
 
     <ion-item class="about-item">
       <ion-label>Platforms</ion-label>
-      <ion-note slot="end" color="dark" class="about-value about-value-platforms">{{ platforms }}</ion-note>
+      <ion-note slot="end" class="about-value about-value-platforms">{{ platforms }}</ion-note>
     </ion-item>
 
     <ion-item class="about-item">
       <ion-label>Network Status</ion-label>
-      <ion-note slot="end" color="dark" class="about-value">{{ globals.net_status }}</ion-note>
+      <ion-note slot="end" class="about-value">{{ globals.net_status }}</ion-note>
     </ion-item>
 
     <ion-item class="about-item">
       <ion-label>Network Type</ion-label>
-      <ion-note slot="end" color="dark" class="about-value">{{ globals.net_type }}</ion-note>
+      <ion-note slot="end" class="about-value">{{ globals.net_type }}</ion-note>
     </ion-item>
   </ion-list>
 
@@ -81,34 +81,34 @@
 
     <ion-item class="about-item" *ngIf="globals.device_info?.name">
       <ion-label>Device Name</ion-label>
-      <ion-note slot="end" color="dark" class="about-value">{{ globals.device_info?.name }}</ion-note>
+      <ion-note slot="end" class="about-value">{{ globals.device_info?.name }}</ion-note>
     </ion-item>
 
     <ion-item class="about-item">
       <ion-label>Virtual</ion-label>
-      <ion-note slot="end" color="dark" class="about-value">{{ globals.device_info?.isVirtual }}</ion-note>
+      <ion-note slot="end" class="about-value">{{ globals.device_info?.isVirtual }}</ion-note>
     </ion-item>
 
     <ion-item class="about-item">
       <ion-label>Manufacturer</ion-label>
-      <ion-note slot="end" color="dark" class="about-value">{{ globals.device_info?.manufacturer }}</ion-note>
+      <ion-note slot="end" class="about-value">{{ globals.device_info?.manufacturer }}</ion-note>
     </ion-item>
 
     <ion-item class="about-item">
       <ion-label>Model</ion-label>
-      <ion-note slot="end" color="dark" class="about-value">{{ globals.device_info?.model }}</ion-note>
+      <ion-note slot="end" class="about-value">{{ globals.device_info?.model }}</ion-note>
     </ion-item>
 
     <ion-item class="about-item">
       <ion-label>OS</ion-label>
-      <ion-note slot="end" color="dark" class="about-value">
+      <ion-note slot="end" class="about-value">
         {{ globals.device_info?.operatingSystem }} {{ globals.device_info?.osVersion }}
       </ion-note>
     </ion-item>
 
     <ion-item class="about-item">
       <ion-label>Webview Version</ion-label>
-      <ion-note slot="end" color="dark" class="about-value">{{ globals.device_info?.webViewVersion }}</ion-note>
+      <ion-note slot="end" class="about-value">{{ globals.device_info?.webViewVersion }}</ion-note>
     </ion-item>
   </ion-list>
 

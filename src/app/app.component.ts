@@ -40,7 +40,7 @@ import { DiscoveryLinkRouterService } from './services/discovery-link-router.ser
   ],
 })
 export class AppComponent implements OnInit {
-  public appPages: Array<{ title: string; url: string; icon: string }> = [
+  readonly appPages: Array<{ title: string; url: string; icon: string }> = [
     { title: 'Home', url: '/home', icon: 'home' },
     { title: 'Account', url: '/account', icon: 'person-circle' },
     { title: 'Search', url: '/search', icon: 'search' },

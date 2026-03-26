@@ -1564,7 +1564,9 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
 
           this.needsHoldsRefresh = true;
           this.auth.adjustActiveProfileCounts({ holds: 1, holdsRequested: 1 });
-          this.toast.presentToast(res?.message || 'Hold placed.');
+          void this.toast.presentHoldPlacedToast(res?.message || 'Hold placed.', () =>
+            this.openHoldsPage(),
+          );
           this.insertOptimisticPlacedHold(recordId, pickupBranch);
           void this.refreshHoldForThisItemFromFreshFetch();
         },
@@ -1766,12 +1768,19 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
         providerLabel: providerLabel || (variation?.source ?? '').toString().trim() || 'Provider',
         source,
         groupedStatus: (status?.groupedStatus ?? '').toString().trim(),
-        numCopiesMessage: (status?.numCopiesMessage ?? '').toString().trim(),
+        numCopiesMessage: this.normalizeCopiesMessage((status?.numCopiesMessage ?? '').toString().trim()),
         isAvailable: !!(status?.isAvailableOnline ?? status?.isAvailable),
       });
     }
 
     return out;
+  }
+
+  private normalizeCopiesMessage(value: string): string {
+    const raw = (value ?? '').toString().trim();
+    if (!raw) return '';
+
+    return raw.replace(/\b1\s+copies\b\.?/i, '1 copy');
   }
 
   private prepareWorkLoadState(work: AspenGroupedWork | null) {

@@ -25,7 +25,11 @@
     <ion-item class="pref-item pref-item--setting">
       <ion-label>
         <div class="pref-label">Links</div>
-        <ion-segment [value]="linkMode()" (ionChange)="onLinkModeChange($event)">
+        <ion-segment
+          aria-label="Link mode preference"
+          [value]="linkMode()"
+          (ionChange)="onLinkModeChange($event)"
+        >
           <ion-segment-button value="app">
             <ion-label>Use App</ion-label>
           </ion-segment-button>
@@ -42,7 +46,11 @@
     <ion-item class="pref-item pref-item--setting">
       <ion-label>
         <div class="pref-label">Theme</div>
-        <ion-segment [value]="themeMode()" (ionChange)="onThemeChange($event)">
+        <ion-segment
+          aria-label="Theme preference"
+          [value]="themeMode()"
+          (ionChange)="onThemeChange($event)"
+        >
           <ion-segment-button value="system">
             <ion-label>System</ion-label>
           </ion-segment-button>
@@ -67,12 +75,13 @@
 
     <ion-item>
       <ion-label>Pickup Library</ion-label>
-      <ion-select
-        slot="end"
-        interface="popover"
-        [value]="preferences.pickup_library"
-        [disabled]="saving"
-        (ionChange)="onPickupLibraryChanged($event)"
+        <ion-select
+          slot="end"
+          interface="popover"
+          aria-label="Pickup library"
+          [value]="preferences.pickup_library"
+          [disabled]="saving"
+          (ionChange)="onPickupLibraryChanged($event)"
       >
         <ion-select-option *ngFor="let opt of pickupOptions" [value]="opt.code">{{ opt.name }}</ion-select-option>
       </ion-select>
@@ -80,12 +89,13 @@
 
     <ion-item>
       <ion-label>Default Search Location</ion-label>
-      <ion-select
-        slot="end"
-        interface="popover"
-        [value]="preferences.default_search"
-        [disabled]="saving"
-        (ionChange)="onDefaultSearchChanged($event)"
+        <ion-select
+          slot="end"
+          interface="popover"
+          aria-label="Default search location"
+          [value]="preferences.default_search"
+          [disabled]="saving"
+          (ionChange)="onDefaultSearchChanged($event)"
       >
         <ion-select-option *ngFor="let opt of searchOptions" [value]="opt.code">{{ opt.name }}</ion-select-option>
       </ion-select>
@@ -95,6 +105,7 @@
       <ion-label>Keep Circulation History</ion-label>
       <ion-toggle
         slot="end"
+        aria-label="Keep circulation history"
         [checked]="preferences.keep_circ_history"
         [disabled]="saving"
         (ionChange)="onKeepCircHistoryToggle($event)"
@@ -110,22 +121,22 @@
 
     <ion-item button detail="true" [disabled]="saving" (click)="updateUsername()">
       <ion-label>Username</ion-label>
-      <ion-note slot="end" color="dark">{{ preferences.username }}</ion-note>
+      <ion-note slot="end">{{ preferences.username }}</ion-note>
     </ion-item>
 
     <ion-item button detail="true" [disabled]="saving" (click)="updateAlias()">
       <ion-label>Holdshelf Alias</ion-label>
-      <ion-note slot="end" color="dark">{{ preferences.hold_shelf_alias }}</ion-note>
+      <ion-note slot="end">{{ preferences.hold_shelf_alias }}</ion-note>
     </ion-item>
 
     <ion-item button detail="true" [disabled]="saving" (click)="updateEmail()">
       <ion-label>Email Address</ion-label>
-      <ion-note slot="end" color="dark">{{ preferences.email }}</ion-note>
+      <ion-note slot="end">{{ preferences.email }}</ion-note>
     </ion-item>
 
     <ion-item button detail="true" [disabled]="saving" (click)="updatePassword()">
       <ion-label>Password</ion-label>
-      <ion-note slot="end" color="dark">(not displayed)</ion-note>
+      <ion-note slot="end">(not displayed)</ion-note>
     </ion-item>
   </ion-list>
 
@@ -136,18 +147,19 @@
 
     <ion-item button detail="true" [disabled]="saving" (click)="updatePhoneNotifyNumber()">
       <ion-label>Phone Notify Number</ion-label>
-      <ion-note slot="end" color="dark">{{ preferences.phone_notify_number }}</ion-note>
+      <ion-note slot="end">{{ preferences.phone_notify_number }}</ion-note>
     </ion-item>
 
     <ion-item button detail="true" [disabled]="saving" (click)="updateTextNotifyNumber()">
       <ion-label>Text Notify Number</ion-label>
-      <ion-note slot="end" color="dark">{{ preferences.text_notify_number }}</ion-note>
+      <ion-note slot="end">{{ preferences.text_notify_number }}</ion-note>
     </ion-item>
 
     <ion-item>
       <ion-label>Email Notify</ion-label>
       <ion-toggle
         slot="end"
+        aria-label="Email notifications"
         [checked]="preferences.email_notify"
         [disabled]="saving"
         (ionChange)="onToggleNotify('email_notify', $event.detail.checked)"
@@ -158,6 +170,7 @@
       <ion-label>Phone Notify</ion-label>
       <ion-toggle
         slot="end"
+        aria-label="Phone notifications"
         [checked]="preferences.phone_notify"
         [disabled]="saving"
         (ionChange)="onToggleNotify('phone_notify', $event.detail.checked)"
@@ -168,6 +181,7 @@
       <ion-label>Text Notify</ion-label>
       <ion-toggle
         slot="end"
+        aria-label="Text notifications"
         [checked]="preferences.text_notify"
         [disabled]="saving"
         (ionChange)="onToggleNotify('text_notify', $event.detail.checked)"

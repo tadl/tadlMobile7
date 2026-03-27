@@ -11,7 +11,7 @@ export class ToastService {
     buttons?: ToastButton[],
   ) {
     const toast = await this.toastController.create({
-      message,
+      message: this.normalizeMessage(message),
       duration,
       position: 'bottom',
       buttons,
@@ -36,5 +36,14 @@ export class ToastService {
       : [];
 
     await this.presentToast(message, 5000, buttons);
+  }
+
+  private normalizeMessage(message: string): string {
+    return (message ?? '')
+      .toString()
+      .trim()
+      .replace(/\s+([,.;!?])/g, '$1')
+      .replace(/[,;:]+\s*$/g, '')
+      .trim();
   }
 }

@@ -11,6 +11,18 @@
 </ion-header>
 
 <ion-content class="ion-padding">
+  <ion-card class="closure-notice-card" *ngIf="closureNotice as notice" button (click)="goToRoute('/locations')">
+    <ion-card-content>
+      <div class="closure-notice-header">
+        <div class="closure-notice-eyebrow">Service alert</div>
+      </div>
+      <div class="closure-notice-text">{{ notice.message }}</div>
+      <div class="closure-notice-action">
+        <span>{{ notice.actionLabel }} &gt;</span>
+      </div>
+    </ion-card-content>
+  </ion-card>
+
   <ion-card class="welcome-card">
     <ion-card-content>
       <ng-container *ngIf="auth.authState() | async as s">
@@ -39,15 +51,12 @@
     </ion-card-content>
   </ion-card>
 
-  <ion-card class="closure-notice-card" *ngIf="closureNotice as notice" button (click)="goToRoute('/locations')">
+  <ion-card class="closure-notice-card service-status-card" *ngIf="serviceAlerts.alert$() | async as serviceAlert">
     <ion-card-content>
       <div class="closure-notice-header">
-        <div class="closure-notice-eyebrow">Service alert</div>
+        <div class="closure-notice-eyebrow">System status message</div>
       </div>
-      <div class="closure-notice-text">{{ notice.message }}</div>
-      <div class="closure-notice-action">
-        <span>{{ notice.actionLabel }} &gt;</span>
-      </div>
+      <div class="closure-notice-text">{{ serviceAlert }}</div>
     </ion-card-content>
   </ion-card>
 

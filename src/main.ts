@@ -66,6 +66,7 @@ import { routes } from './app/app.routes';
 import { AppComponent } from './app/app.component';
 import { AspenApiParamsInterceptor } from './app/services/aspen-api-params.interceptor';
 import { LoadingInterceptor } from './app/services/loading.interceptor';
+import { ServiceAlertInterceptor } from './app/services/service-alert.interceptor';
 
 // Register only what you use (fixes ionicon asset-path / base URL issues)
 addIcons({
@@ -127,6 +128,7 @@ bootstrapApplication(AppComponent, {
 
     // Interceptors
     { provide: HTTP_INTERCEPTORS, useClass: AspenApiParamsInterceptor, multi: true },
+    { provide: HTTP_INTERCEPTORS, useClass: ServiceAlertInterceptor, multi: true },
     { provide: HTTP_INTERCEPTORS, useClass: LoadingInterceptor, multi: true },
 
     provideRouter(routes, withPreloading(PreloadAllModules)),

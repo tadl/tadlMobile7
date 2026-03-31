@@ -52,6 +52,15 @@
   border-left: 4px solid var(--ion-color-warning);
 }
 
+.service-status-card {
+  cursor: default;
+  border-left-color: var(--ion-color-primary);
+}
+
+.service-status-card .closure-notice-eyebrow {
+  color: var(--ion-color-primary);
+}
+
 .closure-notice-header {
   display: flex;
   align-items: center;

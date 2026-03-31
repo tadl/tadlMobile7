@@ -12,6 +12,7 @@ import { PatronService } from '../../services/patron.service';
 import { ToastService } from '../../services/toast.service';
 import { ShowCardModalComponent } from '../../components/show-card-modal/show-card-modal.component';
 import { LocationsService, type AppLocation, type AppLocationException } from '../../services/locations.service';
+import { ServiceAlertService } from '../../services/service-alert.service';
 
 type HomeClosureNotice = {
   message: string;
@@ -37,6 +38,7 @@ export class HomePage {
     private modal: ModalController,
     private toast: ToastService,
     private locationsService: LocationsService,
+    public serviceAlerts: ServiceAlertService,
   ) {}
 
   ionViewDidEnter() {

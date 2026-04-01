@@ -5,6 +5,7 @@ import { Observable, map, from, switchMap } from 'rxjs';
 import { Globals } from '../globals';
 import { AuthService } from './auth.service';
 import { AccountStoreService } from './account-store.service';
+import { DiscoveryUrlService } from './discovery-url.service';
 
 export type AspenSearchIndex = 'Keyword' | 'Title' | 'Author' | 'Subject' | 'ISBN';
 export type AspenSearchSource = 'local' | 'combined';
@@ -108,6 +109,7 @@ export class SearchService {
     private globals: Globals,
     private auth: AuthService,
     private accounts: AccountStoreService,
+    private discoveryUrls: DiscoveryUrlService,
   ) {}
 
   getAppSearchResults(opts: AspenSearchOptions): Observable<AspenSearchResult> {
@@ -196,7 +198,7 @@ export class SearchService {
 
       const title = this.decodeEntities(r?.title);
       const author = this.decodeEntities(r?.author);
-      const coverUrl = typeof r?.image === 'string' ? r.image : undefined;
+      const coverUrl = this.discoveryUrls.normalize(r?.image);
       const summary = this.decodeEntities(r?.summary);
       const language = this.decodeEntities(r?.language);
 

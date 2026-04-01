@@ -29,6 +29,7 @@ import { AuthService } from '../../services/auth.service';
 import { CopyDetailsPopoverComponent } from '../copy-details-popover/copy-details-popover.component';
 import { AccountPreferencesService } from '../../services/account-preferences.service';
 import { ListLookupService } from '../../services/list-lookup.service';
+import { DiscoveryUrlService } from '../../services/discovery-url.service';
 import { SwitchUserModalComponent } from '../switch-user-modal/switch-user-modal.component';
 
 interface ItemDetailListContext {
@@ -137,6 +138,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     private lists: ListsService,
     private listLookup: ListLookupService,
     private accountPreferences: AccountPreferencesService,
+    private discoveryUrls: DiscoveryUrlService,
     private router: Router,
     private modalCtrl: ModalController, // ✅ renamed from "modal"
     private actionSheet: ActionSheetController,
@@ -2086,7 +2088,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   }
 
   private normalizeCoverUrl(value: unknown): string {
-    return (value ?? '').toString().trim();
+    return this.discoveryUrls.normalize(value) ?? '';
   }
 
   private dedupeShelfDetails(details: FormatShelfDetail[]): FormatShelfDetail[] {

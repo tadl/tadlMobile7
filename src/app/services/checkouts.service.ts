@@ -8,6 +8,7 @@ import { Globals } from '../globals';
 import { AuthService } from './auth.service';
 import { AccountStoreService } from './account-store.service';
 import { AppCacheService } from './app-cache.service';
+import { DiscoveryUrlService } from './discovery-url.service';
 
 export interface AspenCheckout {
   id: number;
@@ -69,6 +70,7 @@ export class CheckoutsService {
     private auth: AuthService,
     private accounts: AccountStoreService,
     private cache: AppCacheService,
+    private discoveryUrls: DiscoveryUrlService,
   ) {}
 
   /**
@@ -105,7 +107,9 @@ export class CheckoutsService {
             map((r: any) => {
               if (!r?.success) return [];
               const list = Array.isArray(r?.checkedOutItems) ? (r.checkedOutItems as AspenCheckout[]) : [];
-              return list.filter((c) => c?.type === 'ils' || c?.source === 'ils');
+              return list
+                .filter((c) => c?.type === 'ils' || c?.source === 'ils')
+                .map((checkout) => this.normalizeCheckout(checkout));
             }),
             tap((list) => {
               this.cache.write(cacheKey, list).catch(() => {});
@@ -218,6 +222,13 @@ export class CheckoutsService {
     await Preferences.set({ key: PREF_APP_SESSION_ID, value: sid });
     this.sessionId = sid;
     return sid;
+  }
+
+  private normalizeCheckout(checkout: AspenCheckout): AspenCheckout {
+    return {
+      ...checkout,
+      coverUrl: this.discoveryUrls.normalize(checkout?.coverUrl),
+    };
   }
 
   // ---------- Small helpers ----------

@@ -7,6 +7,7 @@ import { Globals } from '../globals';
 import { AuthService } from './auth.service';
 import { AccountStoreService } from './account-store.service';
 import { AppCacheService } from './app-cache.service';
+import { DiscoveryUrlService } from './discovery-url.service';
 
 export interface AspenHold {
   id: number; // transactionId-ish
@@ -69,6 +70,7 @@ export class HoldsService {
     private auth: AuthService,
     private accounts: AccountStoreService,
     private cache: AppCacheService,
+    private discoveryUrls: DiscoveryUrlService,
   ) {}
 
   // ---------- Cache ----------
@@ -158,6 +160,13 @@ export class HoldsService {
     }
 
     return [];
+  }
+
+  private normalizeHold(hold: AspenHold): AspenHold {
+    return {
+      ...hold,
+      coverUrl: this.discoveryUrls.normalize(hold?.coverUrl),
+    };
   }
 
   // ---------- Place hold (ILS item hold) ----------
@@ -317,7 +326,9 @@ export class HoldsService {
                 ...this.normalizeHoldCollection(r?.holds?.available),
                 ...this.normalizeHoldCollection(r?.holds?.unavailable),
               ];
-              return all.filter(h => (h?.type === 'ils' || h?.source === 'ils'));
+              return all
+                .filter(h => (h?.type === 'ils' || h?.source === 'ils'))
+                .map((hold) => this.normalizeHold(hold));
             }),
             tap((holds) => {
               this.cache.write(cacheKey, holds).catch(() => {});

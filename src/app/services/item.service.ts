@@ -4,6 +4,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, map, concat, from, filter, tap } from 'rxjs';
 import { Globals } from '../globals';
 import { AppCacheService } from './app-cache.service';
+import { DiscoveryUrlService } from './discovery-url.service';
 
 export type AspenWorkAction =
   | {
@@ -99,6 +100,7 @@ export class ItemService {
     private http: HttpClient,
     private globals: Globals,
     private cache: AppCacheService,
+    private discoveryUrls: DiscoveryUrlService,
   ) {}
 
   /**
@@ -119,7 +121,7 @@ export class ItemService {
     const network$ = this.http
       .get<any>(`${this.globals.aspen_api_base}/WorkAPI`, { params })
       .pipe(
-        map(raw => (raw?.result ?? raw) as AspenGroupedWork),
+        map(raw => this.normalizeGroupedWork(raw?.result ?? raw)),
         tap((work) => {
           this.cache.write(cacheKey, work).catch(() => {});
         }),
@@ -270,6 +272,14 @@ export class ItemService {
       format: typeof input?.format === 'string' ? input.format : formatLabel,
       variations,
       message: typeof input?.message === 'string' ? input.message : undefined,
+    };
+  }
+
+  private normalizeGroupedWork(input: any): AspenGroupedWork {
+    const work = (input ?? {}) as AspenGroupedWork;
+    return {
+      ...work,
+      cover: this.discoveryUrls.normalize(work?.cover),
     };
   }
 }

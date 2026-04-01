@@ -6,6 +6,7 @@ import { Globals } from '../globals';
 import { AuthService } from './auth.service';
 import { AccountStoreService } from './account-store.service';
 import { AppCacheService } from './app-cache.service';
+import { DiscoveryUrlService } from './discovery-url.service';
 
 export interface AspenReadingHistoryItem {
   id?: string;
@@ -41,6 +42,7 @@ export class HistoryService {
     private auth: AuthService,
     private accounts: AccountStoreService,
     private cache: AppCacheService,
+    private discoveryUrls: DiscoveryUrlService,
   ) {}
 
   fetchReadingHistoryPage(
@@ -98,7 +100,9 @@ export class HistoryService {
             map(raw => raw?.result ?? raw),
             map((r: any) => ({
               success: !!r?.success,
-              items: Array.isArray(r?.readingHistory) ? (r.readingHistory as AspenReadingHistoryItem[]) : [],
+              items: Array.isArray(r?.readingHistory)
+                ? (r.readingHistory as AspenReadingHistoryItem[]).map((item) => this.normalizeHistoryItem(item))
+                : [],
               totalResults: Number.isFinite(Number(r?.totalResults)) ? Number(r.totalResults) : 0,
               pageCurrent: Number.isFinite(Number(r?.page_current)) ? Number(r.page_current) : p,
               pageTotal: Number.isFinite(Number(r?.page_total)) ? Number(r.page_total) : 1,
@@ -113,5 +117,13 @@ export class HistoryService {
     );
 
     return concat(cached$, network$);
+  }
+
+  private normalizeHistoryItem(item: AspenReadingHistoryItem): AspenReadingHistoryItem {
+    return {
+      ...item,
+      coverUrl: this.discoveryUrls.normalize(item?.coverUrl),
+      image: this.discoveryUrls.normalize(item?.image),
+    };
   }
 }

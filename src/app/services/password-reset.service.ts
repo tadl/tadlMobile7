@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { catchError, map, Observable, throwError } from 'rxjs';
 
 import { Globals } from '../globals';
@@ -9,6 +9,12 @@ export interface PasswordResetRequest {
   email: string;
 }
 
+export interface PasswordResetResult {
+  success: boolean;
+  message?: string;
+  action?: string | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class PasswordResetService {
   constructor(
@@ -16,32 +22,38 @@ export class PasswordResetService {
     private globals: Globals,
   ) {}
 
-  submitResetRequest(input: PasswordResetRequest): Observable<void> {
+  submitResetRequest(input: PasswordResetRequest): Observable<PasswordResetResult> {
     const username = (input?.username ?? '').toString().trim();
     const email = (input?.email ?? '').toString().trim();
     const body = new URLSearchParams();
     body.set('username', username);
     body.set('email', email);
-    body.set('submit', 'Reset My Password');
 
     const headers = new HttpHeaders({
       'Content-Type': 'application/x-www-form-urlencoded',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept': 'application/json',
     });
+    const params = new HttpParams().set('method', 'resetPassword');
 
-    return this.http.post(
-      `${this.globals.aspen_discovery_base}/MyAccount/EmailResetPin`,
+    return this.http.post<any>(
+      `${this.globals.aspen_api_base}/UserAPI`,
       body.toString(),
       {
+        params,
         headers,
-        observe: 'response',
-        responseType: 'text',
       },
     ).pipe(
-      map(() => void 0),
+      map((raw) => {
+        const result = raw?.result ?? raw ?? {};
+        return {
+          success: !!result?.success,
+          message: typeof result?.message === 'string' ? result.message : undefined,
+          action: typeof result?.action === 'string' ? result.action : null,
+        } satisfies PasswordResetResult;
+      }),
       catchError((err) => {
         const status = Number(err?.status ?? 0);
-        if (status === 0) return throwError(() => new Error('password_reset_network_or_cors'));
+        if (status === 0) return throwError(() => new Error('password_reset_network_error'));
         return throwError(() => new Error('password_reset_failed'));
       }),
     );

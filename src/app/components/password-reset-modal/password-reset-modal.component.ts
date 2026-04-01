@@ -47,25 +47,32 @@ export class PasswordResetModalComponent {
     this.passwordReset.submitResetRequest({ username, email })
       .pipe(finalize(() => { this.submitting = false; }))
       .subscribe({
-        next: () => {
+        next: (res) => {
           this.submitted = true;
-          this.submitTitle = 'Request Sent';
+          if (res?.success) {
+            this.submitTitle = 'Request Sent';
+            this.submitMessage =
+              (res?.message ?? '').toString().trim() ||
+              'If the email address on file matches the one provided, you should receive a reset link within a few minutes.';
+            return;
+          }
+          this.submitTitle = 'Could Not Send Reset';
           this.submitMessage =
-            'Your request was received. If the email address on file matches the one provided, you should receive a reset link within a few minutes.';
+            (res?.message ?? '').toString().trim() ||
+            'We could not send a password reset request right now. Please verify your information and try again.';
         },
         error: (err) => {
           const msg = (err?.message ?? '').toString();
-          if (msg === 'password_reset_network_or_cors') {
-            this.submitted = true;
-            this.submitTitle = 'Request Received';
+          this.submitted = true;
+          if (msg === 'password_reset_network_error') {
+            this.submitTitle = 'Network Error';
             this.submitMessage =
-              'Your request was received. If the email address on file matches the one provided, you should receive a reset link within a few minutes.';
+              'We could not reach the server to request a password reset. Please try again in a moment.';
             return;
           }
-          this.submitted = true;
-          this.submitTitle = 'Could Not Confirm Submission';
+          this.submitTitle = 'Could Not Send Reset';
           this.submitMessage =
-            'We could not confirm submission in-app. Please use "Reset on Website" to complete password reset.';
+            'We could not send a password reset request right now. Please try again later.';
         },
       });
   }

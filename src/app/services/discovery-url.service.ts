@@ -20,9 +20,13 @@ export class DiscoveryUrlService {
     try {
       const u = new URL(raw);
       const apiHost = new URL(this.globals.aspen_api_host).host;
+      const discoveryHost = new URL(this.globals.aspen_discovery_base).host;
+      if (u.protocol === 'http:' && (u.host === discoveryHost || u.host === apiHost)) {
+        u.protocol = 'https:';
+      }
       if (u.host === apiHost) {
         u.protocol = 'https:';
-        u.host = new URL(this.globals.aspen_discovery_base).host;
+        u.host = discoveryHost;
       }
       return u.toString();
     } catch {

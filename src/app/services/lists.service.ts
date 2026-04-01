@@ -6,6 +6,7 @@ import { Globals } from '../globals';
 import { AuthService } from './auth.service';
 import { AccountStoreService } from './account-store.service';
 import { AppCacheService } from './app-cache.service';
+import { DiscoveryUrlService } from './discovery-url.service';
 
 export interface AspenUserList {
   id: string | number;
@@ -63,6 +64,7 @@ export class ListsService {
     private auth: AuthService,
     private accounts: AccountStoreService,
     private cache: AppCacheService,
+    private discoveryUrls: DiscoveryUrlService,
   ) {}
 
   fetchUserLists(): Observable<AspenUserList[]> {
@@ -230,24 +232,7 @@ export class ListsService {
   }
 
   private normalizeDiscoveryUrl(input: any): string | undefined {
-    const raw = (input ?? '').toString().trim();
-    if (!raw) return undefined;
-
-    if (raw.startsWith('/')) return `${this.globals.aspen_discovery_base}${raw}`;
-    if (!/^https?:\/\//i.test(raw)) return `${this.globals.aspen_discovery_base}/${raw}`;
-
-    try {
-      const u = new URL(raw);
-      const apiHost = new URL(this.globals.aspen_api_host).host;
-      if (u.host === apiHost) {
-        u.protocol = 'https:';
-        u.host = new URL(this.globals.aspen_discovery_base).host;
-        return u.toString();
-      }
-      return raw;
-    } catch {
-      return raw;
-    }
+    return this.discoveryUrls.normalize(input);
   }
 
   private callListApi(method: string, extraParams?: Record<string, string>): Observable<any> {

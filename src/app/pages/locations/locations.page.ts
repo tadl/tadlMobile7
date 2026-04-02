@@ -9,6 +9,10 @@ import {
   LocationsService,
   type AppLocation,
   type AppLocationException,
+  type LocationWeekdayKey,
+  formatLocationDayHours,
+  getLocationClosingMinutes,
+  isLocationClosed,
 } from '../../services/locations.service';
 
 type Location = AppLocation;
@@ -75,9 +79,9 @@ export class LocationsPage {
     );
   }
 
-  private todayKey(): keyof Location | null {
+  private todayKey(): LocationWeekdayKey | null {
     const fromGlobals = (this.globals.day_today?.() || '').toString().toLowerCase().trim();
-    const map: Record<string, keyof Location> = {
+    const map: Record<string, LocationWeekdayKey> = {
       sunday: 'sunday',
       monday: 'monday',
       tuesday: 'tuesday',
@@ -91,29 +95,30 @@ export class LocationsPage {
     const d = new Date().getDay();
     return (['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][
       d
-    ] as keyof Location) ?? null;
+    ] as LocationWeekdayKey) ?? null;
   }
 
   today_hours(loc: Location): string {
     const todayException = this.exceptionForDate(loc, this.globals.easternDateString());
     if (todayException) {
-      const exHours = (todayException.hours ?? '').toString().trim();
-      const exReason = (todayException.reason ?? '').toString().trim();
-      const closure = exHours.toLowerCase().includes('closed');
-      const base = closure ? 'Closed today' : exHours ? `Open ${exHours} today` : 'Hours updated today';
-      return exReason ? `${base} (${exReason})` : base;
+      const todayMessage = this.formatHoursMessage(
+        todayException.hours,
+        'today',
+        todayException.reason,
+      );
+      if (!this.isPastExceptionClosingHours(todayException.hours)) return todayMessage;
+      return this.tomorrowHoursMessage(loc) || todayMessage;
     }
 
     const key = this.todayKey();
     if (!key) return '';
 
-    const raw = ((loc as any)?.[key] ?? '').toString().trim();
-    if (!raw) return '';
+    const todayHours = formatLocationDayHours(loc, key);
+    if (!todayHours) return '';
 
-    const lower = raw.toLowerCase();
-    if (lower.includes('closed')) return 'Closed today';
-
-    return `Open ${raw} today`;
+    const todayMessage = this.formatHoursMessage(todayHours, 'today');
+    if (!this.isPastClosingHours(loc, key)) return todayMessage;
+    return this.tomorrowHoursMessage(loc) || todayMessage;
   }
 
   isTodayException(loc: Location): boolean {
@@ -159,6 +164,108 @@ export class LocationsPage {
       if ((ex?.date ?? '').toString().trim() === dateKey) return ex;
     }
     return null;
+  }
+
+  private tomorrowHoursMessage(loc: Location): string {
+    const tomorrowException = this.exceptionForDate(loc, this.globals.easternDateStringPlusDays(1));
+    if (tomorrowException) {
+      return this.formatHoursMessage(
+        tomorrowException.hours,
+        'tomorrow',
+        tomorrowException.reason,
+      );
+    }
+
+    const tomorrowKey = this.weekdayKeyPlusDays(1);
+    if (!tomorrowKey) return '';
+
+    return this.formatHoursMessage(formatLocationDayHours(loc, tomorrowKey), 'tomorrow');
+  }
+
+  private weekdayKeyPlusDays(days: number): LocationWeekdayKey | null {
+    const weekday = this.globals.easternWeekdayKey(
+      new Date(Date.now() + days * 24 * 60 * 60 * 1000),
+    );
+    const map: Record<string, LocationWeekdayKey> = {
+      sunday: 'sunday',
+      monday: 'monday',
+      tuesday: 'tuesday',
+      wednesday: 'wednesday',
+      thursday: 'thursday',
+      friday: 'friday',
+      saturday: 'saturday',
+    };
+    return map[weekday] ?? null;
+  }
+
+  private formatHoursMessage(rawHours: unknown, dayLabel: 'today' | 'tomorrow', reason?: unknown): string {
+    const hours = (rawHours ?? '').toString().trim();
+    const reasonText = (reason ?? '').toString().trim();
+    if (!hours) {
+      const fallback = dayLabel === 'today' ? 'Hours updated today' : 'Hours updated tomorrow';
+      return reasonText ? `${fallback} (${reasonText})` : fallback;
+    }
+
+    const lower = hours.toLowerCase();
+    let base = '';
+    if (lower === 'closed') {
+      base = dayLabel === 'today' ? 'Closed today' : 'Closed tomorrow';
+    } else {
+      base = dayLabel === 'today' ? `Open ${hours} today` : `Open tomorrow ${hours}`;
+    }
+
+    return reasonText ? `${base} (${reasonText})` : base;
+  }
+
+  private isPastClosingHours(loc: Location, weekday: LocationWeekdayKey): boolean {
+    if (isLocationClosed(loc, weekday)) return false;
+
+    const closeTime = getLocationClosingMinutes(loc, weekday);
+    if (closeTime === null) return false;
+    return this.currentEasternMinutes() > closeTime;
+  }
+
+  private isPastExceptionClosingHours(rawHours: unknown): boolean {
+    const hours = (rawHours ?? '').toString().trim();
+    if (!hours || hours.toLowerCase().includes('closed')) return false;
+
+    const closeTime = this.extractCloseTime(hours);
+    if (closeTime === null) return false;
+    return this.currentEasternMinutes() > closeTime;
+  }
+
+  private extractCloseTime(hours: string): number | null {
+    const trimmed = (hours ?? '').toString().trim();
+    if (!trimmed) return null;
+
+    const lower = trimmed.toLowerCase();
+    if (lower.includes('midnight')) return 24 * 60;
+
+    const match = trimmed.match(/(?:to|-|–|—)\s*([0-9]{1,2})(?::([0-9]{2}))?\s*([AaPp][Mm])/);
+    if (!match) return null;
+
+    const hour12 = Number(match[1]);
+    const minutes = Number(match[2] ?? '0');
+    const meridiem = (match[3] ?? '').toUpperCase();
+    if (!Number.isFinite(hour12) || !Number.isFinite(minutes)) return null;
+
+    let hour24 = hour12 % 12;
+    if (meridiem === 'PM') hour24 += 12;
+    return hour24 * 60 + minutes;
+  }
+
+  private currentEasternMinutes(): number {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: this.globals.app_time_zone,
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: false,
+    }).formatToParts(new Date());
+
+    const hour = Number(parts.find((part) => part.type === 'hour')?.value ?? '0');
+    const minute = Number(parts.find((part) => part.type === 'minute')?.value ?? '0');
+    if (!Number.isFinite(hour) || !Number.isFinite(minute)) return 0;
+    return hour * 60 + minute;
   }
 
   async view_details(loc: Location) {

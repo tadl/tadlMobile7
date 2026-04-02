@@ -9,6 +9,8 @@ import {
   LocationsService,
   type AppLocation,
   type AppLocationException,
+  type LocationWeekdayKey,
+  formatLocationDayHours,
 } from '../../../services/locations.service';
 
 type Location = AppLocation;
@@ -129,15 +131,10 @@ export class LocationDetailComponent {
     }
 
     const todayKey = this.todayKey();
-    const raw = (loc as any)?.[todayKey];
-    const hours = (raw ?? '').toString().trim();
+    const hours = formatLocationDayHours(loc, todayKey);
     if (!hours) return '';
 
-    // Normalize common cases
-    const lower = hours.toLowerCase();
-    if (lower === 'closed') return 'Closed today';
-
-    // Expected: "9:00 AM to 7:00 PM"
+    if (hours.toLowerCase() === 'closed') return 'Closed today';
     return `Open ${hours} today`;
   }
 
@@ -159,30 +156,25 @@ export class LocationDetailComponent {
 
     const todayKey = this.todayKey();
 
-    const rows: Array<{ key: keyof Location | string; day: string; hours: any }> = [
-      { key: 'sunday', day: 'Sunday', hours: loc.sunday },
-      { key: 'monday', day: 'Monday', hours: loc.monday },
-      { key: 'tuesday', day: 'Tuesday', hours: loc.tuesday },
-      { key: 'wednesday', day: 'Wednesday', hours: loc.wednesday },
-      { key: 'thursday', day: 'Thursday', hours: loc.thursday },
-      { key: 'friday', day: 'Friday', hours: loc.friday },
-      { key: 'saturday', day: 'Saturday', hours: loc.saturday },
+    const rows: Array<{ key: LocationWeekdayKey; day: string }> = [
+      { key: 'sunday', day: 'Sunday' },
+      { key: 'monday', day: 'Monday' },
+      { key: 'tuesday', day: 'Tuesday' },
+      { key: 'wednesday', day: 'Wednesday' },
+      { key: 'thursday', day: 'Thursday' },
+      { key: 'friday', day: 'Friday' },
+      { key: 'saturday', day: 'Saturday' },
     ];
 
-    return rows
-      .map((r) => {
-        const hours = (r.hours ?? '').toString().trim();
-        return {
-          key: r.key.toString(),
-          day: r.day,
-          hours: hours || '—',
-          isToday: r.key.toString() === todayKey,
-        } as HoursRow;
-      })
-      .filter((r) => r.hours.length > 0);
+    return rows.map((r) => ({
+      key: r.key,
+      day: r.day,
+      hours: formatLocationDayHours(loc, r.key),
+      isToday: r.key === todayKey,
+    }));
   }
 
-  private todayKey(): string {
+  private todayKey(): LocationWeekdayKey {
     // globals.day_today() appears to return "Monday" etc in your app
     const d = (this.globals.day_today?.() || '').toString().trim().toLowerCase();
     // ensure it matches the JSON keys
@@ -197,10 +189,7 @@ export class LocationDetailComponent {
         return d;
       default:
         // fallback to real date if globals returns something unexpected
-        const idxMap = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-        const eastern = this.globals.easternWeekdayKey(new Date());
-        const idx = idxMap.indexOf(eastern);
-        return ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][idx];
+        return this.globals.easternWeekdayKey(new Date()) as LocationWeekdayKey;
     }
   }
 

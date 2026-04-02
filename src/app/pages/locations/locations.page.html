@@ -12,32 +12,49 @@
   </ion-toolbar>
 </ion-header>
 
-<ion-content>
+<ion-content class="locations-content">
   <ion-refresher slot="fixed" (ionRefresh)="get_locations(); $event.target.complete()">
     <ion-refresher-content></ion-refresher-content>
   </ion-refresher>
 
-  <ion-list>
-    <ion-item button *ngFor="let loc of locations" (click)="view_details(loc)" detail="true">
-      <ion-thumbnail slot="start">
-        <ion-img
-          [src]="imageFor(loc)"
-          [alt]="loc.fullname"
-          (ionError)="markLocationImageBroken(loc)"
-        ></ion-img>
-      </ion-thumbnail>
-
-      <ion-label>
+  <ion-list class="locations-list">
+    <ion-item
+      class="location-item"
+      button
+      *ngFor="let loc of locations"
+      (click)="view_details(loc)"
+      detail="true"
+    >
+      <ion-label class="location-copy">
         <h2>{{ loc.fullname }}</h2>
-        <p *ngIf="today_hours(loc) as todayHours" [class.location-today-exception]="isTodayException(loc)">
-          {{ todayHours }}
-        </p>
-        <p *ngIf="addressLine(loc)">{{ addressLine(loc) }}</p>
+
+        <div class="location-body">
+          <ion-thumbnail slot="start">
+            <ion-img
+              [src]="imageFor(loc)"
+              [alt]="loc.fullname"
+              (ionError)="markLocationImageBroken(loc)"
+            ></ion-img>
+          </ion-thumbnail>
+
+          <div class="location-meta">
+            <div
+              class="location-hours"
+              *ngIf="locationStatus(loc) as status"
+              [class.location-today-exception]="status.isException"
+            >
+              <div class="location-hours-label">{{ status.label }}</div>
+            <div class="location-hours-detail" *ngIf="status.detail">{{ status.detail }}</div>
+            </div>
+          </div>
+        </div>
+
+        <p class="location-address" *ngIf="addressLine(loc)">{{ addressLine(loc) }}</p>
       </ion-label>
     </ion-item>
   </ion-list>
 
-  <ion-item *ngIf="!loadingLocations && hasLoadedLocations && locations.length === 0">
+  <ion-item class="empty-state" *ngIf="!loadingLocations && hasLoadedLocations && locations.length === 0">
     <ion-label>No locations found.</ion-label>
   </ion-item>
 

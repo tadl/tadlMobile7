@@ -16,6 +16,11 @@ import {
 } from '../../services/locations.service';
 
 type Location = AppLocation;
+type LocationStatusDisplay = {
+  label: string;
+  detail: string;
+  isException: boolean;
+};
 
 @Component({
   standalone: true,
@@ -98,27 +103,27 @@ export class LocationsPage {
     ] as LocationWeekdayKey) ?? null;
   }
 
-  today_hours(loc: Location): string {
+  locationStatus(loc: Location): LocationStatusDisplay | null {
     const todayException = this.exceptionForDate(loc, this.globals.easternDateString());
     if (todayException) {
-      const todayMessage = this.formatHoursMessage(
+      const todayDisplay = this.formatStatusDisplay(
         todayException.hours,
         'today',
         todayException.reason,
       );
-      if (!this.isPastExceptionClosingHours(todayException.hours)) return todayMessage;
-      return this.tomorrowHoursMessage(loc) || todayMessage;
+      if (!this.isPastExceptionClosingHours(todayException.hours)) return todayDisplay;
+      return this.tomorrowStatus(loc) || todayDisplay;
     }
 
     const key = this.todayKey();
-    if (!key) return '';
+    if (!key) return null;
 
     const todayHours = formatLocationDayHours(loc, key);
-    if (!todayHours) return '';
+    if (!todayHours) return null;
 
-    const todayMessage = this.formatHoursMessage(todayHours, 'today');
-    if (!this.isPastClosingHours(loc, key)) return todayMessage;
-    return this.tomorrowHoursMessage(loc) || todayMessage;
+    const todayDisplay = this.formatStatusDisplay(todayHours, 'today');
+    if (!this.isPastClosingHours(loc, key)) return todayDisplay;
+    return this.tomorrowStatus(loc) || todayDisplay;
   }
 
   isTodayException(loc: Location): boolean {
@@ -127,7 +132,7 @@ export class LocationsPage {
 
   addressLine(loc: Location): string {
     const a = (loc.address || '').trim();
-    const csz = (loc.citystatezip || '').trim();
+    const csz = this.compactCityState(loc.citystatezip);
     if (a && csz) return `${a} • ${csz}`;
     return a || csz;
   }
@@ -166,10 +171,10 @@ export class LocationsPage {
     return null;
   }
 
-  private tomorrowHoursMessage(loc: Location): string {
+  private tomorrowStatus(loc: Location): LocationStatusDisplay | null {
     const tomorrowException = this.exceptionForDate(loc, this.globals.easternDateStringPlusDays(1));
     if (tomorrowException) {
-      return this.formatHoursMessage(
+      return this.formatStatusDisplay(
         tomorrowException.hours,
         'tomorrow',
         tomorrowException.reason,
@@ -177,9 +182,9 @@ export class LocationsPage {
     }
 
     const tomorrowKey = this.weekdayKeyPlusDays(1);
-    if (!tomorrowKey) return '';
+    if (!tomorrowKey) return null;
 
-    return this.formatHoursMessage(formatLocationDayHours(loc, tomorrowKey), 'tomorrow');
+    return this.formatStatusDisplay(formatLocationDayHours(loc, tomorrowKey), 'tomorrow');
   }
 
   private weekdayKeyPlusDays(days: number): LocationWeekdayKey | null {
@@ -198,23 +203,42 @@ export class LocationsPage {
     return map[weekday] ?? null;
   }
 
-  private formatHoursMessage(rawHours: unknown, dayLabel: 'today' | 'tomorrow', reason?: unknown): string {
+  private formatStatusDisplay(
+    rawHours: unknown,
+    dayLabel: 'today' | 'tomorrow',
+    reason?: unknown,
+  ): LocationStatusDisplay {
     const hours = (rawHours ?? '').toString().trim();
     const reasonText = (reason ?? '').toString().trim();
     if (!hours) {
-      const fallback = dayLabel === 'today' ? 'Hours updated today' : 'Hours updated tomorrow';
-      return reasonText ? `${fallback} (${reasonText})` : fallback;
+      const label = dayLabel === 'today' ? 'Hours Updated Today' : 'Hours Updated Tomorrow';
+      return {
+        label,
+        detail: reasonText,
+        isException: !!reasonText,
+      };
     }
 
     const lower = hours.toLowerCase();
-    let base = '';
-    if (lower === 'closed') {
-      base = dayLabel === 'today' ? 'Closed today' : 'Closed tomorrow';
-    } else {
-      base = dayLabel === 'today' ? `Open ${hours} today` : `Open tomorrow ${hours}`;
-    }
+    const isClosed = lower === 'closed';
+    const label = isClosed
+      ? dayLabel === 'today'
+        ? 'Closed Today'
+        : 'Closed Tomorrow'
+      : dayLabel === 'today'
+        ? 'Open Today'
+        : 'Open Tomorrow';
 
-    return reasonText ? `${base} (${reasonText})` : base;
+    const detail = [isClosed ? '' : hours, reasonText ? `(${reasonText})` : '']
+      .filter(Boolean)
+      .join(' ')
+      .trim();
+
+    return {
+      label,
+      detail,
+      isException: !!reasonText,
+    };
   }
 
   private isPastClosingHours(loc: Location, weekday: LocationWeekdayKey): boolean {
@@ -266,6 +290,12 @@ export class LocationsPage {
     const minute = Number(parts.find((part) => part.type === 'minute')?.value ?? '0');
     if (!Number.isFinite(hour) || !Number.isFinite(minute)) return 0;
     return hour * 60 + minute;
+  }
+
+  private compactCityState(value: string | undefined): string {
+    const raw = (value ?? '').toString().trim();
+    if (!raw) return '';
+    return raw.replace(/,\s*MI\s+\d{5}(?:-\d{4})?$/i, '').trim();
   }
 
   async view_details(loc: Location) {

@@ -1,4 +1,143 @@
-ion-label p.location-today-exception {
-  color: var(--ion-color-danger, #b42318) !important;
+.locations-content {
+  --background: linear-gradient(180deg, #f7f9fc 0%, #eef3f9 100%);
+}
+
+.locations-list {
+  background: transparent;
+  padding: 12px 12px 24px;
+}
+
+.location-item {
+  --background: rgba(255, 255, 255, 0.96);
+  --border-color: rgba(35, 55, 91, 0.1);
+  --border-radius: 18px;
+  --detail-icon-color: rgba(35, 55, 91, 0.36);
+  --detail-icon-opacity: 1;
+  --inner-border-width: 0;
+  --inner-padding-end: 14px;
+  --inner-padding-start: 10px;
+  --min-height: 132px;
+  --padding-start: 10px;
+  --padding-end: 6px;
+  margin-bottom: 9px;
+  border: 1px solid rgba(35, 55, 91, 0.1);
+  border-radius: 18px;
+  box-shadow: 0 10px 24px rgba(23, 43, 77, 0.08);
+}
+
+.location-body {
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.location-item ion-thumbnail {
+  --border-radius: 14px;
+  width: 62px;
+  height: 62px;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.location-item ion-thumbnail ion-img,
+.location-item ion-thumbnail img {
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.location-copy {
+  margin: 10px 0;
+}
+
+.location-copy h2 {
+  margin: 0 0 12px;
+  color: #14233b;
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.1;
+}
+
+.location-hours {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #eef4ff;
+  color: #173f96;
+}
+
+.location-hours-label {
+  margin: 0 0 2px;
+  color: #173f96;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.location-hours-detail {
+  color: #17304f;
+  font-size: 1rem;
   font-weight: 600;
+  line-height: 1.28;
+}
+
+.location-address {
+  margin: 8px 0 0;
+  color: #4c5d78;
+  font-size: 0.98rem;
+  line-height: 1.35;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.location-today-exception {
+  background: #fff3eb;
+}
+
+.location-today-exception .location-hours-label,
+.location-today-exception .location-hours-detail {
+  color: #9a4117 !important;
+}
+
+.empty-state {
+  --background: rgba(255, 255, 255, 0.94);
+  --border-radius: 18px;
+  --inner-border-width: 0;
+  margin: 18px 12px;
+  border: 1px solid rgba(35, 55, 91, 0.08);
+  border-radius: 18px;
+  box-shadow: 0 10px 24px rgba(23, 43, 77, 0.08);
+}
+
+@media (min-width: 768px) {
+  .locations-list {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 16px 18px 30px;
+  }
+
+  .location-item {
+    --min-height: 144px;
+    --padding-start: 12px;
+    --inner-padding-end: 18px;
+  }
+
+  .location-body {
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .location-item ion-thumbnail {
+    width: 72px;
+    height: 72px;
+  }
+
+  .location-copy h2 {
+    font-size: 1.4rem;
+  }
 }

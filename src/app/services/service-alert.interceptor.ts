@@ -33,7 +33,7 @@ export class ServiceAlertInterceptor implements HttpInterceptor {
             void this.serviceAlerts.set(alert);
             return;
           }
-          if (this.isCacheWarmRequest(req.url)) {
+          if (this.isCacheWarmRequest(req.url) && this.isConfirmedCacheWarmSuccess(event.body)) {
             void this.serviceAlerts.clear();
           }
         },
@@ -65,5 +65,9 @@ export class ServiceAlertInterceptor implements HttpInterceptor {
     if (resultAlert) return resultAlert;
 
     return null;
+  }
+
+  private isConfirmedCacheWarmSuccess(payload: any): boolean {
+    return payload?.ok === true;
   }
 }

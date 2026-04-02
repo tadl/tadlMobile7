@@ -27,6 +27,8 @@ import { AuthService } from './services/auth.service';
 import { LoadingService } from './services/loading.service';
 import { CacheWarmService } from './services/cache-warm.service';
 import { DiscoveryLinkRouterService } from './services/discovery-link-router.service';
+import { ServiceAlertService } from './services/service-alert.service';
+import { AccountCacheCleanupService } from './services/account-cache-cleanup.service';
 
 @Component({
   standalone: true,
@@ -69,6 +71,7 @@ export class AppComponent implements OnInit {
   private readonly appBootStartedAt = Date.now();
   private incomingUrlInFlight = false;
   private queuedIncomingUrl: string | null = null;
+  private lastObservedAccountId: string | null = null;
 
   constructor(
     public globals: Globals,
@@ -76,6 +79,8 @@ export class AppComponent implements OnInit {
     private auth: AuthService,
     private loading: LoadingService,
     private cacheWarm: CacheWarmService,
+    private serviceAlerts: ServiceAlertService,
+    private accountCacheCleanup: AccountCacheCleanupService,
     private router: Router,
     private discoveryLinks: DiscoveryLinkRouterService,
     private zone: NgZone,
@@ -153,8 +158,18 @@ export class AppComponent implements OnInit {
         ),
       )
       .subscribe((s) => {
+        const nextAccountId = s?.isLoggedIn ? (s?.activeAccountId ?? null) : null;
+        const previousAccountId = this.lastObservedAccountId;
+        this.lastObservedAccountId = nextAccountId;
+
+        if (previousAccountId && previousAccountId !== nextAccountId) {
+          void this.serviceAlerts.clear();
+          void this.accountCacheCleanup.clearForAccount(previousAccountId);
+        }
+
         if (!s.isLoggedIn || !s.activeAccountId) {
           this.lastWarmedAccountId = null;
+          void this.serviceAlerts.clear();
           return;
         }
 

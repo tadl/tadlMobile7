@@ -170,6 +170,12 @@ export class ListLookupService {
     state.membershipIndexUpdatedAt = Date.now();
   }
 
+  clearAccountState(accountId: string | null | undefined): void {
+    const normalized = (accountId ?? '').toString().trim();
+    if (!normalized) return;
+    this.stateByAccountId.delete(normalized);
+  }
+
   private currentAccountId(): string | null {
     const snap = this.auth.snapshot();
     const accountId = (snap?.activeAccountId ?? '').toString().trim();

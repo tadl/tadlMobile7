@@ -64,6 +64,20 @@ export class AppCacheService {
     this.lastSerializedByKey.delete(cacheKey);
   }
 
+  async removeByPrefixes(prefixes: string[]): Promise<void> {
+    const normalized = (prefixes ?? [])
+      .map((prefix) => this.cacheKey((prefix ?? '').toString().trim()))
+      .filter((prefix) => !!prefix);
+    if (!normalized.length) return;
+
+    const { keys } = await Preferences.keys();
+    const toRemove = (keys ?? []).filter((key) => normalized.some((prefix) => key.startsWith(prefix)));
+    await Promise.all(toRemove.map((key) => Preferences.remove({ key })));
+    for (const key of toRemove) {
+      this.lastSerializedByKey.delete(key);
+    }
+  }
+
   private cacheKey(key: string): string {
     return `${this.prefix}${key}`;
   }

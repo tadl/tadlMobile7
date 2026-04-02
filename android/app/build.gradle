@@ -36,8 +36,8 @@ android {
         applicationId "org.TADL.TADLMobile"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 70085
-        versionName "7.0.85"
+        versionCode 70086
+        versionName "7.0.86"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

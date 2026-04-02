@@ -7,6 +7,7 @@ import { AppCacheService } from './app-cache.service';
 export class ServiceAlertService {
   private readonly cacheKey = 'proxy:service-alert';
   private readonly alertSubject = new BehaviorSubject<string | null>(null);
+  private mutationCount = 0;
 
   constructor(private cache: AppCacheService) {
     void this.restoreFromCache();
@@ -24,11 +25,16 @@ export class ServiceAlertService {
     const next = this.normalize(message);
     if (next === this.alertSubject.value) return;
 
+    this.mutationCount += 1;
     this.alertSubject.next(next);
-    if (next) {
-      await this.cache.write(this.cacheKey, next);
-    } else {
-      await this.cache.remove(this.cacheKey);
+    try {
+      if (next) {
+        await this.cache.write(this.cacheKey, next);
+      } else {
+        await this.cache.remove(this.cacheKey);
+      }
+    } catch {
+      // Cache persistence is best-effort; keep in-memory state authoritative.
     }
   }
 
@@ -37,7 +43,9 @@ export class ServiceAlertService {
   }
 
   private async restoreFromCache(): Promise<void> {
+    const mutationAtStart = this.mutationCount;
     const cached = await this.cache.read<string>(this.cacheKey);
+    if (this.mutationCount !== mutationAtStart) return;
     const next = this.normalize(cached);
     this.alertSubject.next(next);
   }

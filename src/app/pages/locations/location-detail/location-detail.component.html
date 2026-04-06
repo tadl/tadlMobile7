@@ -17,13 +17,14 @@
       <div class="details-card">
         <h2 class="title">{{ location.fullname }}</h2>
 
-        <p
+        <div
           class="today-pill"
           [class.today-pill-exception]="hasTodayException(location)"
-          *ngIf="openTodayLine(location)"
+          *ngIf="locationStatus(location) as status"
         >
-          {{ openTodayLine(location) }}
-        </p>
+          <div class="today-pill-label">{{ status.label }}</div>
+          <div class="today-pill-detail" *ngIf="status.detail">{{ status.detail }}</div>
+        </div>
 
         <div class="contact">
           <div class="contact-top">

@@ -88,7 +88,33 @@ export class CheckoutsService {
       filter((v): v is AspenCheckout[] => Array.isArray(v)),
     );
 
-    const network$ = this.activeFetch$ ?? from(this.accounts.getPassword(snap.activeAccountId)).pipe(
+    const network$ = this.activeFetch$ ?? this.fetchCheckoutsNetwork(snap, cacheKey).pipe(
+      finalize(() => {
+        this.activeFetch$ = null;
+      }),
+      shareReplay({ bufferSize: 1, refCount: true }),
+    );
+
+    this.activeFetch$ = network$;
+
+    return concat(cached$, network$);
+  }
+
+  fetchFreshActiveCheckouts(): Observable<AspenCheckout[]> {
+    const snap = this.auth.snapshot();
+    if (!snap.isLoggedIn || !snap.activeAccountId || !snap.activeAccountMeta) {
+      return from([[]]);
+    }
+
+    const cacheKey = `checkouts:${snap.activeAccountId}`;
+    return this.fetchCheckoutsNetwork(snap, cacheKey);
+  }
+
+  private fetchCheckoutsNetwork(
+    snap: ReturnType<AuthService['snapshot']>,
+    cacheKey: string,
+  ): Observable<AspenCheckout[]> {
+    return from(this.accounts.getPassword(snap.activeAccountId!)).pipe(
       switchMap(password => {
         if (!password) return throwError(() => new Error('missing_password'));
 
@@ -116,15 +142,7 @@ export class CheckoutsService {
             }),
           );
       }),
-      finalize(() => {
-        this.activeFetch$ = null;
-      }),
-      shareReplay({ bufferSize: 1, refCount: true }),
     );
-
-    this.activeFetch$ = network$;
-
-    return concat(cached$, network$);
   }
 
   /**

@@ -237,8 +237,7 @@ export class CheckoutsPage {
             this.toast.presentToast(res?.message || 'Could not renew.');
             return;
           }
-          this.applyRenewMutationToCheckout(c, res?.raw);
-          this.toast.presentToast(res?.message || 'Renewed.');
+          this.refreshAfterRenewal(res?.message || 'Renewed.');
         },
         error: () => this.toast.presentToast('Could not renew.'),
       });
@@ -274,23 +273,17 @@ export class CheckoutsPage {
       )
       .subscribe({
         next: (results) => {
-          for (const r of results) {
-            if (r.success && r.checkout) {
-              this.applyRenewMutationToCheckout(r.checkout, r.raw);
-            }
-          }
-
           const ok = results.filter((r) => r.success).length;
           const failed = results.length - ok;
           const rateLimited = results.some((r) => r.rateLimited);
           if (rateLimited) {
             this.toast.presentToast('Aspen rate-limited the bulk renew request. Some items may not have updated yet.', 6000);
           } else if (failed === 0) {
-            this.toast.presentToast(`Renewed ${ok} item${ok === 1 ? '' : 's'}.`);
+            this.refreshAfterRenewal(`Renewed ${ok} item${ok === 1 ? '' : 's'}.`);
           } else if (ok === 0) {
             this.toast.presentToast('Could not renew any items.');
           } else {
-            this.toast.presentToast(`Renewed ${ok} item${ok === 1 ? '' : 's'}; ${failed} failed.`);
+            this.refreshAfterRenewal(`Renewed ${ok} item${ok === 1 ? '' : 's'}; ${failed} failed.`);
           }
         },
         error: () => {
@@ -396,47 +389,17 @@ export class CheckoutsPage {
     return due;
   }
 
-  private applyRenewMutationToCheckout(checkout: AspenCheckout, raw: any): void {
-    if (!checkout) return;
-
-    const parseEpochSeconds = (v: any): number | null => {
-      const n = Number(v);
-      if (!Number.isFinite(n) || n <= 0) return null;
-      return n > 1e12 ? Math.floor(n / 1000) : Math.floor(n);
-    };
-
-    const rawDue =
-      raw?.dueDate ??
-      raw?.due_date ??
-      raw?.newDueDate ??
-      raw?.new_due_date ??
-      raw?.dueDateTs ??
-      raw?.duedate;
-
-    const rawRenewalDate =
-      raw?.renewalDate ??
-      raw?.renewal_date ??
-      raw?.newRenewalDate ??
-      raw?.new_renewal_date;
-
-    const dueEpoch = parseEpochSeconds(rawDue);
-    if (dueEpoch) {
-      checkout.dueDate = dueEpoch;
-      checkout.overdue = false;
-    }
-
-    if (rawRenewalDate != null) {
-      checkout.renewalDate = String(rawRenewalDate);
-    }
-
-    const currentRenewCount = Number(checkout.renewCount ?? 0);
-    checkout.renewCount = Number.isFinite(currentRenewCount) ? currentRenewCount + 1 : 1;
-
-    if (Number.isFinite(Number(checkout.maxRenewals))) {
-      checkout.canRenew = Number(checkout.renewCount ?? 0) < Number(checkout.maxRenewals ?? 0);
-    }
-
-    this.ilsCheckouts = this.sortCheckouts([...this.ilsCheckouts]);
+  private refreshAfterRenewal(successMessage: string): void {
+    this.checkouts.fetchFreshActiveCheckouts().subscribe({
+      next: (list) => {
+        this.ilsCheckouts = this.sortCheckouts((list ?? []).slice());
+        this.syncProfileCheckoutCount(this.ilsCheckouts.length);
+        this.toast.presentToast(successMessage);
+      },
+      error: () => {
+        this.toast.presentToast(successMessage);
+      },
+    });
   }
 
   private syncProfileCheckoutCount(totalCheckouts: number) {

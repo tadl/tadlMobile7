@@ -187,15 +187,17 @@ export class SearchPage implements OnInit, OnDestroy {
       .map((x) => x.trim())
       .filter((x) => !!x);
     const nextExternalFilters = Array.from(new Set(incomingExternalFilters));
+    const normalizedExternalFilters = this.normalizeInitialExternalFilters(nextExternalFilters);
+    const effectiveFilters = nextFilters.length ? nextFilters : normalizedExternalFilters;
 
-    const hasSearchCriteria = !!q || nextFilters.length > 0 || nextExternalFilters.length > 0;
-    const shouldShowAdvanced = advanced || nextFilters.length > 0 || nextExternalFilters.length > 0;
+    const hasSearchCriteria = !!q || effectiveFilters.length > 0 || nextExternalFilters.length > 0;
+    const shouldShowAdvanced = advanced || effectiveFilters.length > 0 || nextExternalFilters.length > 0;
 
     const nextCoreStateKey = JSON.stringify({
       q,
       searchIndex: nextSearchIndex,
       sort: nextSort,
-      filters: nextFilters,
+      filters: effectiveFilters,
     });
 
     const deepLinkTriggered = !!deepLinkToken && deepLinkToken !== this.lastHandledDeepLinkToken;
@@ -207,7 +209,7 @@ export class SearchPage implements OnInit, OnDestroy {
       q !== this.lookfor ||
       nextSearchIndex !== this.searchIndex ||
       nextSort !== this.sort ||
-      !this.sameStringArray(nextFilters, this.filters);
+      !this.sameStringArray(effectiveFilters, this.filters);
 
     if (!deepLinkTriggered && nextCoreStateKey === this.lastAppliedRouteCoreState) {
       return;
@@ -217,7 +219,7 @@ export class SearchPage implements OnInit, OnDestroy {
     this.showAdvanced = shouldShowAdvanced;
     this.searchIndex = nextSearchIndex;
     this.sort = nextSort;
-    this.filters = nextFilters;
+    this.filters = effectiveFilters;
     this.facetsEnabled = true;
 
     if (deepLinkTriggered) {
@@ -1192,7 +1194,6 @@ export class SearchPage implements OnInit, OnDestroy {
   private tryApplyPendingExternalFilters(): boolean {
     if (!this.pendingExternalFilters.length) return false;
     if (!this.facetGroups.length) {
-      this.pendingExternalFilters = [];
       return false;
     }
 
@@ -1228,6 +1229,28 @@ export class SearchPage implements OnInit, OnDestroy {
     return null;
   }
 
+  private normalizeInitialExternalFilters(filters: string[]): string[] {
+    return Array.from(new Set(
+      (filters ?? [])
+        .map((filter) => this.normalizeExternalFilterCandidate(filter))
+        .filter((value): value is string => !!value),
+    ));
+  }
+
+  private normalizeExternalFilterCandidate(filter: string): string | null {
+    const parsed = this.parseExternalFilter(filter);
+    if (!parsed) return null;
+
+    let field = parsed.field;
+    if (field.toLowerCase().startsWith('local_time_since_added_')) {
+      field = 'local_time_since_added_tadl';
+    }
+
+    const value = this.decodeExternalFilterValue(parsed.value).replace(/^"+|"+$/g, '').trim();
+    if (!field || !value) return null;
+    return `${field}:${value}`;
+  }
+
   private parseExternalFilter(filter: string): { field: string; value: string } | null {
     const raw = this.decodeExternalFilterValue(filter);
     const idx = raw.indexOf(':');
@@ -1244,14 +1267,14 @@ export class SearchPage implements OnInit, OnDestroy {
     let current = (input ?? '').toString().trim();
     for (let i = 0; i < 2; i += 1) {
       try {
-        const decoded = decodeURIComponent(current);
+        const decoded = decodeURIComponent(current.replace(/\+/g, ' '));
         if (decoded === current) break;
         current = decoded;
       } catch {
         break;
       }
     }
-    return current;
+    return current.replace(/\+/g, ' ');
   }
 
   private externalFilterFieldMatches(incomingField: string, optionField: string): boolean {

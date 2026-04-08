@@ -1185,14 +1185,11 @@ export class SearchPage implements OnInit, OnDestroy {
       return false;
     }
 
-    const valid = new Set<string>();
-    for (const group of this.facetGroups) {
-      for (const option of group.options) {
-        valid.add(option.filter);
-      }
-    }
-
-    const supported = Array.from(new Set(this.pendingExternalFilters.filter((f) => valid.has(f))));
+    const supported = Array.from(new Set(
+      this.pendingExternalFilters
+        .map((filter) => this.resolveExternalFilter(filter))
+        .filter((value): value is string => !!value),
+    ));
     this.pendingExternalFilters = [];
     if (!supported.length) return false;
     if (this.sameStringArray(supported, this.filters)) return false;
@@ -1200,5 +1197,51 @@ export class SearchPage implements OnInit, OnDestroy {
     this.filters = supported;
     this.runSearch(true);
     return true;
+  }
+
+  private resolveExternalFilter(filter: string): string | null {
+    const parsed = this.parseExternalFilter(filter);
+    if (!parsed) return null;
+
+    for (const group of this.facetGroups) {
+      for (const option of group.options) {
+        if (
+          this.externalFilterFieldMatches(parsed.field, option.field) &&
+          this.normalizeExternalFilterToken(parsed.value) === this.normalizeExternalFilterToken(option.value)
+        ) {
+          return option.filter;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  private parseExternalFilter(filter: string): { field: string; value: string } | null {
+    const raw = (filter ?? '').toString().trim();
+    const idx = raw.indexOf(':');
+    if (idx <= 0) return null;
+
+    const field = raw.slice(0, idx).trim();
+    const value = raw.slice(idx + 1).trim();
+    if (!field || !value) return null;
+
+    return { field, value };
+  }
+
+  private externalFilterFieldMatches(incomingField: string, optionField: string): boolean {
+    const left = this.normalizeExternalFilterToken(incomingField);
+    const right = this.normalizeExternalFilterToken(optionField);
+    if (left === right) return true;
+
+    // Discovery links sometimes carry branch-specific "added in the last" fields
+    // while SearchAPI facets return the shared TADL field name.
+    return left.startsWith('local_time_since_added_') && right.startsWith('local_time_since_added_');
+  }
+
+  private normalizeExternalFilterToken(input: string): string {
+    const trimmed = (input ?? '').toString().trim();
+    const unquoted = trimmed.replace(/^"+|"+$/g, '');
+    return unquoted.replace(/\s+/g, ' ').trim().toLowerCase();
   }
 }

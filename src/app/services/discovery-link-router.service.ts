@@ -104,6 +104,22 @@ export class DiscoveryLinkRouterService {
       url.searchParams.get('type0%5B%5D'),
     ]) ?? '').toLowerCase();
 
+    const filters = Array.from(new Set(this.nonEmptyValues([
+      ...url.searchParams.getAll('filter[]'),
+      ...url.searchParams.getAll('filter'),
+      ...url.searchParams.getAll('filter%5B%5D'),
+    ])));
+
+    const rawSort = this.firstNonEmpty([
+      url.searchParams.get('sort'),
+      url.searchParams.get('sort_by'),
+    ]) ?? '';
+
+    const searchIndex = this.firstNonEmpty([
+      url.searchParams.get('searchIndex'),
+      this.searchIndexFromType(type0),
+    ]) ?? '';
+
     if (type0 === 'id' && lookfor) {
       await this.resolveRecordLink(lookfor, rawUrl);
       return;
@@ -111,6 +127,10 @@ export class DiscoveryLinkRouterService {
 
     const queryParams: Record<string, any> = {};
     if (lookfor) queryParams['lookfor'] = lookfor;
+    if (searchIndex && searchIndex !== 'Keyword') queryParams['searchIndex'] = searchIndex;
+    if (rawSort && rawSort !== 'relevance') queryParams['sort'] = rawSort;
+    if (filters.length) queryParams['extFilter'] = filters;
+    if (filters.length) queryParams['advanced'] = '1';
     queryParams['dl'] = Date.now().toString();
 
     await this.router.navigate(['/search'], {
@@ -125,6 +145,29 @@ export class DiscoveryLinkRouterService {
       if (v) return v;
     }
     return null;
+  }
+
+  private nonEmptyValues(values: Array<string | null | undefined>): string[] {
+    return values
+      .map((raw) => (raw ?? '').toString().trim())
+      .filter((value) => !!value);
+  }
+
+  private searchIndexFromType(type0: string): string | null {
+    switch ((type0 ?? '').toLowerCase()) {
+      case 'title':
+        return 'Title';
+      case 'author':
+        return 'Author';
+      case 'subject':
+        return 'Subject';
+      case 'isbn':
+        return 'ISBN';
+      case 'keyword':
+        return 'Keyword';
+      default:
+        return null;
+    }
   }
 
   private async resolveRecordLink(recordIdRaw: string, fallbackUrl: string): Promise<void> {

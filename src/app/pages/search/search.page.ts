@@ -98,6 +98,7 @@ export class SearchPage implements OnInit, OnDestroy {
   private lastAppliedRouteCoreState = '';
   private lastHandledDeepLinkToken = '';
   private pendingExternalFilters: string[] = [];
+  private pendingMappedFilterSearch = false;
 
   constructor(
     public globals: Globals,
@@ -187,7 +188,8 @@ export class SearchPage implements OnInit, OnDestroy {
       .filter((x) => !!x);
     const nextExternalFilters = Array.from(new Set(incomingExternalFilters));
 
-    const shouldShowAdvanced = advanced || nextFilters.length > 0;
+    const hasSearchCriteria = !!q || nextFilters.length > 0 || nextExternalFilters.length > 0;
+    const shouldShowAdvanced = advanced || nextFilters.length > 0 || nextExternalFilters.length > 0;
 
     const nextCoreStateKey = JSON.stringify({
       q,
@@ -222,7 +224,7 @@ export class SearchPage implements OnInit, OnDestroy {
       this.pendingExternalFilters = nextExternalFilters;
     }
 
-    if (!q) {
+    if (!hasSearchCriteria) {
       this.lookfor = '';
       this.pendingExternalFilters = [];
       this.clearSearch(false);
@@ -312,8 +314,9 @@ export class SearchPage implements OnInit, OnDestroy {
     this.filters = this.filters.filter(f => this.filterField(f) !== 'sort_by');
     const sortValue = this.normalizedSortValue(this.sort);
     if (sortValue !== this.sort) this.sort = sortValue;
+    const hasSearchCriteria = !!q || this.filters.length > 0 || this.pendingExternalFilters.length > 0;
 
-    if (!q) {
+    if (!hasSearchCriteria) {
       this.lastExecutedQuery = '';
       this.hits = [];
       this.page = 1;
@@ -353,7 +356,13 @@ export class SearchPage implements OnInit, OnDestroy {
         includeSortList: true,
         filters: this.filters,
       })
-      .pipe(finalize(() => (this.globals.api_loading = false)))
+      .pipe(finalize(() => {
+        this.globals.api_loading = false;
+        if (this.pendingMappedFilterSearch) {
+          this.pendingMappedFilterSearch = false;
+          this.runSearch(true);
+        }
+      }))
       .subscribe({
         next: res => {
           if (!res.success) {
@@ -372,6 +381,7 @@ export class SearchPage implements OnInit, OnDestroy {
             this.reconcileCollapsedFacetGroups();
             this.rebuildFacetDisplayMap();
             if (this.tryApplyPendingExternalFilters()) {
+              this.pendingMappedFilterSearch = true;
               return;
             }
           } else {
@@ -1152,12 +1162,13 @@ export class SearchPage implements OnInit, OnDestroy {
   private syncSearchUrl(query: string): void {
     const lookfor = (query ?? '').trim();
     const hasQuery = !!lookfor;
+    const hasSearchCriteria = hasQuery || this.filters.length > 0;
     const queryParams: Record<string, any> = {
-      lookfor: hasQuery ? lookfor : null,
-      advanced: hasQuery && this.showAdvanced ? '1' : null,
-      searchIndex: hasQuery && this.searchIndex && this.searchIndex !== 'Keyword' ? this.searchIndex : null,
-      sort: hasQuery && this.sort && this.sort !== 'relevance' ? this.sort : null,
-      filter: hasQuery && this.filters.length ? this.filters : null,
+      lookfor: hasSearchCriteria ? lookfor : null,
+      advanced: hasSearchCriteria && (this.showAdvanced || this.filters.length > 0) ? '1' : null,
+      searchIndex: hasSearchCriteria && this.searchIndex && this.searchIndex !== 'Keyword' ? this.searchIndex : null,
+      sort: hasSearchCriteria && this.sort && this.sort !== 'relevance' ? this.sort : null,
+      filter: hasSearchCriteria && this.filters.length ? this.filters : null,
       extFilter: null,
       dl: null,
     };
@@ -1218,7 +1229,7 @@ export class SearchPage implements OnInit, OnDestroy {
   }
 
   private parseExternalFilter(filter: string): { field: string; value: string } | null {
-    const raw = (filter ?? '').toString().trim();
+    const raw = this.decodeExternalFilterValue(filter);
     const idx = raw.indexOf(':');
     if (idx <= 0) return null;
 
@@ -1227,6 +1238,20 @@ export class SearchPage implements OnInit, OnDestroy {
     if (!field || !value) return null;
 
     return { field, value };
+  }
+
+  private decodeExternalFilterValue(input: string): string {
+    let current = (input ?? '').toString().trim();
+    for (let i = 0; i < 2; i += 1) {
+      try {
+        const decoded = decodeURIComponent(current);
+        if (decoded === current) break;
+        current = decoded;
+      } catch {
+        break;
+      }
+    }
+    return current;
   }
 
   private externalFilterFieldMatches(incomingField: string, optionField: string): boolean {

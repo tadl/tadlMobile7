@@ -114,6 +114,60 @@
   box-shadow: 0 10px 24px rgba(23, 43, 77, 0.08);
 }
 
+:host-context(.ion-palette-dark) {
+  .locations-content {
+    --background: linear-gradient(180deg, #101924 0%, #0a111a 100%);
+  }
+
+  .location-item {
+    --background: rgba(19, 30, 43, 0.96);
+    --border-color: rgba(152, 176, 209, 0.16);
+    --detail-icon-color: rgba(203, 217, 239, 0.6);
+    border-color: rgba(152, 176, 209, 0.16);
+    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.28);
+  }
+
+  .location-copy h2 {
+    color: #f4f7fb;
+  }
+
+  .location-hours {
+    background: #16243a;
+    color: #8db6ff;
+  }
+
+  .location-hours-label {
+    color: #8db6ff;
+  }
+
+  .location-hours-detail {
+    color: #ecf3ff;
+  }
+
+  .location-address {
+    color: #b9c7db;
+  }
+
+  .location-today-exception {
+    background: #3b2418;
+  }
+
+  .location-today-exception .location-hours-label,
+  .location-today-exception .location-hours-detail {
+    color: #ffd1b3 !important;
+  }
+
+  .empty-state {
+    --background: rgba(19, 30, 43, 0.96);
+    border-color: rgba(152, 176, 209, 0.14);
+    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.24);
+  }
+
+  .empty-state ion-label {
+    color: #ecf3ff;
+  }
+}
+
 @media (min-width: 768px) {
   .locations-list {
     max-width: 900px;

@@ -83,7 +83,7 @@ export class FeaturedService {
     return concat(cached$, network$);
   }
 
-  fetchBrowseCategoryPage(textId: string, page = 1, pageSize = 24): Observable<FeaturedCategoryPage> {
+  fetchBrowseCategoryPage(textId: string, page = 1, pageSize = 20): Observable<FeaturedCategoryPage> {
     const id = (textId ?? '').toString().trim();
     const p = Math.max(1, Number(page) || 1);
     const limit = Math.max(1, Number(pageSize) || 24);

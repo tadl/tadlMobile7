@@ -99,7 +99,7 @@ export class ListsService {
     return concat(cached$, network$);
   }
 
-  fetchListTitles(listId: string | number, page = 1, numTitles = 50): Observable<AspenListTitlesResult> {
+  fetchListTitles(listId: string | number, page = 1, numTitles = 20): Observable<AspenListTitlesResult> {
     const id = (listId ?? '').toString().trim();
     if (!id) return throwError(() => new Error('missing_list_id'));
 

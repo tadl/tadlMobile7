@@ -33,7 +33,7 @@ export class FeaturedCategoryPage {
   items: FeaturedRecord[] = [];
   page = 1;
   totalPages = 1;
-  pageSize = 24;
+  pageSize = 20;
   infiniteDisabled = true;
   actionBusyByKey: Record<string, boolean> = {};
 

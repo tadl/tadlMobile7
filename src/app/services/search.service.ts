@@ -114,7 +114,7 @@ export class SearchService {
 
   getAppSearchResults(opts: AspenSearchOptions): Observable<AspenSearchResult> {
     const page = opts.page ?? 1;
-    const pageSize = opts.pageSize ?? 25;
+    const pageSize = opts.pageSize ?? 20;
 
     let params = new HttpParams()
       .set('method', 'searchLite')

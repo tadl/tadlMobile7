@@ -47,7 +47,7 @@ export class HistoryService {
 
   fetchReadingHistoryPage(
     page = 1,
-    pageSize = 50,
+    pageSize = 20,
     sort = 'checkedOut',
     queryFilter = '',
     useCache = true,

@@ -24,7 +24,7 @@ export class CheckoutHistoryPage {
   items: AspenReadingHistoryItem[] = [];
   page = 1;
   totalPages = 1;
-  pageSize = 50;
+  pageSize = 20;
   sort = 'checkedOut';
   infiniteDisabled = true;
 

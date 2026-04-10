@@ -89,7 +89,7 @@ export class SearchPage implements OnInit, OnDestroy {
 
   // paging / infinite scroll
   page = 1;
-  pageSize = 25;
+  pageSize = 20;
   totalPages = 1;
   infiniteDisabled = true;
   scanningIsbn = false;

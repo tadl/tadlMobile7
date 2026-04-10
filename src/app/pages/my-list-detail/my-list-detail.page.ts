@@ -32,7 +32,7 @@ export class MyListDetailPage {
   listDescription = '';
   titles: AspenListTitle[] = [];
   page = 1;
-  pageSize = 50;
+  pageSize = 20;
   totalPages = 1;
   infiniteDisabled = true;
   removingRecordId = '';

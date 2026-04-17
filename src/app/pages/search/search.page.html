@@ -29,10 +29,6 @@
     </ion-item>
 
     <div class="quick-actions-row">
-      <ion-button class="quick-action-btn" size="small" fill="outline" (click)="scanIsbn()" [disabled]="scanningIsbn">
-        <ion-icon name="barcode-outline" slot="start"></ion-icon>
-        {{ scanningIsbn ? 'Scanning' : 'Scan ISBN' }}
-      </ion-button>
       <ion-button class="quick-action-btn" size="small" fill="outline" (click)="searchMelcat()">
         Search MeLCat
       </ion-button>

@@ -41,9 +41,9 @@ export class Globals {
   ) {}
 
   // ---- app identity / toggles ----
-  public app_version: string = '7.0.95';
-  public update_version: string = '20260408';
-  public build_num: string = '05';
+  public app_version: string = '7.0.97';
+  public update_version: string = '20260417';
+  public build_num: string = '03';
 
   public device_info: any;
   public system_color: any = window.matchMedia('(prefers-color-scheme: dark)');
@@ -354,7 +354,12 @@ export class Globals {
   }
 
   async getDeviceInfo() {
-    this.device_info = await Device.getInfo();
+    try {
+      this.device_info = await Device.getInfo();
+    } catch (err) {
+      this.device_info = null;
+      console.error('[Globals] Device.getInfo failed', err);
+    }
   }
 
   initNetworkStatusTracking() {

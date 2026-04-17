@@ -92,46 +92,60 @@ export class AppComponent implements OnInit {
     this.isLoading$ = this.loading.isLoading$();
 
     this.platform.ready().then(async () => {
-      // Ensure splash stays visible through cold-start initialization.
-      await SplashScreen.show({
-        autoHide: false,
-        showDuration: 0,
-      }).catch(() => {});
+      try {
+        // Ensure splash stays visible through cold-start initialization.
+        await SplashScreen.show({
+          autoHide: false,
+          showDuration: 0,
+        }).catch(() => {});
 
-      await this.globals.getDeviceInfo();
-      await this.globals.initThemePreference();
-      await this.globals.initLinkPreference();
-      this.globals.initNetworkStatusTracking();
-
-      App.addListener('backButton', ({ canGoBack }) => {
-        if (canGoBack) this.globals.go_back();
-        else this.globals.confirm_exit();
-      });
-
-      App.addListener('appStateChange', ({ isActive }) => {
-        if (!isActive) return;
-        this.handleAppResume();
-      });
-      App.addListener('appUrlOpen', ({ url }) => {
-        this.zone.run(() => {
-          void this.handleIncomingUrl(url);
+        await this.safeBootStep('getDeviceInfo', () => this.globals.getDeviceInfo());
+        await this.safeBootStep('initThemePreference', () => this.globals.initThemePreference());
+        await this.safeBootStep('initLinkPreference', () => this.globals.initLinkPreference());
+        await this.safeBootStep('initNetworkStatusTracking', async () => {
+          this.globals.initNetworkStatusTracking();
         });
-      });
-      App.getLaunchUrl()
-        .then((launch) => {
+
+        await this.safeBootStep('registerBackButton', async () => {
+          App.addListener('backButton', ({ canGoBack }) => {
+            if (canGoBack) this.globals.go_back();
+            else this.globals.confirm_exit();
+          });
+        });
+
+        await this.safeBootStep('registerAppStateChange', async () => {
+          App.addListener('appStateChange', ({ isActive }) => {
+            if (!isActive) return;
+            this.handleAppResume();
+          });
+        });
+
+        await this.safeBootStep('registerAppUrlOpen', async () => {
+          App.addListener('appUrlOpen', ({ url }) => {
+            this.zone.run(() => {
+              void this.handleIncomingUrl(url);
+            });
+          });
+        });
+
+        await this.safeBootStep('getLaunchUrl', async () => {
+          const launch = await App.getLaunchUrl();
           const url = (launch?.url ?? '').toString().trim();
           if (!url) return;
           this.zone.run(() => {
             void this.handleIncomingUrl(url);
           });
-        })
-        .catch(() => {});
+        });
 
-      fromEvent(document, 'didDismiss').subscribe(() => {
-        this.globals.modal_open = false;
-      });
+        fromEvent(document, 'didDismiss').subscribe(() => {
+          this.globals.modal_open = false;
+        });
 
-      this.whenInitialNavigationReady();
+        this.whenInitialNavigationReady();
+      } catch (err) {
+        console.error('[App] startup failed', err);
+        this.hideLaunchSplash();
+      }
     });
   }
 
@@ -285,6 +299,14 @@ export class AppComponent implements OnInit {
     if (!active || typeof active.blur !== 'function') return;
 
     active.blur();
+  }
+
+  private async safeBootStep(label: string, fn: () => Promise<void> | void): Promise<void> {
+    try {
+      await fn();
+    } catch (err) {
+      console.error(`[App] boot step failed: ${label}`, err);
+    }
   }
 
 }

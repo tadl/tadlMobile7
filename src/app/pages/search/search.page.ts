@@ -6,13 +6,6 @@ import { ActivatedRoute, ParamMap } from '@angular/router';
 import { Router } from '@angular/router';
 import { finalize } from 'rxjs';
 import { Subscription } from 'rxjs';
-import {
-  CapacitorBarcodeScanner,
-  CapacitorBarcodeScannerAndroidScanningLibrary,
-  CapacitorBarcodeScannerCameraDirection,
-  CapacitorBarcodeScannerScanOrientation,
-  CapacitorBarcodeScannerTypeHint,
-} from '@capacitor/barcode-scanner';
 import { Capacitor } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
 
@@ -248,6 +241,11 @@ export class SearchPage implements OnInit, OnDestroy {
   }
 
   async scanIsbn() {
+    if (Capacitor.getPlatform() === 'ios') {
+      this.toast.presentToast('ISBN scanning is temporarily unavailable on iPhone in this diagnostic build.');
+      return;
+    }
+
     if (!Capacitor.isNativePlatform()) {
       this.showAdvanced = true;
       this.searchIndex = 'ISBN';
@@ -259,39 +257,9 @@ export class SearchPage implements OnInit, OnDestroy {
     this.scanningIsbn = true;
 
     try {
-      const res = await CapacitorBarcodeScanner.scanBarcode({
-        hint: CapacitorBarcodeScannerTypeHint.EAN_13,
-        scanInstructions: 'Scan the ISBN barcode',
-        cameraDirection: CapacitorBarcodeScannerCameraDirection.BACK,
-        scanOrientation: CapacitorBarcodeScannerScanOrientation.ADAPTIVE,
-        android: { scanningLibrary: CapacitorBarcodeScannerAndroidScanningLibrary.MLKIT },
-      });
-
-      const raw = (res?.ScanResult ?? '').toString().trim();
-      if (!raw) return;
-
-      const isbn = this.normalizeScannedIsbn(raw);
-      if (!isbn) {
-        this.toast.presentToast('Scanned code was not a valid ISBN.');
-        return;
-      }
-
-      this.lookfor = isbn;
-      this.searchIndex = 'ISBN';
-      this.showAdvanced = true;
-      this.runSearch(true);
+      this.toast.presentToast('ISBN scanning is temporarily unavailable in this diagnostic build.');
     } catch (err: any) {
-      const msg = (err?.message ?? err ?? '').toString().toLowerCase();
-      const canceled =
-        msg.includes('cancel') ||
-        msg.includes('dismiss') ||
-        msg.includes('close') ||
-        msg.includes('back');
-      if (canceled) {
-        this.resetToKeywordSearchMode();
-        return;
-      }
-      if (!canceled) this.toast.presentToast('Could not scan barcode.');
+      this.toast.presentToast(err?.message || 'Could not scan barcode.');
     } finally {
       this.scanningIsbn = false;
     }

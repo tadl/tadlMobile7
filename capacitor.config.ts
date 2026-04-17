@@ -12,6 +12,22 @@ const config: CapacitorConfig = {
   appId: resolvedAppId,
   appName: 'TADL',
   webDir: 'www',
+  ios: {
+    includePlugins: [
+      '@capacitor/app',
+      '@capacitor/app-launcher',
+      '@capacitor/browser',
+      '@capacitor/device',
+      '@capacitor/haptics',
+      '@capacitor/keyboard',
+      '@capacitor/network',
+      '@capacitor/preferences',
+      '@capacitor/splash-screen',
+      '@capacitor/status-bar',
+      '@ebarooni/capacitor-calendar',
+      'capacitor-secure-storage-plugin',
+    ],
+  },
   plugins: {
     SplashScreen: {
       launchAutoHide: false,

@@ -79,8 +79,9 @@ export class HoldsPage {
 
     this.loading = true;
 
-    this.holds
-      .fetchActiveHolds()
+    const holds$ = ev ? this.holds.fetchFreshActiveHolds(true) : this.holds.fetchActiveHolds();
+
+    holds$
       .pipe(
         finalize(() => {
           this.loading = false;
@@ -317,23 +318,45 @@ export class HoldsPage {
     if (!key) return;
     this.holdActionBusyKeys.add(key);
 
-    const op$ = this.holdIsFrozen(h) ? this.holds.thawHold(h) : this.holds.freezeHold(h);
+    const wasFrozen = this.holdIsFrozen(h);
+    const targetFrozen = !wasFrozen;
+    const op$ = wasFrozen ? this.holds.thawHold(h) : this.holds.freezeHold(h);
     op$
-      .pipe(finalize(() => this.holdActionBusyKeys.delete(key)))
       .subscribe({
         next: (res) => {
           if (!res?.success) {
-            this.toast.presentToast(this.holdIsFrozen(h) ? 'Could not activate hold.' : 'Could not suspend hold.');
+            this.holdActionBusyKeys.delete(key);
+            this.toast.presentToast(wasFrozen ? 'Could not activate hold.' : 'Could not suspend hold.');
             return;
           }
 
-          const nowFrozen = !this.holdIsFrozen(h);
-          this.applyHoldFrozenState(h, nowFrozen);
+          this.holdActionBusyKeys.delete(key);
+          this.applyHoldFrozenState(h, targetFrozen);
 
-          this.toast.presentToast(nowFrozen ? 'Hold suspended.' : 'Hold activated.');
+          const title = this.holdTitle(h);
+          this.toast.presentToast(targetFrozen ? `Hold suspended: ${title}` : `Hold activated: ${title}`);
         },
-        error: () => this.toast.presentToast(this.holdIsFrozen(h) ? 'Could not activate hold.' : 'Could not suspend hold.'),
+        error: () => this.reconcileHoldToggleAfterUnknownError(h, targetFrozen, key),
       });
+  }
+
+  private reconcileHoldToggleAfterUnknownError(h: AspenHold, targetFrozen: boolean, key: string) {
+    this.holds.verifyHoldFrozenStateAfterDelay(h, targetFrozen).subscribe({
+      next: (verified) => {
+        if (verified) {
+          this.applyHoldFrozenState(verified, targetFrozen);
+          const title = this.holdTitle(verified);
+          this.toast.presentToast(targetFrozen ? `Hold suspended: ${title}` : `Hold activated: ${title}`);
+          return;
+        }
+
+        this.toast.presentToast(targetFrozen ? 'Could not suspend hold.' : 'Could not activate hold.');
+      },
+      error: () => {
+        this.toast.presentToast(targetFrozen ? 'Could not suspend hold.' : 'Could not activate hold.');
+      },
+      complete: () => this.holdActionBusyKeys.delete(key),
+    });
   }
 
   private async changePickupLocation(h: AspenHold) {

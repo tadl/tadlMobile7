@@ -7,6 +7,7 @@ import { AuthService } from './auth.service';
 import { AccountStoreService } from './account-store.service';
 import { AppCacheService } from './app-cache.service';
 import { DiscoveryUrlService } from './discovery-url.service';
+import { UserApiQueueService } from './user-api-queue.service';
 
 export interface AspenReadingHistoryItem {
   id?: string;
@@ -43,6 +44,7 @@ export class HistoryService {
     private accounts: AccountStoreService,
     private cache: AppCacheService,
     private discoveryUrls: DiscoveryUrlService,
+    private userApiQueue: UserApiQueueService,
   ) {}
 
   fetchReadingHistoryPage(
@@ -94,8 +96,10 @@ export class HistoryService {
 
         const headers = new HttpHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' });
 
-        return this.http
-          .post<any>(`${this.globals.aspen_api_base}/UserAPI`, body.toString(), { params, headers })
+        return this.userApiQueue
+          .run(snap.activeAccountId, () =>
+            this.http.post<any>(`${this.globals.aspen_api_base}/UserAPI`, body.toString(), { params, headers }),
+          )
           .pipe(
             map(raw => raw?.result ?? raw),
             map((r: any) => ({

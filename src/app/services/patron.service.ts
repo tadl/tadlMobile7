@@ -3,6 +3,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams, HttpHeaders } from '@angular/common/http';
 import { Observable, finalize, map, shareReplay } from 'rxjs';
 import { Globals } from '../globals';
+import { UserApiQueueService } from './user-api-queue.service';
 
 export interface AspenPatronProfileResponse {
   success: boolean;
@@ -22,7 +23,11 @@ export interface PatronBadges {
 export class PatronService {
   private profileFetches = new Map<string, Observable<AspenPatronProfileResponse>>();
 
-  constructor(private http: HttpClient, private globals: Globals) {}
+  constructor(
+    private http: HttpClient,
+    private globals: Globals,
+    private userApiQueue: UserApiQueueService,
+  ) {}
 
   /**
    * Aspen LiDA-style:
@@ -31,7 +36,7 @@ export class PatronService {
    *
    * Your proxy currently requires api=tadl-prod for ILS requests, so we include it via globals.
    */
-  getPatronProfile(username: string, password: string): Observable<AspenPatronProfileResponse> {
+  getPatronProfile(username: string, password: string, queueKey?: string | null): Observable<AspenPatronProfileResponse> {
     const key = `${(username ?? '').trim()}\u0000${(password ?? '').trim()}`;
     const existing = this.profileFetches.get(key);
     if (existing) return existing;
@@ -51,8 +56,10 @@ export class PatronService {
       'Content-Type': 'application/x-www-form-urlencoded',
     });
 
-    const request$ = this.http
-      .post<any>(`${this.globals.aspen_api_base}/UserAPI`, body.toString(), { params, headers })
+    const request$ = this.userApiQueue
+      .run(queueKey || `user:${(username ?? '').trim()}`, () =>
+        this.http.post<any>(`${this.globals.aspen_api_base}/UserAPI`, body.toString(), { params, headers }),
+      )
       .pipe(
         map(raw => {
           const r = raw?.result ?? raw;

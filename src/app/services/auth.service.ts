@@ -177,7 +177,7 @@ export class AuthService {
         return from(this.accounts.getPassword(meta.id)).pipe(
           switchMap(password => {
             if (!password) return throwError(() => new Error('missing_password'));
-            return this.patron.getPatronProfile(meta.username, password).pipe(
+            return this.patron.getPatronProfile(meta.username, password, meta.id).pipe(
               switchMap(res => {
                 if (!res.success || !res.profile) return throwError(() => new Error('invalid_login'));
 
@@ -264,7 +264,7 @@ export class AuthService {
           );
         }
 
-        return this.patron.getPatronProfile(snap.activeAccountMeta!.username, password).pipe(
+        return this.patron.getPatronProfile(snap.activeAccountMeta!.username, password, snap.activeAccountId).pipe(
           switchMap(res => {
             if (!res.success || !res.profile) {
               return from(this.invalidateActiveSession(true)).pipe(

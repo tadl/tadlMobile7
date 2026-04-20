@@ -1,7 +1,7 @@
 // src/app/services/checkouts.service.ts
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
-import { Observable, map, switchMap, from, throwError, concat, filter, tap, finalize, shareReplay } from 'rxjs';
+import { Observable, map, switchMap, from, throwError, concat, filter, tap, finalize, shareReplay, timer } from 'rxjs';
 import { Preferences } from '@capacitor/preferences';
 
 import { Globals } from '../globals';
@@ -9,6 +9,7 @@ import { AuthService } from './auth.service';
 import { AccountStoreService } from './account-store.service';
 import { AppCacheService } from './app-cache.service';
 import { DiscoveryUrlService } from './discovery-url.service';
+import { UserApiQueueService } from './user-api-queue.service';
 
 export interface AspenCheckout {
   id: number;
@@ -58,6 +59,8 @@ export interface AspenMutationResult {
 }
 
 const PREF_APP_SESSION_ID = 'app:aspenSessionId';
+const SUSPICIOUS_EMPTY_CHECKOUTS_CACHE_THRESHOLD = 10;
+const SUSPICIOUS_EMPTY_CHECKOUTS_RETRY_DELAY_MS = 750;
 
 @Injectable({ providedIn: 'root' })
 export class CheckoutsService {
@@ -71,6 +74,7 @@ export class CheckoutsService {
     private accounts: AccountStoreService,
     private cache: AppCacheService,
     private discoveryUrls: DiscoveryUrlService,
+    private userApiQueue: UserApiQueueService,
   ) {}
 
   /**
@@ -100,49 +104,83 @@ export class CheckoutsService {
     return concat(cached$, network$);
   }
 
-  fetchFreshActiveCheckouts(): Observable<AspenCheckout[]> {
+  fetchFreshActiveCheckouts(refreshCheckouts = false): Observable<AspenCheckout[]> {
     const snap = this.auth.snapshot();
     if (!snap.isLoggedIn || !snap.activeAccountId || !snap.activeAccountMeta) {
       return from([[]]);
     }
 
     const cacheKey = `checkouts:${snap.activeAccountId}`;
-    return this.fetchCheckoutsNetwork(snap, cacheKey);
+    return this.fetchCheckoutsNetwork(snap, cacheKey, refreshCheckouts);
   }
 
   private fetchCheckoutsNetwork(
     snap: ReturnType<AuthService['snapshot']>,
     cacheKey: string,
+    refreshCheckouts = false,
   ): Observable<AspenCheckout[]> {
-    return from(this.accounts.getPassword(snap.activeAccountId!)).pipe(
-      switchMap(password => {
+    return from(Promise.all([
+      this.accounts.getPassword(snap.activeAccountId!),
+      this.cache.read<AspenCheckout[]>(cacheKey),
+    ])).pipe(
+      switchMap(([password, cached]) => {
         if (!password) return throwError(() => new Error('missing_password'));
+        const cachedCheckouts = Array.isArray(cached) ? cached : [];
 
-        const params = new HttpParams().set('method', 'getPatronCheckedOutItems');
+        return this.userApiQueue.run(snap.activeAccountId, () =>
+          this.requestPatronCheckouts(snap, password, refreshCheckouts).pipe(
+            switchMap((r) => {
+              const checkouts = this.checkoutsFromResponse(r);
+              if (!this.isSuspiciousEmptyCheckouts(checkouts, cachedCheckouts)) return from([checkouts]);
 
-        const body = new URLSearchParams();
-        body.set('username', snap.activeAccountMeta!.username);
-        body.set('password', password);
-
-        const headers = new HttpHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' });
-
-        return this.http
-          .post<any>(`${this.globals.aspen_api_base}/UserAPI`, body.toString(), { params, headers })
-          .pipe(
-            map(raw => raw?.result ?? raw),
-            map((r: any) => {
-              if (!r?.success) return [];
-              const list = Array.isArray(r?.checkedOutItems) ? (r.checkedOutItems as AspenCheckout[]) : [];
-              return list
-                .filter((c) => c?.type === 'ils' || c?.source === 'ils')
-                .map((checkout) => this.normalizeCheckout(checkout));
+              return timer(SUSPICIOUS_EMPTY_CHECKOUTS_RETRY_DELAY_MS).pipe(
+                switchMap(() => this.requestPatronCheckouts(snap, password, true)),
+                map((retryResponse) => {
+                  const retryCheckouts = this.checkoutsFromResponse(retryResponse);
+                  return this.isSuspiciousEmptyCheckouts(retryCheckouts, cachedCheckouts)
+                    ? cachedCheckouts
+                    : retryCheckouts;
+                }),
+              );
             }),
             tap((list) => {
               this.cache.write(cacheKey, list).catch(() => {});
             }),
-          );
+          ),
+        );
       }),
     );
+  }
+
+  private requestPatronCheckouts(
+    snap: ReturnType<AuthService['snapshot']>,
+    password: string,
+    refreshCheckouts: boolean,
+  ): Observable<any> {
+    let params = new HttpParams().set('method', 'getPatronCheckedOutItems');
+    if (refreshCheckouts) params = params.set('refreshCheckouts', 'true');
+
+    const body = new URLSearchParams();
+    body.set('username', snap.activeAccountMeta!.username);
+    body.set('password', password);
+
+    const headers = new HttpHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' });
+
+    return this.http
+      .post<any>(`${this.globals.aspen_api_base}/UserAPI`, body.toString(), { params, headers })
+      .pipe(map(raw => raw?.result ?? raw));
+  }
+
+  private checkoutsFromResponse(r: any): AspenCheckout[] {
+    if (!r?.success) return [];
+    const list = Array.isArray(r?.checkedOutItems) ? (r.checkedOutItems as AspenCheckout[]) : [];
+    return list
+      .filter((c) => c?.type === 'ils' || c?.source === 'ils')
+      .map((checkout) => this.normalizeCheckout(checkout));
+  }
+
+  private isSuspiciousEmptyCheckouts(checkouts: AspenCheckout[], cachedCheckouts: AspenCheckout[]): boolean {
+    return checkouts.length === 0 && cachedCheckouts.length >= SUSPICIOUS_EMPTY_CHECKOUTS_CACHE_THRESHOLD;
   }
 
   /**
@@ -205,20 +243,22 @@ export class CheckoutsService {
 
             const headers = new HttpHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' });
 
-            return this.http
-              .post<any>(`${this.globals.aspen_api_base}/UserAPI`, body.toString(), { params, headers })
-              .pipe(
-                map(raw => raw?.result ?? raw),
-                map((r: any) => {
-                  const success = r?.success !== undefined ? !!r.success : true;
-                  return {
-                    success,
-                    title: typeof r?.title === 'string' ? r.title : undefined,
-                    message: typeof r?.message === 'string' ? r.message : (typeof r?.renewMessage === 'string' ? r.renewMessage : undefined),
-                    raw: r,
-                  } satisfies AspenMutationResult;
-                }),
-              );
+            return this.userApiQueue.run(snap.activeAccountId, () =>
+              this.http
+                .post<any>(`${this.globals.aspen_api_base}/UserAPI`, body.toString(), { params, headers })
+                .pipe(
+                  map(raw => raw?.result ?? raw),
+                  map((r: any) => {
+                    const success = r?.success !== undefined ? !!r.success : true;
+                    return {
+                      success,
+                      title: typeof r?.title === 'string' ? r.title : undefined,
+                      message: typeof r?.message === 'string' ? r.message : (typeof r?.renewMessage === 'string' ? r.renewMessage : undefined),
+                      raw: r,
+                    } satisfies AspenMutationResult;
+                  }),
+                ),
+            );
           }),
         );
       }),

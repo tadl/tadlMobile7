@@ -5,6 +5,7 @@ import { Observable, from, map, shareReplay, switchMap } from 'rxjs';
 import { Globals } from '../globals';
 import { AuthService } from './auth.service';
 import { AccountStoreService } from './account-store.service';
+import { UserApiQueueService } from './user-api-queue.service';
 
 export interface AspenFine {
   reason?: string;
@@ -35,6 +36,7 @@ export class FinesService {
     private globals: Globals,
     private auth: AuthService,
     private accounts: AccountStoreService,
+    private userApiQueue: UserApiQueueService,
   ) {}
 
   fetchPatronFines(): Observable<AspenPatronFinesResponse> {
@@ -78,8 +80,10 @@ export class FinesService {
           'Content-Type': 'application/x-www-form-urlencoded',
         });
 
-        return this.http
-          .post<any>(`${this.globals.aspen_api_base}/UserAPI`, body.toString(), { params, headers })
+        return this.userApiQueue
+          .run(snap.activeAccountId, () =>
+            this.http.post<any>(`${this.globals.aspen_api_base}/UserAPI`, body.toString(), { params, headers }),
+          )
           .pipe(
             map(raw => {
               const result = raw?.result ?? raw ?? {};

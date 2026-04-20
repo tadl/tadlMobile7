@@ -1,13 +1,14 @@
 // src/app/services/holds.service.ts
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
-import { Observable, map, switchMap, from, throwError, concat, filter, tap, finalize, shareReplay } from 'rxjs';
+import { Observable, map, switchMap, from, throwError, concat, filter, tap, finalize, shareReplay, timer } from 'rxjs';
 
 import { Globals } from '../globals';
 import { AuthService } from './auth.service';
 import { AccountStoreService } from './account-store.service';
 import { AppCacheService } from './app-cache.service';
 import { DiscoveryUrlService } from './discovery-url.service';
+import { UserApiQueueService } from './user-api-queue.service';
 
 export interface AspenHold {
   id: number; // transactionId-ish
@@ -59,6 +60,9 @@ export interface AspenMutationResult {
 }
 
 const PREF_HOLDS_CACHE_PREFIX = 'accounts:holds:'; // + accountId
+const SUSPICIOUS_EMPTY_HOLDS_CACHE_THRESHOLD = 10;
+const SUSPICIOUS_EMPTY_HOLDS_RETRY_DELAY_MS = 750;
+const HOLD_MUTATION_VERIFY_DELAY_MS = 3500;
 
 @Injectable({ providedIn: 'root' })
 export class HoldsService {
@@ -71,6 +75,7 @@ export class HoldsService {
     private accounts: AccountStoreService,
     private cache: AppCacheService,
     private discoveryUrls: DiscoveryUrlService,
+    private userApiQueue: UserApiQueueService,
   ) {}
 
   // ---------- Cache ----------
@@ -114,14 +119,14 @@ export class HoldsService {
     return concat(cached$, network$);
   }
 
-  fetchFreshActiveHolds(): Observable<AspenHold[]> {
+  fetchFreshActiveHolds(refreshHolds = false): Observable<AspenHold[]> {
     const snap = this.auth.snapshot();
     if (!snap.isLoggedIn || !snap.activeAccountId || !snap.activeAccountMeta) {
       return from([[]]);
     }
 
     const cacheKey = PREF_HOLDS_CACHE_PREFIX + snap.activeAccountId;
-    return this.fetchHoldsNetwork(snap, cacheKey);
+    return this.fetchHoldsNetwork(snap, cacheKey, refreshHolds);
   }
 
   async removeCachedHold(hold: AspenHold): Promise<void> {
@@ -245,6 +250,21 @@ export class HoldsService {
     });
   }
 
+  verifyHoldFrozenStateAfterDelay(
+    hold: AspenHold,
+    expectedFrozen: boolean,
+    delayMs = HOLD_MUTATION_VERIFY_DELAY_MS,
+  ): Observable<AspenHold | null> {
+    return timer(delayMs).pipe(
+      switchMap(() => this.fetchFreshActiveHolds(true)),
+      map((holds) => {
+        const match = this.findMatchingHold(holds ?? [], hold);
+        if (!match) return null;
+        return this.holdLooksFrozen(match) === expectedFrozen ? match : null;
+      }),
+    );
+  }
+
   cancelHold(hold: AspenHold): Observable<AspenMutationResult> {
     const cancelId = this.pickCancelId(hold);
     if (!cancelId) return throwError(() => new Error('missing_cancel_id'));
@@ -303,39 +323,98 @@ export class HoldsService {
     return s;
   }
 
-  private fetchHoldsNetwork(snap: ReturnType<AuthService['snapshot']>, cacheKey: string): Observable<AspenHold[]> {
-    return from(this.accounts.getPassword(snap.activeAccountId!)).pipe(
-      switchMap(password => {
+  private fetchHoldsNetwork(
+    snap: ReturnType<AuthService['snapshot']>,
+    cacheKey: string,
+    refreshHolds = false,
+  ): Observable<AspenHold[]> {
+    return from(Promise.all([
+      this.accounts.getPassword(snap.activeAccountId!),
+      this.cache.read<AspenHold[]>(cacheKey),
+    ])).pipe(
+      switchMap(([password, cached]) => {
         if (!password) return throwError(() => new Error('missing_password'));
+        const cachedHolds = Array.isArray(cached) ? cached : [];
 
-        const params = new HttpParams().set('method', 'getPatronHolds');
+        return this.userApiQueue.run(snap.activeAccountId, () =>
+          this.requestPatronHolds(snap, password, refreshHolds).pipe(
+            switchMap((r) => {
+              const holds = this.holdsFromResponse(r);
+              if (!this.isSuspiciousEmptyHolds(holds, cachedHolds)) return from([holds]);
 
-        const body = new URLSearchParams();
-        body.set('username', snap.activeAccountMeta!.username);
-        body.set('password', password);
-
-        const headers = new HttpHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' });
-
-        return this.http
-          .post<any>(`${this.globals.aspen_api_base}/UserAPI`, body.toString(), { params, headers })
-          .pipe(
-            map(raw => (raw?.result ?? raw) as PatronHoldsResponse),
-            map(r => {
-              if (!r?.success) return [];
-              const all = [
-                ...this.normalizeHoldCollection(r?.holds?.available),
-                ...this.normalizeHoldCollection(r?.holds?.unavailable),
-              ];
-              return all
-                .filter(h => (h?.type === 'ils' || h?.source === 'ils'))
-                .map((hold) => this.normalizeHold(hold));
+              return timer(SUSPICIOUS_EMPTY_HOLDS_RETRY_DELAY_MS).pipe(
+                switchMap(() => this.requestPatronHolds(snap, password, true)),
+                map((retryResponse) => {
+                  const retryHolds = this.holdsFromResponse(retryResponse);
+                  return this.isSuspiciousEmptyHolds(retryHolds, cachedHolds) ? cachedHolds : retryHolds;
+                }),
+              );
             }),
             tap((holds) => {
               this.cache.write(cacheKey, holds).catch(() => {});
             }),
-          );
+          ),
+        );
       }),
     );
+  }
+
+  private requestPatronHolds(
+    snap: ReturnType<AuthService['snapshot']>,
+    password: string,
+    refreshHolds: boolean,
+  ): Observable<PatronHoldsResponse> {
+    let params = new HttpParams().set('method', 'getPatronHolds');
+    if (refreshHolds) params = params.set('refreshHolds', 'true');
+
+    const body = new URLSearchParams();
+    body.set('username', snap.activeAccountMeta!.username);
+    body.set('password', password);
+
+    const headers = new HttpHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' });
+
+    return this.http
+      .post<any>(`${this.globals.aspen_api_base}/UserAPI`, body.toString(), { params, headers })
+      .pipe(map(raw => (raw?.result ?? raw) as PatronHoldsResponse));
+  }
+
+  private holdsFromResponse(r: PatronHoldsResponse): AspenHold[] {
+    if (!r?.success) return [];
+    const all = [
+      ...this.normalizeHoldCollection(r?.holds?.available),
+      ...this.normalizeHoldCollection(r?.holds?.unavailable),
+    ];
+    return all
+      .filter(h => (h?.type === 'ils' || h?.source === 'ils'))
+      .map((hold) => this.normalizeHold(hold));
+  }
+
+  private isSuspiciousEmptyHolds(holds: AspenHold[], cachedHolds: AspenHold[]): boolean {
+    return holds.length === 0 && cachedHolds.length >= SUSPICIOUS_EMPTY_HOLDS_CACHE_THRESHOLD;
+  }
+
+  private findMatchingHold(holds: AspenHold[], target: AspenHold): AspenHold | null {
+    const targetKeys = this.holdMatchKeys(target);
+    return (holds ?? []).find((hold) => {
+      const keys = this.holdMatchKeys(hold);
+      return keys.some((key) => targetKeys.includes(key));
+    }) ?? null;
+  }
+
+  private holdMatchKeys(hold: AspenHold): string[] {
+    const keys = [
+      (hold as any)?.cancelId ? `cancel:${(hold as any).cancelId}` : '',
+      (hold as any)?.id ? `id:${(hold as any).id}` : '',
+      (hold as any)?.recordId ? `record:${(hold as any).recordId}` : '',
+      (hold as any)?.groupedWorkId ? `grouped:${(hold as any).groupedWorkId}` : '',
+    ];
+    return keys.map((key) => key.toString().trim()).filter(Boolean);
+  }
+
+  private holdLooksFrozen(hold: AspenHold): boolean {
+    if ((hold as any)?.frozen === true) return true;
+    const status = `${hold?.statusMessage ?? ''} ${hold?.status ?? ''}`.toLowerCase();
+    return status.includes('frozen') || status.includes('suspend') || status.includes('suspended');
   }
 
   // ---------- Core mutation plumbing ----------
@@ -361,20 +440,22 @@ export class HoldsService {
 
         const headers = new HttpHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' });
 
-        return this.http
-          .post<any>(`${this.globals.aspen_api_base}/UserAPI`, body.toString(), { params, headers })
-          .pipe(
-            map(raw => raw?.result ?? raw),
-            map((r: any) => {
-              const success = r?.success !== undefined ? !!r.success : true;
-              return {
-                success,
-                title: typeof r?.title === 'string' ? r.title : undefined,
-                message: typeof r?.message === 'string' ? r.message : undefined,
-                raw: r,
-              } satisfies AspenMutationResult;
-            }),
-          );
+        return this.userApiQueue.run(snap.activeAccountId, () =>
+          this.http
+            .post<any>(`${this.globals.aspen_api_base}/UserAPI`, body.toString(), { params, headers })
+            .pipe(
+              map(raw => raw?.result ?? raw),
+              map((r: any) => {
+                const success = r?.success !== undefined ? !!r.success : true;
+                return {
+                  success,
+                  title: typeof r?.title === 'string' ? r.title : undefined,
+                  message: typeof r?.message === 'string' ? r.message : undefined,
+                  raw: r,
+                } satisfies AspenMutationResult;
+              }),
+            ),
+        );
       }),
     );
   }

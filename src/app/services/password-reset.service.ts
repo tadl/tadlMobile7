@@ -3,6 +3,7 @@ import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { catchError, map, Observable, throwError } from 'rxjs';
 
 import { Globals } from '../globals';
+import { UserApiQueueService } from './user-api-queue.service';
 
 export interface PasswordResetRequest {
   username: string;
@@ -20,6 +21,7 @@ export class PasswordResetService {
   constructor(
     private http: HttpClient,
     private globals: Globals,
+    private userApiQueue: UserApiQueueService,
   ) {}
 
   submitResetRequest(input: PasswordResetRequest): Observable<PasswordResetResult> {
@@ -35,13 +37,15 @@ export class PasswordResetService {
     });
     const params = new HttpParams().set('method', 'resetPassword');
 
-    return this.http.post<any>(
-      `${this.globals.aspen_api_base}/UserAPI`,
-      body.toString(),
-      {
-        params,
-        headers,
-      },
+    return this.userApiQueue.run(`password-reset:${username}`, () =>
+      this.http.post<any>(
+        `${this.globals.aspen_api_base}/UserAPI`,
+        body.toString(),
+        {
+          params,
+          headers,
+        },
+      ),
     ).pipe(
       map((raw) => {
         const result = raw?.result ?? raw ?? {};

@@ -779,6 +779,10 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   // Hold card helpers
   // ----------------------------
 
+  holdToastTitle(hold?: AspenHold | null): string {
+    return this.cleanTitlePart(hold?.title) || this.itemDisplayTitle();
+  }
+
   hasAnyHoldForItem(): boolean {
     return this.holdsForItem.length > 0;
   }
@@ -920,14 +924,15 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     this.holdActionBusy = true;
     this.holds
       .freezeHold(this.hold)
-      .pipe(finalize(() => (this.holdActionBusy = false)))
       .subscribe({
         next: (res) => {
           if (!res?.success) {
+            this.holdActionBusy = false;
             this.toast.presentToast('Could not suspend hold.');
             return;
           }
 
+          this.holdActionBusy = false;
           this.needsHoldsRefresh = true;
 
           // optimistic UI update
@@ -936,9 +941,9 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
           this.syncHoldAcrossItemState(this.hold);
           this.holds.upsertCachedHold(this.hold!).catch(() => {});
 
-          this.toast.presentToast('Hold suspended.');
+          this.toast.presentToast(`Hold suspended: ${this.holdToastTitle(this.hold)}`);
         },
-        error: () => this.toast.presentToast('Could not suspend hold.'),
+        error: () => this.reconcileHoldMutationAfterUnknownError(this.hold, true),
       });
   }
 
@@ -950,14 +955,15 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     this.holdActionBusy = true;
     this.holds
       .thawHold(this.hold)
-      .pipe(finalize(() => (this.holdActionBusy = false)))
       .subscribe({
         next: (res) => {
           if (!res?.success) {
+            this.holdActionBusy = false;
             this.toast.presentToast('Could not activate hold.');
             return;
           }
 
+          this.holdActionBusy = false;
           this.needsHoldsRefresh = true;
 
           // optimistic UI update
@@ -966,10 +972,39 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
           this.syncHoldAcrossItemState(this.hold);
           this.holds.upsertCachedHold(this.hold!).catch(() => {});
 
-          this.toast.presentToast('Hold activated.');
+          this.toast.presentToast(`Hold activated: ${this.holdToastTitle(this.hold)}`);
         },
-        error: () => this.toast.presentToast('Could not activate hold.'),
+        error: () => this.reconcileHoldMutationAfterUnknownError(this.hold, false),
       });
+  }
+
+  private reconcileHoldMutationAfterUnknownError(hold: AspenHold | null, targetFrozen: boolean) {
+    if (!hold) {
+      this.holdActionBusy = false;
+      this.toast.presentToast(targetFrozen ? 'Could not suspend hold.' : 'Could not activate hold.');
+      return;
+    }
+
+    this.holds.verifyHoldFrozenStateAfterDelay(hold, targetFrozen).subscribe({
+      next: (verified) => {
+        if (verified) {
+          this.needsHoldsRefresh = true;
+          this.hold = verified;
+          this.syncHoldAcrossItemState(verified);
+          this.holds.upsertCachedHold(verified).catch(() => {});
+          this.toast.presentToast(targetFrozen ? `Hold suspended: ${this.holdToastTitle(verified)}` : `Hold activated: ${this.holdToastTitle(verified)}`);
+          return;
+        }
+
+        this.toast.presentToast(targetFrozen ? 'Could not suspend hold.' : 'Could not activate hold.');
+      },
+      error: () => {
+        this.toast.presentToast(targetFrozen ? 'Could not suspend hold.' : 'Could not activate hold.');
+      },
+      complete: () => {
+        this.holdActionBusy = false;
+      },
+    });
   }
 
   async confirmCancelHold() {

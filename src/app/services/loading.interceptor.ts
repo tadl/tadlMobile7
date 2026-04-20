@@ -12,7 +12,7 @@ import { LoadingService } from './loading.service';
 
 @Injectable()
 export class LoadingInterceptor implements HttpInterceptor {
-  private static readonly DEFAULT_REQUEST_TIMEOUT_MS = 20000;
+  private static readonly DEFAULT_REQUEST_TIMEOUT_MS = 30000;
 
   constructor(private loading: LoadingService) {}
 

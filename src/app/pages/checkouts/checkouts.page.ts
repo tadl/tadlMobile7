@@ -55,8 +55,9 @@ export class CheckoutsPage {
 
     this.loading = true;
 
-    this.checkouts
-      .fetchActiveCheckouts()
+    const checkouts$ = ev ? this.checkouts.fetchFreshActiveCheckouts(true) : this.checkouts.fetchActiveCheckouts();
+
+    checkouts$
       .pipe(
         finalize(() => {
           this.loading = false;

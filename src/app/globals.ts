@@ -48,7 +48,7 @@ export class Globals {
   public device_info: any;
   public system_color: any = window.matchMedia('(prefers-color-scheme: dark)');
   public theme_mode: ThemeMode = 'system';
-  public link_mode: LinkMode = 'app';
+  public link_mode: LinkMode = 'browser';
 
   public system_short_name: string = 'TADL';
 
@@ -197,7 +197,7 @@ export class Globals {
   async initLinkPreference() {
     if (this.link_mode_initialized) return;
 
-    let preferred: LinkMode = 'app';
+    let preferred: LinkMode = 'browser';
     try {
       const { value } = await Preferences.get({ key: this.link_pref_key });
       if (value === 'app' || value === 'browser') preferred = value;

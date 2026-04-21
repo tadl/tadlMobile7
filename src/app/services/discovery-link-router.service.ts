@@ -60,7 +60,7 @@ export class DiscoveryLinkRouterService {
     }
 
     if (first === 'myaccount') {
-      await this.router.navigate(['/account']);
+      await this.globals.open_external_page(raw);
       return true;
     }
 

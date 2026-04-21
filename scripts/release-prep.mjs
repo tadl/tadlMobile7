@@ -302,7 +302,6 @@ function ensureAndroidManifestDeepLinks() {
         `                <data android:scheme="https" android:host="discover.tadl.org" android:pathPrefix="/Record/" />\n` +
         `                <data android:scheme="https" android:host="discover.tadl.org" android:pathPrefix="/Union/Search" />\n` +
         `                <data android:scheme="https" android:host="discover.tadl.org" android:pathPrefix="/Search/" />\n` +
-        `                <data android:scheme="https" android:host="discover.tadl.org" android:pathPrefix="/MyAccount/Home" />\n` +
         `            </intent-filter>\n        </activity>`,
     );
   }

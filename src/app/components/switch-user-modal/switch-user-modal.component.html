@@ -29,51 +29,58 @@
     <div class="section-title">Log in</div>
   </div>
 
-  <div class="login-card">
-    <ion-item class="login-item" lines="none">
-      <ion-input
-        class="login-input"
-        [(ngModel)]="username"
-        label="Library card / username"
-        labelPlacement="floating"
-        fill="outline"
-        autocomplete="off"
-        autocapitalize="off"
-        autocorrect="off"
-        spellcheck="false"
-        placeholder="Enter card number or username"
-      ></ion-input>
-    </ion-item>
+  <form autocomplete="on" (ngSubmit)="submitLogin()">
+    <div class="login-card">
+      <ion-item class="login-item" lines="none">
+        <ion-input
+          class="login-input"
+          [(ngModel)]="username"
+          name="username"
+          type="text"
+          inputmode="text"
+          label="Library card / username"
+          labelPlacement="floating"
+          fill="outline"
+          autocomplete="username"
+          autocapitalize="off"
+          autocorrect="off"
+          spellcheck="false"
+          placeholder="Enter card number or username"
+        ></ion-input>
+      </ion-item>
 
-    <ion-item class="login-item password-input-wrap" lines="none">
-      <ion-input
-        class="login-input login-input--password"
-        [(ngModel)]="password"
-        [type]="showPassword ? 'text' : 'password'"
-        label="Password"
-        labelPlacement="floating"
-        fill="outline"
-        [clearOnEdit]="true"
-        autocomplete="off"
-        autocapitalize="off"
-        autocorrect="off"
-        spellcheck="false"
-        placeholder="Enter password"
-      ></ion-input>
-      <ion-button
-        fill="clear"
-        size="small"
-        class="password-toggle-inline"
-        aria-label="Toggle password visibility"
-        (click)="togglePasswordVisibility()"
-      >
-        <ion-icon slot="icon-only" [name]="showPassword ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
-      </ion-button>
-    </ion-item>
-  </div>
+      <ion-item class="login-item password-input-wrap" lines="none">
+        <ion-input
+          class="login-input login-input--password"
+          [(ngModel)]="password"
+          name="password"
+          [type]="showPassword ? 'text' : 'password'"
+          label="Password"
+          labelPlacement="floating"
+          fill="outline"
+          [clearOnEdit]="false"
+          autocomplete="current-password"
+          autocapitalize="off"
+          autocorrect="off"
+          spellcheck="false"
+          placeholder="Enter password"
+        ></ion-input>
+        <ion-button
+          type="button"
+          fill="clear"
+          size="small"
+          class="password-toggle-inline"
+          aria-label="Toggle password visibility"
+          (click)="togglePasswordVisibility()"
+        >
+          <ion-icon slot="icon-only" [name]="showPassword ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
+        </ion-button>
+      </ion-item>
+    </div>
 
-  <div class="actions">
-    <ion-button expand="block" (click)="submitLogin()">Log In</ion-button>
-    <ion-button expand="block" fill="clear" (click)="troubleLoggingIn()">Trouble logging in?</ion-button>
-  </div>
+    <div class="actions">
+      <ion-button expand="block" type="submit">Log In</ion-button>
+      <ion-button expand="block" fill="clear" type="button" (click)="troubleLoggingIn()">Trouble logging in?</ion-button>
+    </div>
+  </form>
 </ion-content>

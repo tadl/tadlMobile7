@@ -600,11 +600,11 @@ export class SearchPage implements OnInit, OnDestroy {
   }
 
   mediaFamilySummary(hit: AspenSearchHit): string {
-    return this.formatFamily.familySummaryForHit(hit);
+    return this.formatFamily.familySummaryForItem(hit);
   }
 
   mediaIconName(hit: AspenSearchHit): string {
-    return this.formatFamily.iconNameForHit(hit);
+    return this.formatFamily.iconNameForItem(hit);
   }
 
   canPlaceHoldFromHit(hit: AspenSearchHit): boolean {

@@ -10,6 +10,7 @@ import { CheckoutsService, type AspenCheckout } from '../../services/checkouts.s
 import { ItemDetailComponent } from '../../components/item-detail/item-detail.component';
 import { AspenSearchHit } from '../../services/search.service';
 import { MelcatManageModalComponent } from '../../components/melcat-manage-modal/melcat-manage-modal.component';
+import { FormatFamilyService } from '../../services/format-family.service';
 
 @Component({
   standalone: true,
@@ -34,6 +35,7 @@ export class CheckoutsPage {
     private checkouts: CheckoutsService,
     private modalCtrl: ModalController,
     private actionSheetCtrl: ActionSheetController,
+    private formatFamily: FormatFamilyService,
   ) {}
 
   ionViewWillEnter() {
@@ -89,6 +91,10 @@ export class CheckoutsPage {
 
   checkoutAuthor(c: AspenCheckout): string {
     return ((c?.author ?? '') as any)?.toString?.().trim?.() || '';
+  }
+
+  mediaIconNameForCheckout(c: AspenCheckout): string {
+    return this.formatFamily.iconNameForItem({ format: c?.format, itemList: c?.['itemList'] });
   }
 
   dueText(c: AspenCheckout): string {

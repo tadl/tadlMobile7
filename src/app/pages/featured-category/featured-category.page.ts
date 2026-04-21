@@ -241,13 +241,14 @@ export class FeaturedCategoryPage {
   }
 
   mediaIconName(hit: AspenSearchHit): string {
-    return this.formatFamily.iconNameForHit(hit);
+    return this.formatFamily.iconNameForItem(hit);
   }
 
   mediaIconNameForRecord(i: FeaturedRecord): string {
-    const hit = this.asSearchHit(i);
-    if (!hit) return 'albums-outline';
-    return this.mediaIconName(hit);
+    return this.formatFamily.iconNameForItem({
+      format: (i as any)?.format,
+      itemList: (i as any)?.itemList,
+    });
   }
 
   private asSearchHit(i: FeaturedRecord): AspenSearchHit | null {

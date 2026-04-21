@@ -10,6 +10,7 @@ import { HoldsService, AspenHold } from '../../services/holds.service';
 import { ItemDetailComponent } from '../../components/item-detail/item-detail.component';
 import { AspenSearchHit } from '../../services/search.service';
 import { MelcatManageModalComponent } from '../../components/melcat-manage-modal/melcat-manage-modal.component';
+import { FormatFamilyService } from '../../services/format-family.service';
 
 @Component({
   standalone: true,
@@ -35,6 +36,7 @@ export class HoldsPage {
     private holds: HoldsService,
     private modal: ModalController,
     private actionSheet: ActionSheetController,
+    private formatFamily: FormatFamilyService,
   ) {}
 
   async ionViewWillEnter() {
@@ -145,6 +147,10 @@ export class HoldsPage {
   holdAuthor(h: AspenHold): string {
     const a = (h?.author ?? '').toString().trim();
     return a.replace(/\s+$/, '');
+  }
+
+  mediaIconNameForHold(h: AspenHold): string {
+    return this.formatFamily.iconNameForItem({ format: h?.['format'], itemList: h?.['itemList'] });
   }
 
   holdStatus(h: AspenHold): string {

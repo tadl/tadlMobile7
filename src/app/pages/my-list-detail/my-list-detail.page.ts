@@ -286,16 +286,10 @@ export class MyListDetailPage {
   }
 
   mediaIconNameForTitle(t: AspenListTitle): string {
-    const hit: AspenSearchHit = {
-      key: this.recordIdForEntry(t),
-      title: this.titleText(t),
-      author: this.authorText(t) || undefined,
+    return this.formatFamily.iconNameForItem({
       format: t?.format,
-      itemList: Array.isArray((t as any)?.itemList) ? (t as any).itemList : [],
-      catalogUrl: '',
-      raw: t,
-    };
-    return this.formatFamily.iconNameForHit(hit);
+      itemList: (t as any)?.itemList,
+    });
   }
 
   private async placeHoldFromTitle(t: AspenListTitle, precomputedTargets?: HoldTargetOption[]): Promise<void> {

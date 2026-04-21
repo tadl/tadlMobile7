@@ -3,6 +3,11 @@ import { AspenSearchHit } from './search.service';
 
 export type FormatFamily = 'book' | 'music' | 'video' | 'other';
 
+export interface FormatFamilyInput {
+  format?: string | string[] | null;
+  itemList?: any[] | Record<string, any> | null;
+}
+
 interface FormatClassification {
   family: FormatFamily;
   physical: boolean;
@@ -64,7 +69,11 @@ export class FormatFamilyService {
   }
 
   iconNameForHit(hit: AspenSearchHit): string {
-    return this.iconNameForFamily(this.primaryFamilyForHit(hit));
+    return this.iconNameForItem(hit);
+  }
+
+  iconNameForItem(item: FormatFamilyInput | null | undefined): string {
+    return this.iconNameForFamily(this.primaryFamilyForItem(item));
   }
 
   familyLabel(family: FormatFamily): string {
@@ -75,6 +84,10 @@ export class FormatFamilyService {
   }
 
   uniqueFormatLabels(hit: AspenSearchHit): string[] {
+    return this.uniqueFormatLabelsForItem(hit);
+  }
+
+  uniqueFormatLabelsForItem(item: FormatFamilyInput | null | undefined): string[] {
     const out: string[] = [];
     const seen = new Set<string>();
 
@@ -87,12 +100,15 @@ export class FormatFamilyService {
       out.push(label);
     };
 
-    if (typeof hit?.format === 'string') pushLabel(hit.format);
-    if (Array.isArray(hit?.format)) {
-      for (const x of hit.format) pushLabel(x);
+    if (typeof item?.format === 'string') pushLabel(item.format);
+    if (Array.isArray(item?.format)) {
+      for (const x of item.format) pushLabel(x);
     }
-    for (const item of hit?.itemList ?? []) {
-      pushLabel(item?.name);
+    for (const entry of this.itemListEntries(item?.itemList)) {
+      pushLabel(entry?.name);
+      pushLabel(entry?.format);
+      pushLabel(entry?.label);
+      if (!entry?.name && !entry?.format && !entry?.label) pushLabel(entry?.key);
     }
 
     return out;
@@ -129,15 +145,23 @@ export class FormatFamilyService {
   }
 
   familiesForHit(hit: AspenSearchHit): FormatFamily[] {
+    return this.familiesForItem(hit);
+  }
+
+  familiesForItem(item: FormatFamilyInput | null | undefined): FormatFamily[] {
     const families = new Set<FormatFamily>();
-    for (const label of this.uniqueFormatLabels(hit)) {
+    for (const label of this.uniqueFormatLabelsForItem(item)) {
       families.add(this.classifyFormatLabel(label).family);
     }
     return Array.from(families.values());
   }
 
   primaryFamilyForHit(hit: AspenSearchHit): FormatFamily {
-    const families = this.familiesForHit(hit);
+    return this.primaryFamilyForItem(hit);
+  }
+
+  primaryFamilyForItem(item: FormatFamilyInput | null | undefined): FormatFamily {
+    const families = this.familiesForItem(item);
     if (families.includes('book')) return 'book';
     if (families.includes('music')) return 'music';
     if (families.includes('video')) return 'video';
@@ -145,18 +169,38 @@ export class FormatFamilyService {
   }
 
   familySummaryForHit(hit: AspenSearchHit): string {
-    const families = this.familiesForHit(hit);
+    return this.familySummaryForItem(hit);
+  }
+
+  familySummaryForItem(item: FormatFamilyInput | null | undefined): string {
+    const families = this.familiesForItem(item);
     if (!families.length) return '';
     return families.map((f) => this.familyLabel(f)).join(' • ');
   }
 
   hasPhysicalHoldableFormat(hit: AspenSearchHit): boolean {
-    const labels = this.uniqueFormatLabels(hit);
+    return this.hasPhysicalHoldableItemFormat(hit);
+  }
+
+  hasPhysicalHoldableItemFormat(item: FormatFamilyInput | null | undefined): boolean {
+    const labels = this.uniqueFormatLabelsForItem(item);
     if (!labels.length) return false;
 
     return labels.some((label) => {
       const cls = this.classifyFormatLabel(label);
       return cls.physical && (cls.family === 'book' || cls.family === 'music' || cls.family === 'video');
     });
+  }
+
+  private itemListEntries(itemList: FormatFamilyInput['itemList']): any[] {
+    if (!itemList) return [];
+    if (Array.isArray(itemList)) return itemList;
+    if (typeof itemList === 'object') {
+      return Object.entries(itemList).map(([key, value]) => {
+        if (value && typeof value === 'object') return { key, ...value };
+        return { key, name: value };
+      });
+    }
+    return [];
   }
 }

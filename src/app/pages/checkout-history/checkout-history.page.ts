@@ -9,6 +9,7 @@ import { AuthService } from '../../services/auth.service';
 import { HistoryService, type AspenReadingHistoryItem } from '../../services/history.service';
 import { ItemDetailComponent } from '../../components/item-detail/item-detail.component';
 import type { AspenSearchHit } from '../../services/search.service';
+import { FormatFamilyService } from '../../services/format-family.service';
 
 @Component({
   standalone: true,
@@ -34,6 +35,7 @@ export class CheckoutHistoryPage {
     private auth: AuthService,
     private history: HistoryService,
     private modalCtrl: ModalController,
+    private formatFamily: FormatFamilyService,
   ) {}
 
   ionViewWillEnter() {
@@ -140,6 +142,10 @@ export class CheckoutHistoryPage {
 
   authorText(i: AspenReadingHistoryItem): string {
     return (i?.author ?? '').toString().trim();
+  }
+
+  mediaIconNameForHistoryItem(i: AspenReadingHistoryItem): string {
+    return this.formatFamily.iconNameForItem({ format: i?.format, itemList: i?.['itemList'] });
   }
 
   whenText(i: AspenReadingHistoryItem): string {

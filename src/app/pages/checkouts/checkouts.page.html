@@ -51,7 +51,10 @@
       </ion-thumbnail>
 
       <ion-label class="ion-text-wrap">
-        <div class="title">{{ checkoutTitle(c) }}</div>
+        <div class="result-title">
+          <ion-icon [name]="mediaIconNameForCheckout(c)" aria-hidden="true"></ion-icon>
+          <span class="title">{{ checkoutTitle(c) }}</span>
+        </div>
         <div class="sub" *ngIf="checkoutAuthor(c)">{{ checkoutAuthor(c) }}</div>
 
         <ion-note *ngIf="dueText(c)" class="checkout-meta">

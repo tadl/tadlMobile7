@@ -24,7 +24,10 @@
       </ion-thumbnail>
 
       <ion-label class="ion-text-wrap">
-        <div class="title">{{ titleText(i) }}</div>
+        <div class="result-title">
+          <ion-icon [name]="mediaIconNameForHistoryItem(i)" aria-hidden="true"></ion-icon>
+          <span class="title">{{ titleText(i) }}</span>
+        </div>
         <div class="sub" *ngIf="authorText(i)">{{ authorText(i) }}</div>
         <ion-note *ngIf="whenText(i)" class="meta">{{ whenText(i) }}</ion-note>
       </ion-label>
@@ -42,4 +45,3 @@
     </ion-infinite-scroll-content>
   </ion-infinite-scroll>
 </ion-content>
-

@@ -283,13 +283,64 @@ export class CheckoutsService {
   }
 
   private normalizeCheckout(checkout: AspenCheckout): AspenCheckout {
+    const raw: any = checkout ?? {};
     return {
-      ...checkout,
-      coverUrl: this.discoveryUrls.normalize(checkout?.coverUrl),
+      id: Number(raw?.id ?? raw?.itemId ?? 0) || 0,
+      type: (raw?.type ?? 'ils').toString(),
+      source: (raw?.source ?? 'ils').toString(),
+      userId: this.numberOrUndefined(raw?.userId),
+      sourceId: this.numberOrUndefined(raw?.sourceId),
+      recordId: this.numberOrUndefined(raw?.recordId),
+      groupedWorkId: this.stringOrUndefined(raw?.groupedWorkId),
+      title: this.stringOrUndefined(raw?.title),
+      author: this.stringOrUndefined(raw?.author),
+      coverUrl: this.discoveryUrls.normalize(raw?.coverUrl),
+      linkUrl: this.stringOrUndefined(raw?.linkUrl),
+      format: this.compactFormat(raw?.format) as any,
+      itemId: this.numberOrUndefined(raw?.itemId),
+      itemIndex: this.numberOrUndefined(raw?.itemIndex) ?? null,
+      barcode: this.stringOrUndefined(raw?.barcode),
+      checkoutDate: this.numberOrUndefined(raw?.checkoutDate),
+      dueDate: this.numberOrUndefined(raw?.dueDate),
+      renewalDate: this.stringOrUndefined(raw?.renewalDate),
+      canRenew: this.boolOrUndefined(raw?.canRenew),
+      canrenew: this.boolOrUndefined(raw?.canrenew),
+      renewCount: this.numberOrUndefined(raw?.renewCount) ?? null,
+      maxRenewals: this.numberOrUndefined(raw?.maxRenewals) ?? null,
+      renewError: this.stringOrUndefined(raw?.renewError) ?? null,
+      renewMessage: this.stringOrUndefined(raw?.renewMessage),
+      overdue: this.boolOrUndefined(raw?.overdue),
+      daysUntilDue: this.numberOrUndefined(raw?.daysUntilDue),
     };
   }
 
   // ---------- Small helpers ----------
+
+  private stringOrUndefined(value: any): string | undefined {
+    const text = (value ?? '').toString().trim();
+    return text || undefined;
+  }
+
+  private numberOrUndefined(value: any): number | undefined {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : undefined;
+  }
+
+  private boolOrUndefined(value: any): boolean | undefined {
+    if (value === true || value === false) return value;
+    const text = (value ?? '').toString().trim().toLowerCase();
+    if (['true', '1', 'yes'].includes(text)) return true;
+    if (['false', '0', 'no'].includes(text)) return false;
+    return undefined;
+  }
+
+  private compactFormat(value: any): string | string[] | undefined {
+    if (Array.isArray(value)) {
+      const items = value.map((item) => this.stringOrUndefined(item)).filter((item): item is string => !!item);
+      return items.length ? items : undefined;
+    }
+    return this.stringOrUndefined(value);
+  }
 
   private pickPatronId(profile: any): number | null {
     const n = Number(profile?.id);

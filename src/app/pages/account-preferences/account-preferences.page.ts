@@ -538,6 +538,7 @@ export class AccountPreferencesPage {
       if (cached) {
         this.preferences = cached;
       }
+      const hadCachedPreferences = !!cached;
 
       this.prefsService
         .fetchForAccount(this.activeAccountId, this.activeUsername, this.activePassword)
@@ -550,7 +551,9 @@ export class AccountPreferencesPage {
         .subscribe({
           next: (res) => {
             if (!res.token || !res.preferences) {
-              this.toast.presentToast('Could not load account preferences.');
+              if (!hadCachedPreferences) {
+                this.toast.presentToast('Could not load account preferences.');
+              }
               return;
             }
             this.token = (res.token ?? '').toString().trim();
@@ -560,7 +563,11 @@ export class AccountPreferencesPage {
               void this.prefsService.persistTokenForAccount(this.activeAccountId, this.token);
             }
           },
-          error: () => this.toast.presentToast('Could not load account preferences.'),
+          error: () => {
+            if (!hadCachedPreferences) {
+              this.toast.presentToast('Could not load account preferences.');
+            }
+          },
         });
     } catch {
       this.loading = false;

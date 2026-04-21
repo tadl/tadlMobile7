@@ -87,7 +87,7 @@ export class HoldsService {
   }
 
   async setCachedHolds(accountId: string, holds: AspenHold[]): Promise<void> {
-    await this.cache.write(PREF_HOLDS_CACHE_PREFIX + accountId, holds ?? []);
+    await this.cache.write(PREF_HOLDS_CACHE_PREFIX + accountId, (holds ?? []).map((hold) => this.normalizeHold(hold)));
   }
 
   // ---------- Fetch holds ----------
@@ -136,7 +136,7 @@ export class HoldsService {
     const existing = await this.cache.read<AspenHold[]>(cacheKey);
     const current = Array.isArray(existing) ? existing : [];
     const next = current.filter((candidate) => !this.holdMatches(candidate, hold));
-    await this.cache.write(cacheKey, next);
+    await this.cache.write(cacheKey, next.map((hold) => this.normalizeHold(hold)));
   }
 
   async upsertCachedHold(hold: AspenHold): Promise<void> {
@@ -149,11 +149,11 @@ export class HoldsService {
     const next = current.map((candidate) => {
       if (!this.holdMatches(candidate, hold)) return candidate;
       matched = true;
-      return { ...(candidate as any), ...(hold as any) } as AspenHold;
+      return this.normalizeHold({ ...(candidate as any), ...(hold as any) } as AspenHold);
     });
 
-    if (!matched) next.unshift(hold);
-    await this.cache.write(cacheKey, next);
+    if (!matched) next.unshift(this.normalizeHold(hold));
+    await this.cache.write(cacheKey, next.map((candidate) => this.normalizeHold(candidate)));
   }
 
   private normalizeHoldCollection(input: any): AspenHold[] {
@@ -168,9 +168,35 @@ export class HoldsService {
   }
 
   private normalizeHold(hold: AspenHold): AspenHold {
+    const raw: any = hold ?? {};
     return {
-      ...hold,
-      coverUrl: this.discoveryUrls.normalize(hold?.coverUrl),
+      id: Number(raw?.id ?? raw?.cancelId ?? 0) || 0,
+      type: (raw?.type ?? 'ils').toString(),
+      source: (raw?.source ?? 'ils').toString(),
+      recordId: Number(raw?.recordId ?? 0) || undefined,
+      groupedWorkId: this.stringOrUndefined(raw?.groupedWorkId),
+      title: this.stringOrUndefined(raw?.title),
+      author: this.stringOrUndefined(raw?.author),
+      coverUrl: this.discoveryUrls.normalize(raw?.coverUrl),
+      linkUrl: this.stringOrUndefined(raw?.linkUrl),
+      available: this.boolOrUndefined(raw?.available),
+      frozen: this.boolOrUndefined(raw?.frozen),
+      status: this.stringOrUndefined(raw?.status),
+      statusMessage: this.stringOrUndefined(raw?.statusMessage),
+      position: this.numberOrUndefined(raw?.position),
+      holdQueueLength: this.numberOrUndefined(raw?.holdQueueLength),
+      pickupLocationId: this.stringOrUndefined(raw?.pickupLocationId),
+      pickupLocationName: this.stringOrUndefined(raw?.pickupLocationName),
+      currentPickupId: this.stringOrUndefined(raw?.currentPickupId),
+      currentPickupName: this.stringOrUndefined(raw?.currentPickupName),
+      cancelable: this.boolOrUndefined(raw?.cancelable),
+      cancelId: this.numberOrUndefined(raw?.cancelId),
+      canFreeze: this.boolOrUndefined(raw?.canFreeze),
+      freezable: this.boolOrUndefined(raw?.freezable),
+      allowFreezeHolds: this.stringOrUndefined(raw?.allowFreezeHolds),
+      expirationDate: this.numberOrUndefined(raw?.expirationDate),
+      expire: this.numberOrUndefined(raw?.expire),
+      format: this.compactFormat(raw?.format),
     };
   }
 
@@ -461,6 +487,32 @@ export class HoldsService {
   }
 
   // ---------- Small helpers ----------
+
+  private stringOrUndefined(value: any): string | undefined {
+    const text = (value ?? '').toString().trim();
+    return text || undefined;
+  }
+
+  private numberOrUndefined(value: any): number | undefined {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : undefined;
+  }
+
+  private boolOrUndefined(value: any): boolean | undefined {
+    if (value === true || value === false) return value;
+    const text = (value ?? '').toString().trim().toLowerCase();
+    if (['true', '1', 'yes'].includes(text)) return true;
+    if (['false', '0', 'no'].includes(text)) return false;
+    return undefined;
+  }
+
+  private compactFormat(value: any): string | string[] | undefined {
+    if (Array.isArray(value)) {
+      const items = value.map((item) => this.stringOrUndefined(item)).filter((item): item is string => !!item);
+      return items.length ? items : undefined;
+    }
+    return this.stringOrUndefined(value);
+  }
 
   private pickRecordId(hold: AspenHold): number | null {
     const n = Number((hold as any)?.recordId);

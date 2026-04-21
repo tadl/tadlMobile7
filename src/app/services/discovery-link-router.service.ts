@@ -40,7 +40,7 @@ export class DiscoveryLinkRouterService {
 
     if (this.globals.link_mode === 'browser') {
       if (options?.openExternalWhenBrowserMode) {
-        await this.globals.open_external_page(raw);
+        await this.globals.open_page(raw);
       }
       return true;
     }
@@ -212,8 +212,7 @@ export class DiscoveryLinkRouterService {
       const result = raw?.result ?? raw;
       const success = !!result?.success;
       const groupedId = (result?.id ?? '').toString().trim();
-      const hasFormats = result?.formats && typeof result.formats === 'object';
-      if (!success || !groupedId || !hasFormats) return null;
+      if (!success || !groupedId) return null;
       return groupedId;
     } catch {
       return null;

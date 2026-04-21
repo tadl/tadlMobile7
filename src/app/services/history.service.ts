@@ -124,10 +124,51 @@ export class HistoryService {
   }
 
   private normalizeHistoryItem(item: AspenReadingHistoryItem): AspenReadingHistoryItem {
+    const raw: any = item ?? {};
     return {
-      ...item,
-      coverUrl: this.discoveryUrls.normalize(item?.coverUrl),
-      image: this.discoveryUrls.normalize(item?.image),
+      id: this.stringOrUndefined(raw?.id),
+      recordId: this.stringOrUndefined(raw?.recordId),
+      groupedWorkId: this.stringOrUndefined(raw?.groupedWorkId),
+      permanentId: this.stringOrUndefined(raw?.permanentId),
+      groupedWorkPermanentId: this.stringOrUndefined(raw?.groupedWorkPermanentId),
+      title: this.stringOrUndefined(raw?.title),
+      author: this.stringOrUndefined(raw?.author),
+      format: this.compactFormat(raw?.format) as any,
+      coverUrl: this.discoveryUrls.normalize(raw?.coverUrl),
+      image: this.discoveryUrls.normalize(raw?.image),
+      checkout: this.stringOrUndefined(raw?.checkout),
+      checkoutTime: this.numberOrUndefined(raw?.checkoutTime),
+      lastCheckout: this.stringOrUndefined(raw?.lastCheckout),
+      lastCheckoutTime: this.numberOrUndefined(raw?.lastCheckoutTime),
+      checkin: this.stringOrUndefined(raw?.checkin),
+      lastCheckin: this.stringOrUndefined(raw?.lastCheckin),
+      checkedOut: this.boolOrUndefined(raw?.checkedOut),
     };
+  }
+
+  private stringOrUndefined(value: any): string | undefined {
+    const text = (value ?? '').toString().trim();
+    return text || undefined;
+  }
+
+  private numberOrUndefined(value: any): number | undefined {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : undefined;
+  }
+
+  private boolOrUndefined(value: any): boolean | undefined {
+    if (value === true || value === false) return value;
+    const text = (value ?? '').toString().trim().toLowerCase();
+    if (['true', '1', 'yes'].includes(text)) return true;
+    if (['false', '0', 'no'].includes(text)) return false;
+    return undefined;
+  }
+
+  private compactFormat(value: any): string | string[] | undefined {
+    if (Array.isArray(value)) {
+      const items = value.map((item) => this.stringOrUndefined(item)).filter((item): item is string => !!item);
+      return items.length ? items : undefined;
+    }
+    return this.stringOrUndefined(value);
   }
 }

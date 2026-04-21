@@ -50,10 +50,12 @@ export class CacheWarmService {
       const warmed = await this.warmFromBundledEndpoint();
       if (warmed) return;
 
-      await lastValueFrom(this.auth.refreshActiveProfile());
-      await lastValueFrom(this.lists.fetchUserLists());
-      await this.warmPreferencesForActiveAccount();
-      await lastValueFrom(this.locations.getLocations());
+      await Promise.all([
+        this.settle(lastValueFrom(this.auth.refreshActiveProfile())),
+        this.settle(lastValueFrom(this.lists.fetchUserLists())),
+        this.settle(this.warmPreferencesForActiveAccount()),
+        this.settle(lastValueFrom(this.locations.getLocations())),
+      ]);
     });
   }
 
@@ -62,6 +64,14 @@ export class CacheWarmService {
       await fn();
     } catch {
       // warm-up is best-effort by design.
+    }
+  }
+
+  private async settle(promise: Promise<unknown>): Promise<void> {
+    try {
+      await promise;
+    } catch {
+      // Individual warm-up calls should not block the rest of the batch.
     }
   }
 

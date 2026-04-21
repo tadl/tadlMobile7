@@ -9,6 +9,7 @@ interface CacheEnvelope<T> {
 @Injectable({ providedIn: 'root' })
 export class AppCacheService {
   private readonly prefix = 'cache:v1:';
+  private readonly maxValueBytes = 1_000_000;
   private readonly lastSerializedByKey = new Map<string, string>();
 
   async read<T>(key: string): Promise<T | null> {
@@ -50,10 +51,17 @@ export class AppCacheService {
       updatedAt: Date.now(),
       value,
     };
+    const serializedEnvelope = JSON.stringify(envelope);
+
+    if (this.byteLength(serializedEnvelope) > this.maxValueBytes) {
+      await Preferences.remove({ key: cacheKey });
+      this.lastSerializedByKey.set(cacheKey, serializedValue);
+      return;
+    }
 
     await Preferences.set({
       key: cacheKey,
-      value: JSON.stringify(envelope),
+      value: serializedEnvelope,
     });
     this.lastSerializedByKey.set(cacheKey, serializedValue);
   }
@@ -80,5 +88,12 @@ export class AppCacheService {
 
   private cacheKey(key: string): string {
     return `${this.prefix}${key}`;
+  }
+
+  private byteLength(value: string): number {
+    if (typeof TextEncoder !== 'undefined') {
+      return new TextEncoder().encode(value).length;
+    }
+    return value.length;
   }
 }

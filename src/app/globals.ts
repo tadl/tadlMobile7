@@ -41,9 +41,9 @@ export class Globals {
   ) {}
 
   // ---- app identity / toggles ----
-  public app_version: string = '7.0.97';
-  public update_version: string = '20260417';
-  public build_num: string = '04';
+  public app_version: string = '7.0.98';
+  public update_version: string = '20260421';
+  public build_num: string = '00';
 
   public device_info: any;
   public system_color: any = window.matchMedia('(prefers-color-scheme: dark)');

@@ -30,6 +30,12 @@ export interface AspenHold {
 
   position?: number;
   holdQueueLength?: number;
+  create?: number;
+  createTime?: number;
+  availableDate?: number;
+  availableTime?: number;
+  expirationDate?: number;
+  expire?: number;
 
   pickupLocationId?: string;
   pickupLocationName?: string;
@@ -187,6 +193,10 @@ export class HoldsService {
       statusMessage: this.stringOrUndefined(raw?.statusMessage),
       position: this.numberOrUndefined(raw?.position),
       holdQueueLength: this.numberOrUndefined(raw?.holdQueueLength),
+      create: this.numberOrUndefined(raw?.create),
+      createTime: this.numberOrUndefined(raw?.createTime),
+      availableDate: this.numberOrUndefined(raw?.availableDate),
+      availableTime: this.numberOrUndefined(raw?.availableTime),
       pickupLocationId: this.stringOrUndefined(raw?.pickupLocationId),
       pickupLocationName: this.stringOrUndefined(raw?.pickupLocationName),
       currentPickupId: this.stringOrUndefined(raw?.currentPickupId),

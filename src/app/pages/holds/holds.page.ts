@@ -119,18 +119,37 @@ export class HoldsPage {
       else notReady.push(h);
     }
 
+    ready.sort((a, b) => {
+      const byAvailable = this.holdAvailableSortValue(b) - this.holdAvailableSortValue(a);
+      if (byAvailable !== 0) return byAvailable;
+      return this.holdTitle(a).localeCompare(this.holdTitle(b), undefined, { sensitivity: 'base' });
+    });
+
     notReady.sort((a, b) => {
       const aFrozen = this.holdDisplayState(a) === 'frozen';
       const bFrozen = this.holdDisplayState(b) === 'frozen';
       if (aFrozen !== bFrozen) return aFrozen ? 1 : -1;
 
+      const byPlaced = this.holdPlacedSortValue(b) - this.holdPlacedSortValue(a);
+      if (byPlaced !== 0) return byPlaced;
+
       const aPos = Number(a?.position ?? Number.MAX_SAFE_INTEGER);
       const bPos = Number(b?.position ?? Number.MAX_SAFE_INTEGER);
-      return aPos - bPos;
+      if (aPos !== bPos) return aPos - bPos;
+
+      return this.holdTitle(a).localeCompare(this.holdTitle(b), undefined, { sensitivity: 'base' });
     });
 
     this.ilsReady = ready;
     this.ilsNotReady = notReady;
+  }
+
+  private holdPlacedSortValue(h: AspenHold): number {
+    return Number((h as any)?.create ?? (h as any)?.createTime ?? 0);
+  }
+
+  private holdAvailableSortValue(h: AspenHold): number {
+    return Number((h as any)?.availableDate ?? (h as any)?.availableTime ?? (h as any)?.expirationDate ?? (h as any)?.expire ?? 0);
   }
 
   holdTitle(h: AspenHold): string {

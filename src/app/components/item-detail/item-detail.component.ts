@@ -932,6 +932,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
           }
 
           this.holdActionBusy = false;
+          this.needsHoldsRefresh = true;
 
           // optimistic UI update
           (this.hold as any).frozen = true;
@@ -963,6 +964,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
           }
 
           this.holdActionBusy = false;
+          this.needsHoldsRefresh = true;
 
           // optimistic UI update
           (this.hold as any).frozen = false;
@@ -987,6 +989,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     this.holds.verifyHoldFrozenStateAfterDelay(hold, targetFrozen).subscribe({
       next: (verified) => {
         if (verified) {
+          this.needsHoldsRefresh = true;
           this.hold = verified;
           (this.hold as any).statusMessage = targetFrozen ? 'Frozen' : 'Pending';
           (this.hold as any).status = targetFrozen ? 'Frozen' : 'Pending';
@@ -2158,7 +2161,10 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
       payload.groupedWorkId = (this.hit?.key ?? '').toString().trim();
       payload.holdsForItem = [...(this.holdsForItem ?? [])];
     }
-    if (this.needsCheckoutsRefresh) payload.refreshCheckouts = true;
+    if (this.needsCheckoutsRefresh) {
+      payload.refreshCheckouts = true;
+      payload.checkout = this.checkout ? { ...(this.checkout as any) } : null;
+    }
     if (this.needsListRefresh) payload.refreshList = true;
     return Object.keys(payload).length ? payload : undefined;
   }

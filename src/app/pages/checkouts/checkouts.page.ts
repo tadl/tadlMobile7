@@ -354,7 +354,12 @@ export class CheckoutsPage {
     m.onDidDismiss().then((res) => {
       const data = res?.data;
       if (data?.refreshCheckouts) {
-        this.ilsCheckouts = this.sortCheckouts([...(this.ilsCheckouts ?? [])]);
+        const updatedCheckout = data?.checkout as AspenCheckout | null | undefined;
+        if (updatedCheckout) {
+          this.applyCheckoutMutation(updatedCheckout);
+        } else {
+          this.ilsCheckouts = this.sortCheckouts([...(this.ilsCheckouts ?? [])]);
+        }
       }
     });
 
@@ -414,6 +419,27 @@ export class CheckoutsPage {
 
       return this.checkoutTitle(a).localeCompare(this.checkoutTitle(b));
     });
+  }
+
+  private applyCheckoutMutation(updatedCheckout: AspenCheckout): void {
+    const updatedKey = this.checkoutKey(updatedCheckout);
+    if (!updatedKey) {
+      this.ilsCheckouts = this.sortCheckouts([...(this.ilsCheckouts ?? [])]);
+      return;
+    }
+
+    let matched = false;
+    this.ilsCheckouts = this.sortCheckouts(
+      (this.ilsCheckouts ?? []).map((checkout) => {
+        if (this.checkoutKey(checkout) !== updatedKey) return checkout;
+        matched = true;
+        return { ...(checkout as any), ...(updatedCheckout as any) } as AspenCheckout;
+      }),
+    );
+
+    if (!matched) {
+      this.ilsCheckouts = this.sortCheckouts([updatedCheckout, ...(this.ilsCheckouts ?? [])]);
+    }
   }
 
   private dueDateSortValue(c: AspenCheckout): number {

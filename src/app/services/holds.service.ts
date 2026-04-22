@@ -70,6 +70,11 @@ const PREF_HOLDS_CACHE_PREFIX = 'accounts:holds:'; // + accountId
 const SUSPICIOUS_EMPTY_HOLDS_CACHE_THRESHOLD = 10;
 const SUSPICIOUS_EMPTY_HOLDS_RETRY_DELAY_MS = 750;
 const HOLD_MUTATION_VERIFY_DELAY_MS = 3500;
+const HELPER_BACKED_HOLD_MUTATION_METHODS = new Set([
+  'freezeHold',
+  'activateHold',
+  'changeHoldPickUpLocation',
+]);
 
 @Injectable({ providedIn: 'root' })
 export class HoldsService {
@@ -475,8 +480,10 @@ export class HoldsService {
         if (!token && !password) return throwError(() => new Error('missing_auth'));
 
         let params = new HttpParams()
-          .set('method', method)
-          .set('userApiBackend', 'helper');
+          .set('method', method);
+        if (HELPER_BACKED_HOLD_MUTATION_METHODS.has(method)) {
+          params = params.set('userApiBackend', 'helper');
+        }
         for (const [k, v] of Object.entries(extraParams)) {
           params = params.set(k, (v ?? '').toString());
         }

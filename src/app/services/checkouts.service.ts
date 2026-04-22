@@ -235,8 +235,7 @@ export class CheckoutsService {
         return from(this.getOrCreateSessionId()).pipe(
           switchMap(sessionId => {
             let params = new HttpParams()
-              .set('method', method)
-              .set('userApiBackend', 'helper');
+              .set('method', method);
 
             const includeSessionId = options?.includeSessionId !== false;
             const includeUserId = options?.includeUserId !== false;

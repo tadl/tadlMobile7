@@ -417,7 +417,9 @@ export class HoldsPage {
             (h as any).pickupLocationName = this.globals.pickupNameForCode(parsed.code) ?? (h as any).pickupLocationName;
           }
 
-          this.toast.presentToast(res?.message || 'Pickup location updated.');
+          const title = this.holdTitle(h);
+          const pickupName = parsed ? this.globals.pickupNameForCode(parsed.code) : '';
+          this.toast.presentToast(pickupName ? `Pickup location updated for ${title}: ${pickupName}` : `Pickup location updated: ${title}`);
           void this.persistLocalHolds();
         },
         error: () => this.toast.presentToast('Could not change pickup location.'),
@@ -448,7 +450,7 @@ export class HoldsPage {
             holdsReady: wasReady ? -1 : 0,
             holdsRequested: wasReady ? 0 : -1,
           });
-          this.toast.presentToast(res?.message || 'Hold cancelled.');
+          this.toast.presentToast(`Hold cancelled: ${this.holdTitle(h)}`);
 
           const snap = this.auth.snapshot();
           if (snap.isLoggedIn && snap.activeAccountId) {

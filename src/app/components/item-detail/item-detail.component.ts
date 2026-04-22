@@ -768,7 +768,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
           }
 
           this.needsCheckoutsRefresh = true;
-          this.toast.presentToast(res?.message || 'Renewed.');
+          this.toast.presentToast(`Renewed: ${this.itemDisplayTitle()}`);
           this.applyRenewMutationToCheckout(this.checkout, res?.raw);
         },
         error: () => this.toast.presentToast('Could not renew.'),
@@ -1052,7 +1052,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
             holdsRequested: wasReady ? 0 : -1,
           });
 
-          this.toast.presentToast(res?.message || 'Hold cancelled.');
+          this.toast.presentToast(`Hold cancelled: ${this.holdToastTitle(selected)}`);
           this.holds.removeCachedHold(selected).catch(() => {});
 
           // Keep modal open and update local state without re-fetching.
@@ -1130,7 +1130,9 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
           this.syncHoldAcrossItemState(this.hold);
           this.holds.upsertCachedHold(this.hold!).catch(() => {});
 
-          this.toast.presentToast(res?.message || 'Pickup location updated.');
+          const title = this.holdToastTitle(this.hold);
+          const pickupName = parsed ? this.globals.pickupNameForCode(parsed.code) : '';
+          this.toast.presentToast(pickupName ? `Pickup location updated for ${title}: ${pickupName}` : `Pickup location updated: ${title}`);
         },
         error: () => this.toast.presentToast('Could not change pickup location.'),
       });
@@ -1601,7 +1603,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
 
           this.needsHoldsRefresh = true;
           this.auth.adjustActiveProfileCounts({ holds: 1, holdsRequested: 1 });
-          void this.toast.presentHoldPlacedToast(res?.message || 'Hold placed.', () =>
+          void this.toast.presentHoldPlacedToast(`Hold placed: ${this.itemDisplayTitle()}`, () =>
             this.openHoldsPage(),
           );
           this.insertOptimisticPlacedHold(recordId, pickupBranch);

@@ -365,13 +365,14 @@ export class MyListDetailPage {
             author: this.authorText(t) || undefined,
             coverUrl: this.coverUrl(t) || undefined,
           }, recordId, selectedFormatLabel);
+          const title = this.titleText(t) || 'this title';
           if (selectedFormatLabel) {
-            void this.toast.presentHoldPlacedToast(`Hold placed on format ${selectedFormatLabel}.`, () => {
+            void this.toast.presentHoldPlacedToast(`Hold placed: ${title} (${selectedFormatLabel})`, () => {
               void this.router.navigate(['/holds']);
             });
             return;
           }
-          void this.toast.presentHoldPlacedToast(res?.message || 'Hold placed.', () => {
+          void this.toast.presentHoldPlacedToast(`Hold placed: ${title}`, () => {
             void this.router.navigate(['/holds']);
           });
         },

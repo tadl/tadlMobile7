@@ -244,7 +244,7 @@ export class CheckoutsPage {
             this.toast.presentToast(res?.message || 'Could not renew.');
             return;
           }
-          this.refreshAfterRenewal(res?.message || 'Renewed.');
+          this.refreshAfterRenewal(`Renewed: ${this.checkoutTitle(c)}`);
         },
         error: () => this.toast.presentToast('Could not renew.'),
       });

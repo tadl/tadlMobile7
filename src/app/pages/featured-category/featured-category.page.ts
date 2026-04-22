@@ -576,13 +576,14 @@ export class FeaturedCategoryPage {
             author: hit.author,
             coverUrl: hit.coverUrl,
           }, recordId, selectedFormatLabel);
+          const title = (hit?.title ?? '').toString().trim() || 'this title';
           if (selectedFormatLabel) {
-            void this.toast.presentHoldPlacedToast(`Hold placed on format ${selectedFormatLabel}.`, () => {
+            void this.toast.presentHoldPlacedToast(`Hold placed: ${title} (${selectedFormatLabel})`, () => {
               void this.router.navigate(['/holds']);
             });
             return;
           }
-          void this.toast.presentHoldPlacedToast(res?.message || 'Hold placed.', () => {
+          void this.toast.presentHoldPlacedToast(`Hold placed: ${title}`, () => {
             void this.router.navigate(['/holds']);
           });
         },

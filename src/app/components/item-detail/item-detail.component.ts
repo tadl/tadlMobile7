@@ -846,7 +846,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     if (!h) return '';
     const raw = (h?.statusMessage ?? h?.status ?? '').toString().trim();
     if (raw && /ready/i.test(raw)) return this.readyHoldPickupText(h) || raw;
-    return this.holdIsFrozen(h) ? 'Suspended' : 'Active';
+    return this.holdIsFrozen(h) ? 'Frozen' : 'Pending';
   }
 
   holdStatusLabel(hold?: AspenHold | null): string {
@@ -856,7 +856,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   holdStatusClass(hold?: AspenHold | null): string {
     const txt = this.holdStatusText(hold).toLowerCase();
     if (txt.includes('ready')) return 'status-ready';
-    if (txt.includes('suspend')) return 'status-suspended';
+    if (txt.includes('frozen')) return 'status-suspended';
     return 'status-active';
   }
 
@@ -928,20 +928,20 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
         next: (res) => {
           if (!res?.success) {
             this.holdActionBusy = false;
-            this.toast.presentToast('Could not suspend hold.');
+            this.toast.presentToast('Could not freeze hold.');
             return;
           }
 
           this.holdActionBusy = false;
-          this.needsHoldsRefresh = true;
 
           // optimistic UI update
           (this.hold as any).frozen = true;
-          (this.hold as any).statusMessage = 'Suspended';
+          (this.hold as any).statusMessage = 'Frozen';
+          (this.hold as any).status = 'Frozen';
           this.syncHoldAcrossItemState(this.hold);
           this.holds.upsertCachedHold(this.hold!).catch(() => {});
 
-          this.toast.presentToast(`Hold suspended: ${this.holdToastTitle(this.hold)}`);
+          this.toast.presentToast(`Hold frozen: ${this.holdToastTitle(this.hold)}`);
         },
         error: () => this.reconcileHoldMutationAfterUnknownError(this.hold, true),
       });
@@ -959,20 +959,20 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
         next: (res) => {
           if (!res?.success) {
             this.holdActionBusy = false;
-            this.toast.presentToast('Could not activate hold.');
+            this.toast.presentToast('Could not thaw hold.');
             return;
           }
 
           this.holdActionBusy = false;
-          this.needsHoldsRefresh = true;
 
           // optimistic UI update
           (this.hold as any).frozen = false;
-          (this.hold as any).statusMessage = 'Active';
+          (this.hold as any).statusMessage = 'Pending';
+          (this.hold as any).status = 'Pending';
           this.syncHoldAcrossItemState(this.hold);
           this.holds.upsertCachedHold(this.hold!).catch(() => {});
 
-          this.toast.presentToast(`Hold activated: ${this.holdToastTitle(this.hold)}`);
+          this.toast.presentToast(`Hold thawed: ${this.holdToastTitle(this.hold)}`);
         },
         error: () => this.reconcileHoldMutationAfterUnknownError(this.hold, false),
       });
@@ -981,25 +981,26 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   private reconcileHoldMutationAfterUnknownError(hold: AspenHold | null, targetFrozen: boolean) {
     if (!hold) {
       this.holdActionBusy = false;
-      this.toast.presentToast(targetFrozen ? 'Could not suspend hold.' : 'Could not activate hold.');
+      this.toast.presentToast(targetFrozen ? 'Could not freeze hold.' : 'Could not thaw hold.');
       return;
     }
 
     this.holds.verifyHoldFrozenStateAfterDelay(hold, targetFrozen).subscribe({
       next: (verified) => {
         if (verified) {
-          this.needsHoldsRefresh = true;
           this.hold = verified;
+          (this.hold as any).statusMessage = targetFrozen ? 'Frozen' : 'Pending';
+          (this.hold as any).status = targetFrozen ? 'Frozen' : 'Pending';
           this.syncHoldAcrossItemState(verified);
           this.holds.upsertCachedHold(verified).catch(() => {});
-          this.toast.presentToast(targetFrozen ? `Hold suspended: ${this.holdToastTitle(verified)}` : `Hold activated: ${this.holdToastTitle(verified)}`);
+          this.toast.presentToast(targetFrozen ? `Hold frozen: ${this.holdToastTitle(verified)}` : `Hold thawed: ${this.holdToastTitle(verified)}`);
           return;
         }
 
-        this.toast.presentToast(targetFrozen ? 'Could not suspend hold.' : 'Could not activate hold.');
+        this.toast.presentToast(targetFrozen ? 'Could not freeze hold.' : 'Could not thaw hold.');
       },
       error: () => {
-        this.toast.presentToast(targetFrozen ? 'Could not suspend hold.' : 'Could not activate hold.');
+        this.toast.presentToast(targetFrozen ? 'Could not freeze hold.' : 'Could not thaw hold.');
       },
       complete: () => {
         this.holdActionBusy = false;
@@ -1177,10 +1178,10 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
 
     const buttons: ActionSheetButton[] = [];
     if (!isReady && isFrozen) {
-      buttons.push({ text: 'Activate', handler: () => this.thawHold() });
+      buttons.push({ text: 'Thaw', handler: () => this.thawHold() });
     }
     if (!isReady && !isFrozen && this.holdCanFreeze(this.hold)) {
-      buttons.push({ text: 'Suspend', handler: () => this.freezeHold() });
+      buttons.push({ text: 'Freeze', handler: () => this.freezeHold() });
     }
     if (!isReady) {
       buttons.push({ text: 'Change pickup location', handler: () => this.changePickupLocation() });
@@ -1429,7 +1430,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
       groupedWorkId,
       recordId: Number(recordId),
       format: this.selectedFormatForRecordId(recordId),
-      statusMessage: 'Active',
+      statusMessage: 'Pending',
       status: 'Pending',
       available: false,
       currentPickupId: pickupBranch,

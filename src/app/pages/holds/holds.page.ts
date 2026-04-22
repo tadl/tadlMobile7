@@ -212,9 +212,9 @@ export class HoldsPage {
       case 'ready':
         return 'Ready for pickup';
       case 'frozen':
-        return 'Suspended';
+        return 'Frozen';
       default:
-        return 'Active';
+        return 'Pending';
     }
   }
 
@@ -331,7 +331,7 @@ export class HoldsPage {
     if (!this.holdIsReady(h)) {
       if (frozen || this.holdCanFreeze(h)) {
         buttons.push({
-          text: frozen ? 'Activate hold' : 'Suspend hold',
+          text: frozen ? 'Thaw hold' : 'Freeze hold',
           handler: () => this.toggleHoldFrozen(h),
         });
       }
@@ -386,7 +386,7 @@ export class HoldsPage {
         next: (res) => {
           if (!res?.success) {
             this.holdActionBusyKeys.delete(key);
-            this.toast.presentToast(wasFrozen ? 'Could not activate hold.' : 'Could not suspend hold.');
+            this.toast.presentToast(wasFrozen ? 'Could not thaw hold.' : 'Could not freeze hold.');
             return;
           }
 
@@ -394,7 +394,7 @@ export class HoldsPage {
           this.applyHoldFrozenState(h, targetFrozen);
 
           const title = this.holdTitle(h);
-          this.toast.presentToast(targetFrozen ? `Hold suspended: ${title}` : `Hold activated: ${title}`);
+          this.toast.presentToast(targetFrozen ? `Hold frozen: ${title}` : `Hold thawed: ${title}`);
         },
         error: () => this.reconcileHoldToggleAfterUnknownError(h, targetFrozen, key),
       });
@@ -406,14 +406,14 @@ export class HoldsPage {
         if (verified) {
           this.applyHoldFrozenState(verified, targetFrozen);
           const title = this.holdTitle(verified);
-          this.toast.presentToast(targetFrozen ? `Hold suspended: ${title}` : `Hold activated: ${title}`);
+          this.toast.presentToast(targetFrozen ? `Hold frozen: ${title}` : `Hold thawed: ${title}`);
           return;
         }
 
-        this.toast.presentToast(targetFrozen ? 'Could not suspend hold.' : 'Could not activate hold.');
+        this.toast.presentToast(targetFrozen ? 'Could not freeze hold.' : 'Could not thaw hold.');
       },
       error: () => {
-        this.toast.presentToast(targetFrozen ? 'Could not suspend hold.' : 'Could not activate hold.');
+        this.toast.presentToast(targetFrozen ? 'Could not freeze hold.' : 'Could not thaw hold.');
       },
       complete: () => this.holdActionBusyKeys.delete(key),
     });
@@ -597,8 +597,8 @@ export class HoldsPage {
     if (!match) return;
 
     (match as any).frozen = frozen;
-    (match as any).statusMessage = frozen ? 'Suspended' : 'Active';
-    (match as any).status = frozen ? 'Suspended' : 'Pending';
+    (match as any).statusMessage = frozen ? 'Frozen' : 'Pending';
+    (match as any).status = frozen ? 'Frozen' : 'Pending';
 
     this.partitionIlsHolds([...this.ilsReady, ...this.ilsNotReady]);
     void this.persistLocalHolds();

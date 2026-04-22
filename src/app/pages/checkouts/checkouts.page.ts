@@ -352,6 +352,9 @@ export class CheckoutsPage {
   }
 
   private isMelcatCheckout(c: AspenCheckout | null | undefined): boolean {
+    const recordId = ((c as any)?.recordId ?? '').toString().trim();
+    if (recordId) return false;
+
     const grouped = ((c as any)?.groupedWorkId ?? '').toString().trim();
     const cover = ((c as any)?.coverUrl ?? '').toString().trim();
     return !grouped && !cover;

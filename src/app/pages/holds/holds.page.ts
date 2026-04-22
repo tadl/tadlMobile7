@@ -499,6 +499,9 @@ export class HoldsPage {
   }
 
   private isMelcatHold(h: AspenHold | null | undefined): boolean {
+    const recordId = ((h as any)?.recordId ?? '').toString().trim();
+    if (recordId) return false;
+
     const grouped = ((h as any)?.groupedWorkId ?? '').toString().trim();
     const cover = ((h as any)?.coverUrl ?? '').toString().trim();
     return !grouped && !cover;

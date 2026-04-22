@@ -393,9 +393,8 @@ export class HoldsService {
     token: string | null,
     password: string | null,
   ): Observable<PatronHoldsResponse> {
-    let params = new HttpParams()
-      .set('method', 'getPatronHolds')
-      .set('userApiBackend', 'helper');
+    const params = new HttpParams()
+      .set('method', 'getPatronHolds');
 
     const body = this.authBodyFor(snap, token, password);
 

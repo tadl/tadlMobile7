@@ -160,9 +160,8 @@ export class CheckoutsService {
     token: string | null,
     password: string | null,
   ): Observable<any> {
-    let params = new HttpParams()
-      .set('method', 'getPatronCheckedOutItems')
-      .set('userApiBackend', 'helper');
+    const params = new HttpParams()
+      .set('method', 'getPatronCheckedOutItems');
 
     const body = this.authBodyFor(snap, token, password);
 

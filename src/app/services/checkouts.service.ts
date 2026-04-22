@@ -119,7 +119,7 @@ export class CheckoutsService {
   private fetchCheckoutsNetwork(
     snap: ReturnType<AuthService['snapshot']>,
     cacheKey: string,
-    refreshCheckouts = false,
+    _refreshCheckouts = false,
   ): Observable<AspenCheckout[]> {
     return from(Promise.all([
       this.preferences.getCachedToken(snap.activeAccountId!),
@@ -131,13 +131,13 @@ export class CheckoutsService {
         const cachedCheckouts = Array.isArray(cached) ? cached : [];
 
         return this.userApiQueue.run(snap.activeAccountId, () =>
-          this.requestPatronCheckouts(snap, token, password, refreshCheckouts).pipe(
+          this.requestPatronCheckouts(snap, token, password).pipe(
             switchMap((r) => {
               const checkouts = this.checkoutsFromResponse(r);
               if (!this.isSuspiciousEmptyCheckouts(checkouts, cachedCheckouts)) return from([checkouts]);
 
               return timer(SUSPICIOUS_EMPTY_CHECKOUTS_RETRY_DELAY_MS).pipe(
-                switchMap(() => this.requestPatronCheckouts(snap, token, password, true)),
+                switchMap(() => this.requestPatronCheckouts(snap, token, password)),
                 map((retryResponse) => {
                   const retryCheckouts = this.checkoutsFromResponse(retryResponse);
                   return this.isSuspiciousEmptyCheckouts(retryCheckouts, cachedCheckouts)
@@ -159,12 +159,10 @@ export class CheckoutsService {
     snap: ReturnType<AuthService['snapshot']>,
     token: string | null,
     password: string | null,
-    refreshCheckouts: boolean,
   ): Observable<any> {
     let params = new HttpParams()
       .set('method', 'getPatronCheckedOutItems')
       .set('userApiBackend', 'helper');
-    if (refreshCheckouts) params = params.set('refreshCheckouts', 'true');
 
     const body = this.authBodyFor(snap, token, password);
 

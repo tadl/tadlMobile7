@@ -354,7 +354,7 @@ export class HoldsService {
   private fetchHoldsNetwork(
     snap: ReturnType<AuthService['snapshot']>,
     cacheKey: string,
-    refreshHolds = false,
+    _refreshHolds = false,
   ): Observable<AspenHold[]> {
     return from(Promise.all([
       this.preferences.getCachedToken(snap.activeAccountId!),
@@ -366,13 +366,13 @@ export class HoldsService {
         const cachedHolds = Array.isArray(cached) ? cached : [];
 
         return this.userApiQueue.run(snap.activeAccountId, () =>
-          this.requestPatronHolds(snap, token, password, refreshHolds).pipe(
+          this.requestPatronHolds(snap, token, password).pipe(
             switchMap((r) => {
               const holds = this.holdsFromResponse(r);
               if (!this.isSuspiciousEmptyHolds(holds, cachedHolds)) return from([holds]);
 
               return timer(SUSPICIOUS_EMPTY_HOLDS_RETRY_DELAY_MS).pipe(
-                switchMap(() => this.requestPatronHolds(snap, token, password, true)),
+                switchMap(() => this.requestPatronHolds(snap, token, password)),
                 map((retryResponse) => {
                   const retryHolds = this.holdsFromResponse(retryResponse);
                   return this.isSuspiciousEmptyHolds(retryHolds, cachedHolds) ? cachedHolds : retryHolds;
@@ -392,12 +392,10 @@ export class HoldsService {
     snap: ReturnType<AuthService['snapshot']>,
     token: string | null,
     password: string | null,
-    refreshHolds: boolean,
   ): Observable<PatronHoldsResponse> {
     let params = new HttpParams()
       .set('method', 'getPatronHolds')
       .set('userApiBackend', 'helper');
-    if (refreshHolds) params = params.set('refreshHolds', 'true');
 
     const body = this.authBodyFor(snap, token, password);
 

@@ -17,10 +17,20 @@
     <ion-refresher-content></ion-refresher-content>
   </ion-refresher>
 
-  <ion-list *ngIf="hasAnyData" lines="full" class="full-list">
+  <ion-searchbar
+    [value]="query"
+    (ionInput)="setQuery($any($event.target).value)"
+    placeholder="Filter checkouts by title or author"
+    autocomplete="off"
+    autocapitalize="none"
+    spellcheck="false"
+    debounce="0"
+  ></ion-searchbar>
+
+  <ion-list *ngIf="hasAnyVisibleData" lines="full" class="full-list">
     <ion-item class="checkouts-summary-item">
       <ion-label class="ion-text-wrap">
-        {{ ilsCheckouts.length }} item{{ ilsCheckouts.length === 1 ? '' : 's' }} checked out
+        {{ filteredIlsCheckouts.length }} item{{ filteredIlsCheckouts.length === 1 ? '' : 's' }} checked out
       </ion-label>
 
       <ion-button
@@ -40,7 +50,7 @@
       button
       detail="false"
       class="checkout-row"
-      *ngFor="let c of ilsCheckouts; trackBy: trackByCheckout"
+      *ngFor="let c of filteredIlsCheckouts; trackBy: trackByCheckout"
       (click)="openCheckout(c)"
     >
       <ion-thumbnail slot="start" *ngIf="c.coverUrl">
@@ -82,9 +92,9 @@
     </ion-item>
   </ion-list>
 
-  <ion-item *ngIf="!loading && !hasAnyData">
+  <ion-item *ngIf="!loading && !hasAnyVisibleData">
     <ion-label class="ion-text-wrap">
-      No checkouts right now.
+      {{ hasActiveQuery ? 'No checkouts match your filter.' : 'No checkouts right now.' }}
     </ion-label>
   </ion-item>
 </ion-content>

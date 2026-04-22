@@ -17,11 +17,21 @@
     <ion-refresher-content></ion-refresher-content>
   </ion-refresher>
 
+  <ion-searchbar
+    [value]="query"
+    (ionInput)="setQuery($any($event.target).value)"
+    placeholder="Filter holds by title or author"
+    autocomplete="off"
+    autocapitalize="none"
+    spellcheck="false"
+    debounce="0"
+  ></ion-searchbar>
+
   <!-- READY section only if > 0 -->
-  <ng-container *ngIf="ilsReady.length > 0">
+  <ng-container *ngIf="filteredIlsReady.length > 0">
     <div class="section-title">
       Ready for pickup
-      <ion-badge class="count-badge">{{ ilsReady.length }}</ion-badge>
+      <ion-badge class="count-badge">{{ filteredIlsReady.length }}</ion-badge>
     </div>
 
     <ion-list lines="full" class="full-list">
@@ -29,7 +39,7 @@
         button
         detail="false"
         class="hold-row"
-        *ngFor="let h of ilsReady; trackBy: trackByHold"
+        *ngFor="let h of filteredIlsReady; trackBy: trackByHold"
         (click)="openHold(h)"
       >
         <ion-thumbnail slot="start" *ngIf="h.coverUrl">
@@ -65,10 +75,10 @@
     </ion-list>
   </ng-container>
 
-  <ng-container *ngIf="ilsNotReady.length > 0">
+  <ng-container *ngIf="filteredIlsNotReady.length > 0">
     <div class="section-title">
       Not ready
-      <ion-badge class="count-badge">{{ ilsNotReady.length }}</ion-badge>
+      <ion-badge class="count-badge">{{ filteredIlsNotReady.length }}</ion-badge>
     </div>
 
     <ion-list lines="full" class="full-list">
@@ -76,7 +86,7 @@
         button
         detail="false"
         class="hold-row"
-        *ngFor="let h of ilsNotReady; trackBy: trackByHold"
+        *ngFor="let h of filteredIlsNotReady; trackBy: trackByHold"
         (click)="openHold(h)"
       >
         <ion-thumbnail slot="start" *ngIf="h.coverUrl">
@@ -113,9 +123,9 @@
   </ng-container>
 
   <!-- If we have data and both sections empty, show nothing; but if fully empty after load, show a friendly note -->
-  <ion-item *ngIf="!loading && !hasAnyData">
+  <ion-item *ngIf="!loading && !hasAnyVisibleData">
     <ion-label class="ion-text-wrap">
-      No holds right now.
+      {{ hasActiveQuery ? 'No holds match your filter.' : 'No holds right now.' }}
     </ion-label>
   </ion-item>
 </ion-content>

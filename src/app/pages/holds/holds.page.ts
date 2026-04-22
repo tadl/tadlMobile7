@@ -24,6 +24,7 @@ export class HoldsPage {
   hydratedFromCache = false;
   private holdActionBusyKeys = new Set<string>();
   readonly melcatPlaceholderImage = 'assets/images/melcat-logo-square.png';
+  query = '';
 
   // We’re only showing ILS holds here (per your direction)
   ilsReady: AspenHold[] = [];
@@ -142,6 +143,40 @@ export class HoldsPage {
 
     this.ilsReady = ready;
     this.ilsNotReady = notReady;
+  }
+
+  setQuery(value: string | null | undefined) {
+    this.query = (value ?? '').toString();
+  }
+
+  get filteredIlsReady(): AspenHold[] {
+    return this.filterHolds(this.ilsReady);
+  }
+
+  get filteredIlsNotReady(): AspenHold[] {
+    return this.filterHolds(this.ilsNotReady);
+  }
+
+  get hasAnyVisibleData(): boolean {
+    return this.filteredIlsReady.length > 0 || this.filteredIlsNotReady.length > 0;
+  }
+
+  get hasActiveQuery(): boolean {
+    return this.normalizedQuery.length > 0;
+  }
+
+  private get normalizedQuery(): string {
+    return this.query.trim().toLocaleLowerCase();
+  }
+
+  private filterHolds(holds: AspenHold[]): AspenHold[] {
+    const query = this.normalizedQuery;
+    if (!query) return holds;
+
+    return (holds ?? []).filter((hold) => {
+      const haystack = `${this.holdTitle(hold)} ${this.holdAuthor(hold)}`.toLocaleLowerCase();
+      return haystack.includes(query);
+    });
   }
 
   private holdPlacedSortValue(h: AspenHold): number {

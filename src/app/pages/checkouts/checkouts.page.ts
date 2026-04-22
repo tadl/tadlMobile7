@@ -25,6 +25,7 @@ export class CheckoutsPage {
   renewAllBusy = false;
   private renewingKeys = new Set<string>();
   readonly melcatPlaceholderImage = 'assets/images/melcat-logo-square.png';
+  query = '';
 
   ilsCheckouts: AspenCheckout[] = [];
 
@@ -122,6 +123,32 @@ export class CheckoutsPage {
     return c?.canRenew === true || (c as any)?.canrenew === true;
   }
 
+  setQuery(value: string | null | undefined) {
+    this.query = (value ?? '').toString();
+  }
+
+  get filteredIlsCheckouts(): AspenCheckout[] {
+    const query = this.normalizedQuery;
+    if (!query) return this.ilsCheckouts;
+
+    return (this.ilsCheckouts ?? []).filter((checkout) => {
+      const haystack = `${this.checkoutTitle(checkout)} ${this.checkoutAuthor(checkout)}`.toLocaleLowerCase();
+      return haystack.includes(query);
+    });
+  }
+
+  get hasAnyVisibleData(): boolean {
+    return this.filteredIlsCheckouts.length > 0;
+  }
+
+  get hasActiveQuery(): boolean {
+    return this.normalizedQuery.length > 0;
+  }
+
+  private get normalizedQuery(): string {
+    return this.query.trim().toLocaleLowerCase();
+  }
+
   showMelcatPlaceholder(c: AspenCheckout): boolean {
     return !c?.coverUrl && this.isMelcatCheckout(c);
   }
@@ -131,7 +158,7 @@ export class CheckoutsPage {
   }
 
   get renewableCount(): number {
-    return (this.ilsCheckouts ?? []).filter((c) => this.checkoutCanRenew(c)).length;
+    return (this.filteredIlsCheckouts ?? []).filter((c) => this.checkoutCanRenew(c)).length;
   }
 
   get hasRenewableCheckouts(): boolean {

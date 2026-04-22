@@ -1,7 +1,7 @@
 // src/app/services/checkouts.service.ts
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
-import { Observable, catchError, map, switchMap, from, throwError, concat, filter, tap, finalize, shareReplay, timer } from 'rxjs';
+import { Observable, map, switchMap, from, throwError, concat, filter, tap, finalize, shareReplay, timer } from 'rxjs';
 import { Preferences } from '@capacitor/preferences';
 
 import { Globals } from '../globals';
@@ -131,13 +131,13 @@ export class CheckoutsService {
         const cachedCheckouts = Array.isArray(cached) ? cached : [];
 
         return this.userApiQueue.run(snap.activeAccountId, () =>
-          this.requestPatronCheckoutsWithAuthRetry(snap, token, password, refreshCheckouts).pipe(
+          this.requestPatronCheckouts(snap, token, password, refreshCheckouts).pipe(
             switchMap((r) => {
               const checkouts = this.checkoutsFromResponse(r);
               if (!this.isSuspiciousEmptyCheckouts(checkouts, cachedCheckouts)) return from([checkouts]);
 
               return timer(SUSPICIOUS_EMPTY_CHECKOUTS_RETRY_DELAY_MS).pipe(
-                switchMap(() => this.requestPatronCheckoutsWithAuthRetry(snap, token, password, true)),
+                switchMap(() => this.requestPatronCheckouts(snap, token, password, true)),
                 map((retryResponse) => {
                   const retryCheckouts = this.checkoutsFromResponse(retryResponse);
                   return this.isSuspiciousEmptyCheckouts(retryCheckouts, cachedCheckouts)
@@ -166,41 +166,16 @@ export class CheckoutsService {
       .set('userApiBackend', 'helper');
     if (refreshCheckouts) params = params.set('refreshCheckouts', 'true');
 
-    const body = new URLSearchParams();
-    if (token) {
-      body.set('token', token);
-    } else {
-      body.set('username', snap.activeAccountMeta!.username);
-      body.set('password', password ?? '');
-    }
+    const body = this.authBodyFor(snap, token, password);
 
     const headers = new HttpHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' });
 
     return this.http
       .post<any>(`${this.globals.aspen_api_base}/UserAPI`, body.toString(), { params, headers })
-      .pipe(map(raw => raw?.result ?? raw));
-  }
-
-  private requestPatronCheckoutsWithAuthRetry(
-    snap: ReturnType<AuthService['snapshot']>,
-    token: string | null,
-    password: string | null,
-    refreshCheckouts: boolean,
-  ): Observable<any> {
-    return this.requestPatronCheckouts(snap, token, password, refreshCheckouts).pipe(
-      switchMap((response) => {
-        if (!this.shouldRefreshHelperTokenFromResponse(response, token, password)) return from([response]);
-        return this.refreshHelperToken(snap, password).pipe(
-          switchMap((freshToken) => this.requestPatronCheckouts(snap, freshToken, password, refreshCheckouts)),
-        );
-      }),
-      catchError((err) => {
-        if (!this.shouldRefreshHelperTokenFromError(err, token, password)) return throwError(() => err);
-        return this.refreshHelperToken(snap, password).pipe(
-          switchMap((freshToken) => this.requestPatronCheckouts(snap, freshToken, password, refreshCheckouts)),
-        );
-      }),
-    );
+      .pipe(
+        map(raw => raw?.result ?? raw),
+        tap((result) => this.persistReturnedHelperToken(snap, result)),
+      );
   }
 
   private checkoutsFromResponse(r: any): AspenCheckout[] {
@@ -273,20 +248,15 @@ export class CheckoutsService {
               params = params.set(k, (v ?? '').toString());
             }
 
-            const body = new URLSearchParams();
-            if (token) {
-              body.set('token', token);
-            } else {
-              body.set('username', snap.activeAccountMeta!.username);
-              body.set('password', password ?? '');
-            }
+            const body = this.authBodyFor(snap, token, password);
 
             const headers = new HttpHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' });
 
             return this.userApiQueue.run(snap.activeAccountId, () =>
-              this.postUserApiMutationWithAuthRetry(snap, token, password, params, body, headers)
+              this.http.post<any>(`${this.globals.aspen_api_base}/UserAPI`, body.toString(), { params, headers })
                 .pipe(
                   map(raw => raw?.result ?? raw),
+                  tap((r) => this.persistReturnedHelperToken(snap, r)),
                   map((r: any) => {
                     const success = r?.success !== undefined ? !!r.success : true;
                     return {
@@ -304,100 +274,22 @@ export class CheckoutsService {
     );
   }
 
-  private postUserApiMutationWithAuthRetry(
-    snap: ReturnType<AuthService['snapshot']>,
-    token: string | null,
-    password: string | null,
-    params: HttpParams,
-    body: URLSearchParams,
-    headers: HttpHeaders,
-  ): Observable<any> {
-    return this.http
-      .post<any>(`${this.globals.aspen_api_base}/UserAPI`, body.toString(), { params, headers })
-      .pipe(
-        switchMap((raw) => {
-          const result = raw?.result ?? raw;
-          if (!this.shouldRefreshHelperTokenFromResponse(result, token, password)) return from([raw]);
-          return this.refreshHelperToken(snap, password).pipe(
-            switchMap((freshToken) => {
-              const retryBody = this.authBodyFor(snap, freshToken, password);
-              return this.http.post<any>(`${this.globals.aspen_api_base}/UserAPI`, retryBody.toString(), { params, headers });
-            }),
-          );
-        }),
-        catchError((err) => {
-          if (!this.shouldRefreshHelperTokenFromError(err, token, password)) return throwError(() => err);
-          return this.refreshHelperToken(snap, password).pipe(
-            switchMap((freshToken) => {
-              const retryBody = this.authBodyFor(snap, freshToken, password);
-              return this.http.post<any>(`${this.globals.aspen_api_base}/UserAPI`, retryBody.toString(), { params, headers });
-            }),
-          );
-        }),
-      );
-  }
-
-  private refreshHelperToken(
-    snap: ReturnType<AuthService['snapshot']>,
-    password: string | null,
-  ): Observable<string> {
-    if (!snap.activeAccountId || !snap.activeAccountMeta || !password) {
-      return throwError(() => new Error('missing_password'));
-    }
-
-    return this.preferences.fetchForAccount(snap.activeAccountId, snap.activeAccountMeta.username, password).pipe(
-      map((res) => {
-        const token = (res?.token ?? '').toString().trim();
-        if (!token) throw new Error('missing_helper_token');
-        return token;
-      }),
-    );
-  }
-
   private authBodyFor(
     snap: ReturnType<AuthService['snapshot']>,
     token: string | null,
     password: string | null,
   ): URLSearchParams {
     const body = new URLSearchParams();
-    if (token) {
-      body.set('token', token);
-    } else {
-      body.set('username', snap.activeAccountMeta!.username);
-      body.set('password', password ?? '');
-    }
+    if (token) body.set('token', token);
+    body.set('username', snap.activeAccountMeta!.username);
+    if (password) body.set('password', password);
     return body;
   }
 
-  private shouldRefreshHelperTokenFromResponse(response: any, token: string | null, password: string | null): boolean {
-    if (!token || !password || response?.success !== false) return false;
-    const text = this.helperTokenFailureText(response);
-    return text.includes('token') ||
-      text.includes('login') ||
-      text.includes('auth') ||
-      text.includes('not logged') ||
-      text.includes('invalid') ||
-      text.includes('helper request failed') ||
-      text.includes('upstream');
-  }
-
-  private shouldRefreshHelperTokenFromError(err: any, token: string | null, password: string | null): boolean {
-    if (!token || !password) return false;
-    const status = Number(err?.status ?? 0);
-    if ([401, 403, 502].includes(status)) return true;
-    const text = this.helperTokenFailureText(err?.error ?? err);
-    return text.includes('token') || text.includes('login') || text.includes('auth') || text.includes('not logged') || text.includes('invalid');
-  }
-
-  private helperTokenFailureText(value: any): string {
-    return [
-      value?.message,
-      value?.error,
-      value?.detail,
-      value?.result?.message,
-      value?.result?.error,
-      value?.result?.detail,
-    ].map((part) => (part ?? '').toString().toLowerCase()).join(' ');
+  private persistReturnedHelperToken(snap: ReturnType<AuthService['snapshot']>, result: any): void {
+    const token = (result?.helperToken ?? result?.token ?? '').toString().trim();
+    if (!token || !snap.activeAccountId) return;
+    this.preferences.persistTokenForAccount(snap.activeAccountId, token).catch(() => {});
   }
 
   // ---------- Session id ----------

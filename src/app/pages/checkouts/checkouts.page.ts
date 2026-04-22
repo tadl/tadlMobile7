@@ -110,13 +110,9 @@ export class CheckoutsPage {
     const used = Number(c?.renewCount);
     const max = Number(c?.maxRenewals);
 
-    if (Number.isFinite(used) && Number.isFinite(max) && max >= 0) {
-      const left = Math.max(0, max - used);
-      return `Renewals left: ${left}`;
-    }
-    if (Number.isFinite(max) && max >= 0) return `Max renewals: ${max}`;
-    if (Number.isFinite(used) && used >= 0) return `Renewals used: ${used}`;
-    return '';
+    if (!Number.isFinite(max) || max < 0) return '';
+    const left = Number.isFinite(used) && used >= 0 ? Math.max(0, max - used) : max;
+    return `Renewals available: ${left}`;
   }
 
   checkoutCanRenew(c: AspenCheckout): boolean {

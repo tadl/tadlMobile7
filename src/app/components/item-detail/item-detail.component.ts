@@ -733,12 +733,11 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   checkoutRenewInfoText(): string {
     const c: any = this.checkout;
     if (!c) return '';
-    const used = c?.renewCount;
-    const max = c?.maxRenewals;
-    if (used == null && max == null) return '';
-    if (used == null) return `Max renewals: ${max}`;
-    if (max == null) return `Renewals: ${used}`;
-    return `Renewals: ${used} / ${max}`;
+    const used = Number(c?.renewCount);
+    const max = Number(c?.maxRenewals);
+    if (!Number.isFinite(max) || max < 0) return '';
+    const left = Number.isFinite(used) && used >= 0 ? Math.max(0, max - used) : max;
+    return `Renewals available: ${left}`;
   }
 
   checkoutCanRenew(): boolean {

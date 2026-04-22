@@ -132,7 +132,7 @@ export class HoldsService {
     return concat(cached$, network$);
   }
 
-  fetchFreshActiveHolds(refreshHolds = false): Observable<AspenHold[]> {
+  fetchFreshActiveHolds(refreshHolds = true): Observable<AspenHold[]> {
     const snap = this.auth.snapshot();
     if (!snap.isLoggedIn || !snap.activeAccountId || !snap.activeAccountMeta) {
       return from([[]]);
@@ -369,7 +369,7 @@ export class HoldsService {
   private fetchHoldsNetwork(
     snap: ReturnType<AuthService['snapshot']>,
     cacheKey: string,
-    refreshHolds = false,
+    refreshHolds = true,
   ): Observable<AspenHold[]> {
     return from(Promise.all([
       this.preferences.getCachedToken(snap.activeAccountId!),
@@ -407,7 +407,7 @@ export class HoldsService {
     snap: ReturnType<AuthService['snapshot']>,
     token: string | null,
     password: string | null,
-    refreshHolds = false,
+    refreshHolds = true,
   ): Observable<PatronHoldsResponse> {
     let params = new HttpParams()
       .set('method', 'getPatronHolds');

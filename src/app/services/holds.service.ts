@@ -235,6 +235,7 @@ export class HoldsService {
       sublocation: (sublocation ?? '').toString(),
       holdType: 'item',
       recordId: rid,
+      useHoldNotificationPreferences: 'true',
     });
   }
 

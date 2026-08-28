@@ -43,7 +43,7 @@ export class Globals {
   // ---- app identity / toggles ----
   public app_version: string = '7.1.0';
   public update_version: string = '20260422';
-  public build_num: string = '06';
+  public build_num: string = '07';
 
   public device_info: any;
   public system_color: any = window.matchMedia('(prefers-color-scheme: dark)');

@@ -1,4 +1,4 @@
-import { Component, Input, OnDestroy, OnInit } from '@angular/core';
+import { Component, Input, OnDestroy, OnInit, inject } from '@angular/core';
 import { CommonModule, KeyValue } from '@angular/common';
 import {
   IonicModule,
@@ -6,7 +6,7 @@ import {
   AlertController,
   ModalController,
   type ActionSheetButton,
-} from '@ionic/angular';
+} from '@ionic/angular/lazy';
 import { Router } from '@angular/router';
 import { Subscription, forkJoin, of } from 'rxjs';
 import { catchError, finalize } from 'rxjs/operators';
@@ -78,6 +78,21 @@ interface DetailFact {
   imports: [CommonModule, IonicModule],
 })
 export class ItemDetailComponent implements OnInit, OnDestroy {
+  globals = inject(Globals);
+  private toast = inject(ToastService);
+  private auth = inject(AuthService);
+  private items = inject(ItemService);
+  private holds = inject(HoldsService);
+  private checkouts = inject(CheckoutsService);
+  private lists = inject(ListsService);
+  private listLookup = inject(ListLookupService);
+  private accountPreferences = inject(AccountPreferencesService);
+  private discoveryUrls = inject(DiscoveryUrlService);
+  private router = inject(Router);
+  private modalCtrl = inject(ModalController);
+  private actionSheet = inject(ActionSheetController);
+  private alertCtrl = inject(AlertController);
+
   @Input() hit!: AspenSearchHit;
   @Input() listContext: ItemDetailListContext | null = null;
 
@@ -128,23 +143,6 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   /** prevents overlapping checkout-refresh calls */
   private checkoutRefreshBusy = false;
 
-  constructor(
-    public globals: Globals,
-    private toast: ToastService,
-    private auth: AuthService,
-    private items: ItemService,
-    private holds: HoldsService,
-    private checkouts: CheckoutsService,
-    private lists: ListsService,
-    private listLookup: ListLookupService,
-    private accountPreferences: AccountPreferencesService,
-    private discoveryUrls: DiscoveryUrlService,
-    private router: Router,
-    private modalCtrl: ModalController, // ✅ renamed from "modal"
-    private actionSheet: ActionSheetController,
-    private alertCtrl: AlertController,
-  ) {}
-
   ngOnInit() {
     // If opened from Holds/Checkouts pages, we already have the object in hit.raw
     this.hold = this.extractHoldFromHit(this.hit);
@@ -153,7 +151,9 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     void this.refreshAvailableLists();
     void this.seedKnownListMemberships();
     this.authStateSub = this.auth.authState().subscribe((state) => {
-      const accountId = state?.isLoggedIn ? (state?.activeAccountId ?? '').toString().trim() || null : null;
+      const accountId = state?.isLoggedIn
+        ? (state?.activeAccountId ?? '').toString().trim() || null
+        : null;
       if (!accountId) {
         this.availableLists = [];
         this.listsHydrated = false;
@@ -319,10 +319,12 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     const sheet = await this.actionSheet.create({
       header: 'Add to which list?',
       buttons: [
-        ...lists.map((list): ActionSheetButton => ({
-          text: this.actionListLabel(list),
-          handler: () => this.addRecordToList(list, recordId),
-        })),
+        ...lists.map(
+          (list): ActionSheetButton => ({
+            text: this.actionListLabel(list),
+            handler: () => this.addRecordToList(list, recordId),
+          })
+        ),
         { text: 'Close', role: 'cancel' },
       ],
     });
@@ -341,11 +343,13 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     const pickSheet = await this.actionSheet.create({
       header: 'Remove from which list?',
       buttons: [
-        ...lists.map((list): ActionSheetButton => ({
-          text: this.actionListLabel(list),
-          role: 'destructive',
-          handler: () => this.confirmRemoveFromNamedList(list, recordId),
-        })),
+        ...lists.map(
+          (list): ActionSheetButton => ({
+            text: this.actionListLabel(list),
+            role: 'destructive',
+            handler: () => this.confirmRemoveFromNamedList(list, recordId),
+          })
+        ),
         { text: 'Close', role: 'cancel' },
       ],
     });
@@ -360,7 +364,9 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   }
 
   private async getListsForAction(): Promise<AspenUserList[]> {
-    const loggedIn = await this.ensureLoggedInForInteractiveAction('Log in to manage lists');
+    const loggedIn = await this.ensureLoggedInForInteractiveAction(
+      'Log in to manage lists'
+    );
     if (!loggedIn) return [];
 
     try {
@@ -389,13 +395,18 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     const listId = (list?.id ?? '').toString().trim();
     if (!listId || !recordId) return;
     if (this.listActionBusy) return;
-    if (this.listLookup.cachedMembershipsForRecord(recordId).some((m) => m.listId === listId)) {
+    if (
+      this.listLookup
+        .cachedMembershipsForRecord(recordId)
+        .some((m) => m.listId === listId)
+    ) {
       this.toast.presentToast('Already on this list.');
       return;
     }
 
     this.listActionBusy = true;
-    this.lists.addTitlesToList(listId, [recordId])
+    this.lists
+      .addTitlesToList(listId, [recordId])
       .pipe(finalize(() => (this.listActionBusy = false)))
       .subscribe({
         next: (res) => {
@@ -403,8 +414,15 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
             this.toast.presentToast(res?.message || 'Could not add to list.');
             return;
           }
-          this.upsertKnownListMembership(listId, (list?.title ?? '').toString().trim() || 'Untitled list');
-          this.listLookup.upsertMembership(recordId, listId, (list?.title ?? '').toString().trim() || 'Untitled list');
+          this.upsertKnownListMembership(
+            listId,
+            (list?.title ?? '').toString().trim() || 'Untitled list'
+          );
+          this.listLookup.upsertMembership(
+            recordId,
+            listId,
+            (list?.title ?? '').toString().trim() || 'Untitled list'
+          );
           this.needsListRefresh = true;
           this.toast.presentToast(res?.message || 'Added to list.');
         },
@@ -412,7 +430,10 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
       });
   }
 
-  private async confirmRemoveFromNamedList(list: AspenUserList, recordId: string) {
+  private async confirmRemoveFromNamedList(
+    list: AspenUserList,
+    recordId: string
+  ) {
     const listId = (list?.id ?? '').toString().trim();
     const title = (list?.title ?? '').toString().trim() || 'This list';
     if (!listId || !recordId) return;
@@ -437,12 +458,15 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     if (this.listActionBusy) return;
 
     this.listActionBusy = true;
-    this.lists.removeTitlesFromList(listId, [recordId])
+    this.lists
+      .removeTitlesFromList(listId, [recordId])
       .pipe(finalize(() => (this.listActionBusy = false)))
       .subscribe({
         next: (res) => {
           if (!res?.success) {
-            this.toast.presentToast(res?.message || 'Could not remove from list.');
+            this.toast.presentToast(
+              res?.message || 'Could not remove from list.'
+            );
             return;
           }
 
@@ -458,7 +482,8 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   private async seedKnownListMemberships() {
     const listId = (this.listContext?.listId ?? '').toString().trim();
     if (listId) {
-      const listTitle = (this.listContext?.listTitle ?? '').toString().trim() || 'This list';
+      const listTitle =
+        (this.listContext?.listTitle ?? '').toString().trim() || 'This list';
       this.mergeKnownListMemberships([{ listId, listTitle }]);
     }
 
@@ -473,14 +498,17 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
             listId: (x?.listId ?? '').toString().trim(),
             listTitle: (x?.listTitle ?? '').toString().trim() || 'List',
           }))
-          .filter((x) => !!x.listId),
+          .filter((x) => !!x.listId)
       );
     } catch {
       // Best-effort session cache only.
     }
   }
 
-  private orderListsForAction(lists: AspenUserList[], lastListUsed: string | null): AspenUserList[] {
+  private orderListsForAction(
+    lists: AspenUserList[],
+    lastListUsed: string | null
+  ): AspenUserList[] {
     const preferred = (lastListUsed ?? '').toString().trim();
     if (!preferred) return (lists ?? []).slice();
 
@@ -497,19 +525,24 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     const id = (listId ?? '').toString().trim();
     if (!id) return;
 
-    const existing = this.knownListMemberships.find(x => x.listId === id);
+    const existing = this.knownListMemberships.find((x) => x.listId === id);
     if (existing) {
       existing.listTitle = listTitle || existing.listTitle;
       return;
     }
 
-    this.knownListMemberships = [...this.knownListMemberships, { listId: id, listTitle: listTitle || 'List' }];
+    this.knownListMemberships = [
+      ...this.knownListMemberships,
+      { listId: id, listTitle: listTitle || 'List' },
+    ];
   }
 
   private removeKnownListMembership(listId: string) {
     const id = (listId ?? '').toString().trim();
     if (!id) return;
-    this.knownListMemberships = this.knownListMemberships.filter(x => x.listId !== id);
+    this.knownListMemberships = this.knownListMemberships.filter(
+      (x) => x.listId !== id
+    );
   }
 
   private mergeKnownListMemberships(entries: KnownListMembership[]) {
@@ -522,7 +555,10 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     for (const entry of entries ?? []) {
       const listId = (entry?.listId ?? '').toString().trim();
       if (!listId) continue;
-      byId.set(listId, { listId, listTitle: (entry?.listTitle ?? '').toString().trim() || 'List' });
+      byId.set(listId, {
+        listId,
+        listTitle: (entry?.listTitle ?? '').toString().trim() || 'List',
+      });
     }
     this.knownListMemberships = Array.from(byId.values());
   }
@@ -546,7 +582,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
         handler: () =>
           this.confirmRemoveFromNamedList(
             { id: m.listId, title: m.listTitle } as AspenUserList,
-            this.listRecordId(),
+            this.listRecordId()
           ),
       });
     }
@@ -576,7 +612,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
       this.ownedListIds = new Set(
         (lists ?? [])
           .map((x) => (x?.id ?? '').toString().trim())
-          .filter((x) => !!x),
+          .filter((x) => !!x)
       );
       this.ownedListIdsLoaded = true;
     } catch {
@@ -593,9 +629,13 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   private async refreshAvailableLists(): Promise<void> {
     try {
       const lookup = await this.listLookup.lookup([]);
-      this.availableLists = this.orderListsForAction(lookup.lists, lookup.lastListUsed);
+      this.availableLists = this.orderListsForAction(
+        lookup.lists,
+        lookup.lastListUsed
+      );
       this.listsHydrated = true;
-      this.listsAccountId = (this.auth.snapshot()?.activeAccountId ?? '').toString().trim() || null;
+      this.listsAccountId =
+        (this.auth.snapshot()?.activeAccountId ?? '').toString().trim() || null;
     } catch {
       this.availableLists = [];
       this.listsHydrated = false;
@@ -611,7 +651,8 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
 
     if (this.listActionBusy) return;
     this.listActionBusy = true;
-    this.lists.createList(basics.title, basics.description, isPublic)
+    this.lists
+      .createList(basics.title, basics.description, isPublic)
       .pipe(finalize(() => (this.listActionBusy = false)))
       .subscribe({
         next: (res) => {
@@ -627,7 +668,10 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
             public: isPublic,
             numTitles: 0,
           };
-          this.availableLists = this.orderListsForAction([createdList, ...this.availableLists], res.listId);
+          this.availableLists = this.orderListsForAction(
+            [createdList, ...this.availableLists],
+            res.listId
+          );
           this.listLookup.replaceLists(this.availableLists);
           this.addRecordToList(createdList, recordId);
         },
@@ -638,7 +682,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   private async promptListBasics(
     header: string,
     initialTitle = '',
-    initialDescription = '',
+    initialDescription = ''
   ): Promise<{ title: string; description: string } | null> {
     return new Promise(async (resolve) => {
       const alert = await this.alertCtrl.create({
@@ -678,7 +722,9 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     });
   }
 
-  private async promptVisibility(initialPublic: boolean): Promise<boolean | null> {
+  private async promptVisibility(
+    initialPublic: boolean
+  ): Promise<boolean | null> {
     return new Promise(async (resolve) => {
       const alert = await this.alertCtrl.create({
         header: 'List Visibility',
@@ -736,7 +782,8 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     const used = Number(c?.renewCount);
     const max = Number(c?.maxRenewals);
     if (!Number.isFinite(max) || max < 0) return '';
-    const left = Number.isFinite(used) && used >= 0 ? Math.max(0, max - used) : max;
+    const left =
+      Number.isFinite(used) && used >= 0 ? Math.max(0, max - used) : max;
     return `Renewals available: ${left}`;
   }
 
@@ -802,7 +849,10 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     if (!h) return 'Format';
     const f = h?.format;
     if (Array.isArray(f) && f.length) {
-      return f.map((x: any) => (x ?? '').toString().trim()).filter(Boolean).join(', ');
+      return f
+        .map((x: any) => (x ?? '').toString().trim())
+        .filter(Boolean)
+        .join(', ');
     }
     if (typeof f === 'string' && f.trim()) return f.trim();
     return 'Format';
@@ -812,16 +862,28 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     const h: any = hold ?? this.hold;
     if (!h) return false;
     if (h?.frozen === true) return true;
-    const status = (h?.statusMessage ?? h?.status ?? '').toString().toLowerCase();
-    return status.includes('frozen') || status.includes('suspend') || status.includes('suspended');
+    const status = (h?.statusMessage ?? h?.status ?? '')
+      .toString()
+      .toLowerCase();
+    return (
+      status.includes('frozen') ||
+      status.includes('suspend') ||
+      status.includes('suspended')
+    );
   }
 
   holdIsReady(hold?: AspenHold | null): boolean {
     const h: any = hold ?? this.hold;
     if (!h) return false;
     if (h?.available === true) return true;
-    const status = (h?.statusMessage ?? h?.status ?? '').toString().toLowerCase();
-    return status.includes('ready to pickup') || status.includes('ready for pickup') || status.includes('ready');
+    const status = (h?.statusMessage ?? h?.status ?? '')
+      .toString()
+      .toLowerCase();
+    return (
+      status.includes('ready to pickup') ||
+      status.includes('ready for pickup') ||
+      status.includes('ready')
+    );
   }
 
   holdCanFreeze(hold?: AspenHold | null): boolean {
@@ -837,7 +899,12 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     if (!h) return false;
     const holdId = Number(h?.cancelId ?? h?.id ?? 0);
     const recordId = Number(h?.recordId ?? 0);
-    return Number.isFinite(holdId) && holdId > 0 && Number.isFinite(recordId) && recordId > 0;
+    return (
+      Number.isFinite(holdId) &&
+      holdId > 0 &&
+      Number.isFinite(recordId) &&
+      recordId > 0
+    );
   }
 
   holdStatusText(hold?: AspenHold | null): string {
@@ -862,7 +929,9 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   holdPickupText(hold?: AspenHold | null): string {
     const h: any = hold ?? this.hold;
     if (!h) return '';
-    const name = (h?.pickupLocationName ?? h?.currentPickupName ?? '').toString().trim();
+    const name = (h?.pickupLocationName ?? h?.currentPickupName ?? '')
+      .toString()
+      .trim();
     return name ? `Pickup: ${name}` : '';
   }
 
@@ -873,7 +942,8 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     const q = Number(h?.holdQueueLength);
 
     if (Number.isFinite(pos) && pos > 0) {
-      if (Number.isFinite(q) && q > 0) return `Position ${pos} in queue (queue length ${q})`;
+      if (Number.isFinite(q) && q > 0)
+        return `Position ${pos} in queue (queue length ${q})`;
       return `Position ${pos} in queue`;
     }
     if (Number.isFinite(q) && q > 0) return `Queue length ${q}`;
@@ -894,7 +964,9 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   }
 
   private formatDeadlineDate(date: Date): string {
-    const month = new Intl.DateTimeFormat(undefined, { month: 'long' }).format(date);
+    const month = new Intl.DateTimeFormat(undefined, { month: 'long' }).format(
+      date
+    );
     const day = date.getDate();
     return `${month} ${day}${this.ordinalSuffix(day)}`;
   }
@@ -921,30 +993,30 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     if (!this.holdHasManageableIdentity(this.hold)) return;
 
     this.holdActionBusy = true;
-    this.holds
-      .freezeHold(this.hold)
-      .subscribe({
-        next: (res) => {
-          if (!res?.success) {
-            this.holdActionBusy = false;
-            this.toast.presentToast('Could not freeze hold.');
-            return;
-          }
-
+    this.holds.freezeHold(this.hold).subscribe({
+      next: (res) => {
+        if (!res?.success) {
           this.holdActionBusy = false;
-          this.needsHoldsRefresh = true;
+          this.toast.presentToast('Could not freeze hold.');
+          return;
+        }
 
-          // optimistic UI update
-          (this.hold as any).frozen = true;
-          (this.hold as any).statusMessage = 'Frozen';
-          (this.hold as any).status = 'Frozen';
-          this.syncHoldAcrossItemState(this.hold);
-          this.holds.upsertCachedHold(this.hold!).catch(() => {});
+        this.holdActionBusy = false;
+        this.needsHoldsRefresh = true;
 
-          this.toast.presentToast(`Hold frozen: ${this.holdToastTitle(this.hold)}`);
-        },
-        error: () => this.reconcileHoldMutationAfterUnknownError(this.hold, true),
-      });
+        // optimistic UI update
+        (this.hold as any).frozen = true;
+        (this.hold as any).statusMessage = 'Frozen';
+        (this.hold as any).status = 'Frozen';
+        this.syncHoldAcrossItemState(this.hold);
+        this.holds.upsertCachedHold(this.hold!).catch(() => {});
+
+        this.toast.presentToast(
+          `Hold frozen: ${this.holdToastTitle(this.hold)}`
+        );
+      },
+      error: () => this.reconcileHoldMutationAfterUnknownError(this.hold, true),
+    });
   }
 
   thawHold() {
@@ -953,36 +1025,42 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     if (!this.holdHasManageableIdentity(this.hold)) return;
 
     this.holdActionBusy = true;
-    this.holds
-      .thawHold(this.hold)
-      .subscribe({
-        next: (res) => {
-          if (!res?.success) {
-            this.holdActionBusy = false;
-            this.toast.presentToast('Could not thaw hold.');
-            return;
-          }
-
+    this.holds.thawHold(this.hold).subscribe({
+      next: (res) => {
+        if (!res?.success) {
           this.holdActionBusy = false;
-          this.needsHoldsRefresh = true;
+          this.toast.presentToast('Could not thaw hold.');
+          return;
+        }
 
-          // optimistic UI update
-          (this.hold as any).frozen = false;
-          (this.hold as any).statusMessage = 'Pending';
-          (this.hold as any).status = 'Pending';
-          this.syncHoldAcrossItemState(this.hold);
-          this.holds.upsertCachedHold(this.hold!).catch(() => {});
+        this.holdActionBusy = false;
+        this.needsHoldsRefresh = true;
 
-          this.toast.presentToast(`Hold thawed: ${this.holdToastTitle(this.hold)}`);
-        },
-        error: () => this.reconcileHoldMutationAfterUnknownError(this.hold, false),
-      });
+        // optimistic UI update
+        (this.hold as any).frozen = false;
+        (this.hold as any).statusMessage = 'Pending';
+        (this.hold as any).status = 'Pending';
+        this.syncHoldAcrossItemState(this.hold);
+        this.holds.upsertCachedHold(this.hold!).catch(() => {});
+
+        this.toast.presentToast(
+          `Hold thawed: ${this.holdToastTitle(this.hold)}`
+        );
+      },
+      error: () =>
+        this.reconcileHoldMutationAfterUnknownError(this.hold, false),
+    });
   }
 
-  private reconcileHoldMutationAfterUnknownError(hold: AspenHold | null, targetFrozen: boolean) {
+  private reconcileHoldMutationAfterUnknownError(
+    hold: AspenHold | null,
+    targetFrozen: boolean
+  ) {
     if (!hold) {
       this.holdActionBusy = false;
-      this.toast.presentToast(targetFrozen ? 'Could not freeze hold.' : 'Could not thaw hold.');
+      this.toast.presentToast(
+        targetFrozen ? 'Could not freeze hold.' : 'Could not thaw hold.'
+      );
       return;
     }
 
@@ -991,18 +1069,28 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
         if (verified) {
           this.needsHoldsRefresh = true;
           this.hold = verified;
-          (this.hold as any).statusMessage = targetFrozen ? 'Frozen' : 'Pending';
+          (this.hold as any).statusMessage = targetFrozen
+            ? 'Frozen'
+            : 'Pending';
           (this.hold as any).status = targetFrozen ? 'Frozen' : 'Pending';
           this.syncHoldAcrossItemState(verified);
           this.holds.upsertCachedHold(verified).catch(() => {});
-          this.toast.presentToast(targetFrozen ? `Hold frozen: ${this.holdToastTitle(verified)}` : `Hold thawed: ${this.holdToastTitle(verified)}`);
+          this.toast.presentToast(
+            targetFrozen
+              ? `Hold frozen: ${this.holdToastTitle(verified)}`
+              : `Hold thawed: ${this.holdToastTitle(verified)}`
+          );
           return;
         }
 
-        this.toast.presentToast(targetFrozen ? 'Could not freeze hold.' : 'Could not thaw hold.');
+        this.toast.presentToast(
+          targetFrozen ? 'Could not freeze hold.' : 'Could not thaw hold.'
+        );
       },
       error: () => {
-        this.toast.presentToast(targetFrozen ? 'Could not freeze hold.' : 'Could not thaw hold.');
+        this.toast.presentToast(
+          targetFrozen ? 'Could not freeze hold.' : 'Could not thaw hold.'
+        );
       },
       complete: () => {
         this.holdActionBusy = false;
@@ -1033,8 +1121,11 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     if (!this.holdHasManageableIdentity(this.hold)) return;
 
     const selected = this.hold;
-    const canceledHoldId = Number((selected as any)?.cancelId ?? (selected as any)?.id ?? 0) || 0;
-    const canceledRecordId = ((selected as any)?.recordId ?? '').toString().trim();
+    const canceledHoldId =
+      Number((selected as any)?.cancelId ?? (selected as any)?.id ?? 0) || 0;
+    const canceledRecordId = ((selected as any)?.recordId ?? '')
+      .toString()
+      .trim();
 
     this.holdActionBusy = true;
     this.holds
@@ -1055,7 +1146,9 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
             holdsRequested: wasReady ? 0 : -1,
           });
 
-          this.toast.presentToast(`Hold cancelled: ${this.holdToastTitle(selected)}`);
+          this.toast.presentToast(
+            `Hold cancelled: ${this.holdToastTitle(selected)}`
+          );
           this.holds.removeCachedHold(selected).catch(() => {});
 
           // Keep modal open and update local state without re-fetching.
@@ -1079,18 +1172,27 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     if (this.holdIsReady()) return;
     if (!this.holdHasManageableIdentity(this.hold)) return;
 
-    const holdId = Number((this.hold as any)?.cancelId ?? (this.hold as any)?.id ?? 0) || 0;
+    const holdId =
+      Number((this.hold as any)?.cancelId ?? (this.hold as any)?.id ?? 0) || 0;
     if (!holdId) {
       this.toast.presentToast('This hold is missing a hold id.');
       return;
     }
 
-    const currentCode = ((this.hold as any)?.currentPickupId ?? '').toString().trim();
+    const currentCode = ((this.hold as any)?.currentPickupId ?? '')
+      .toString()
+      .trim();
 
-    const buttons: ActionSheetButton[] = this.globals.pickupLocations.map((loc) => ({
-      text: loc.code === currentCode ? `${loc.name} (Current)` : loc.name,
-      handler: () => this.changePickupLocationNow(holdId, this.globals.pickupAspenNewLocation(loc)),
-    }));
+    const buttons: ActionSheetButton[] = this.globals.pickupLocations.map(
+      (loc) => ({
+        text: loc.code === currentCode ? `${loc.name} (Current)` : loc.name,
+        handler: () =>
+          this.changePickupLocationNow(
+            holdId,
+            this.globals.pickupAspenNewLocation(loc)
+          ),
+      })
+    );
 
     buttons.push({ text: 'Close', role: 'cancel' });
 
@@ -1114,7 +1216,9 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (res) => {
           if (!res?.success) {
-            this.toast.presentToast(res?.message || 'Could not change pickup location.');
+            this.toast.presentToast(
+              res?.message || 'Could not change pickup location.'
+            );
             return;
           }
 
@@ -1124,20 +1228,29 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
           if (parsed) {
             (this.hold as any).currentPickupId = parsed.code;
             (this.hold as any).currentPickupName =
-              this.globals.pickupNameForCode(parsed.code) ?? (this.hold as any).currentPickupName;
+              this.globals.pickupNameForCode(parsed.code) ??
+              (this.hold as any).currentPickupName;
 
             (this.hold as any).pickupLocationId = parsed.id;
             (this.hold as any).pickupLocationName =
-              this.globals.pickupNameForCode(parsed.code) ?? (this.hold as any).pickupLocationName;
+              this.globals.pickupNameForCode(parsed.code) ??
+              (this.hold as any).pickupLocationName;
           }
           this.syncHoldAcrossItemState(this.hold);
           this.holds.upsertCachedHold(this.hold!).catch(() => {});
 
           const title = this.holdToastTitle(this.hold);
-          const pickupName = parsed ? this.globals.pickupNameForCode(parsed.code) : '';
-          this.toast.presentToast(pickupName ? `Pickup location updated for ${title}: ${pickupName}` : `Pickup location updated: ${title}`);
+          const pickupName = parsed
+            ? this.globals.pickupNameForCode(parsed.code)
+            : '';
+          this.toast.presentToast(
+            pickupName
+              ? `Pickup location updated for ${title}: ${pickupName}`
+              : `Pickup location updated: ${title}`
+          );
         },
-        error: () => this.toast.presentToast('Could not change pickup location.'),
+        error: () =>
+          this.toast.presentToast('Could not change pickup location.'),
       });
   }
 
@@ -1153,13 +1266,15 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     const picker = await this.actionSheet.create({
       header: 'Choose hold to manage',
       buttons: [
-        ...this.holdsForItem.map((h): ActionSheetButton => ({
-          text: `${this.holdFormatText(h)} • ${this.holdStatusText(h)}`,
-          handler: () => {
-            this.hold = h;
-            void this.openActionsForCurrentHold();
-          },
-        })),
+        ...this.holdsForItem.map(
+          (h): ActionSheetButton => ({
+            text: `${this.holdFormatText(h)} • ${this.holdStatusText(h)}`,
+            handler: () => {
+              this.hold = h;
+              void this.openActionsForCurrentHold();
+            },
+          })
+        ),
         { text: 'Close', role: 'cancel' },
       ],
     });
@@ -1170,8 +1285,14 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     if (!this.hold) return;
     if (!this.holdHasManageableIdentity(this.hold)) {
       const refreshed = await this.refreshHoldForThisItemFromFreshFetch();
-      if (!refreshed || !this.hold || !this.holdHasManageableIdentity(this.hold)) {
-        this.toast.presentToast('Refreshing hold details. Please try again in a moment.');
+      if (
+        !refreshed ||
+        !this.hold ||
+        !this.holdHasManageableIdentity(this.hold)
+      ) {
+        this.toast.presentToast(
+          'Refreshing hold details. Please try again in a moment.'
+        );
         return;
       }
     }
@@ -1186,9 +1307,16 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
       buttons.push({ text: 'Freeze', handler: () => this.freezeHold() });
     }
     if (!isReady) {
-      buttons.push({ text: 'Change pickup location', handler: () => this.changePickupLocation() });
+      buttons.push({
+        text: 'Change pickup location',
+        handler: () => this.changePickupLocation(),
+      });
     }
-    buttons.push({ text: 'Cancel Hold', role: 'destructive', handler: () => this.confirmCancelHold() });
+    buttons.push({
+      text: 'Cancel Hold',
+      role: 'destructive',
+      handler: () => this.confirmCancelHold(),
+    });
     buttons.push({ text: 'Close', role: 'cancel' });
 
     const actions = await this.actionSheet.create({
@@ -1198,7 +1326,9 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     await actions.present();
   }
 
-  private parseAspenNewLocation(s: string): { id: string; code: string } | null {
+  private parseAspenNewLocation(
+    s: string
+  ): { id: string; code: string } | null {
     const raw = (s ?? '').trim();
     if (!raw) return null;
     const parts = raw.split('_');
@@ -1268,8 +1398,13 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
         component: CopyDetailsPopoverComponent,
         componentProps: {
           formatLabel: label,
-          title: (this.work?.title ?? this.hit?.title ?? 'Untitled').toString().trim() || 'Untitled',
-          author: (this.work?.author ?? this.hit?.author ?? '').toString().trim(),
+          title:
+            (this.work?.title ?? this.hit?.title ?? 'Untitled')
+              .toString()
+              .trim() || 'Untitled',
+          author: (this.work?.author ?? this.hit?.author ?? '')
+            .toString()
+            .trim(),
           coverUrl: this.displayCoverUrl,
           details,
         },
@@ -1309,7 +1444,10 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   }
 
   hasProviderDetails(formatLabel: string): boolean {
-    return this.hasProviderStatuses(formatLabel) || this.providerActionsForFormat(formatLabel).length > 0;
+    return (
+      this.hasProviderStatuses(formatLabel) ||
+      this.providerActionsForFormat(formatLabel).length > 0
+    );
   }
 
   showBaseFormatMeta(formatLabel: string): boolean {
@@ -1335,7 +1473,10 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     const deduped: any[] = [];
 
     for (const a of merged) {
-      const key = `${(a?.url ?? '').toString().trim()}|${(a?.title ?? '').toString().trim().toLowerCase()}`;
+      const key = `${(a?.url ?? '').toString().trim()}|${(a?.title ?? '')
+        .toString()
+        .trim()
+        .toLowerCase()}`;
       if (!key || seen.has(key)) continue;
       seen.add(key);
       deduped.push(a);
@@ -1358,7 +1499,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
       const heldIds = new Set(
         this.holdsForItem
           .map((h) => (h?.recordId ?? '').toString().trim())
-          .filter((id) => !!id),
+          .filter((id) => !!id)
       );
       if (idsForFormat.some((id) => heldIds.has(id))) return true;
     }
@@ -1368,7 +1509,10 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     return this.holdsForItem.some((h: any) => {
       const f = h?.format;
       if (Array.isArray(f)) {
-        return f.some((x: any) => this.normalizeFormatValue((x ?? '').toString()) === wantedNorm);
+        return f.some(
+          (x: any) =>
+            this.normalizeFormatValue((x ?? '').toString()) === wantedNorm
+        );
       }
       if (typeof f === 'string') {
         return this.normalizeFormatValue(f) === wantedNorm;
@@ -1383,7 +1527,9 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     const ids = new Set<string>();
     for (const action of actions) {
       if (!this.isIlsHoldAction(action)) continue;
-      const recordId = this.items.extractIlsIdFromOnclick((action?.onclick ?? '').toString());
+      const recordId = this.items.extractIlsIdFromOnclick(
+        (action?.onclick ?? '').toString()
+      );
       if (!recordId) continue;
       ids.add(recordId);
     }
@@ -1391,30 +1537,36 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   }
 
   private normalizeFormatValue(value: string): string {
-    return (value ?? '')
-      .toString()
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, ' ');
+    return (value ?? '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
   }
 
   private syncHoldAcrossItemState(hold: AspenHold | null) {
     if (!hold) return;
-    const holdId = Number((hold as any)?.cancelId ?? (hold as any)?.id ?? 0) || 0;
+    const holdId =
+      Number((hold as any)?.cancelId ?? (hold as any)?.id ?? 0) || 0;
     const recordId = ((hold as any)?.recordId ?? '').toString().trim();
 
     this.holdsForItem = (this.holdsForItem ?? []).map((h) => {
       const hId = Number((h as any)?.cancelId ?? (h as any)?.id ?? 0) || 0;
       const hRecordId = ((h as any)?.recordId ?? '').toString().trim();
-      if (holdId && hId === holdId) return { ...(h as any), ...(hold as any) } as AspenHold;
-      if (!holdId && recordId && hRecordId === recordId) return { ...(h as any), ...(hold as any) } as AspenHold;
+      if (holdId && hId === holdId)
+        return { ...(h as any), ...(hold as any) } as AspenHold;
+      if (!holdId && recordId && hRecordId === recordId)
+        return { ...(h as any), ...(hold as any) } as AspenHold;
       return h;
     });
 
     if (this.hold) {
-      const currentId = Number((this.hold as any)?.cancelId ?? (this.hold as any)?.id ?? 0) || 0;
-      const currentRecordId = ((this.hold as any)?.recordId ?? '').toString().trim();
-      if ((holdId && currentId === holdId) || (!holdId && recordId && currentRecordId === recordId)) {
+      const currentId =
+        Number((this.hold as any)?.cancelId ?? (this.hold as any)?.id ?? 0) ||
+        0;
+      const currentRecordId = ((this.hold as any)?.recordId ?? '')
+        .toString()
+        .trim();
+      if (
+        (holdId && currentId === holdId) ||
+        (!holdId && recordId && currentRecordId === recordId)
+      ) {
         this.hold = { ...(this.hold as any), ...(hold as any) } as AspenHold;
       }
     }
@@ -1454,10 +1606,14 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     if (!recId || !this.work?.formats) return '';
 
     for (const [formatKey, fmt] of Object.entries(this.work.formats)) {
-      const actions = Array.isArray((fmt as any)?.actions) ? (fmt as any).actions : [];
+      const actions = Array.isArray((fmt as any)?.actions)
+        ? (fmt as any).actions
+        : [];
       for (const action of actions) {
         if (!this.isIlsHoldAction(action)) continue;
-        const actionRecId = this.items.extractIlsIdFromOnclick((action?.onclick ?? '').toString());
+        const actionRecId = this.items.extractIlsIdFromOnclick(
+          (action?.onclick ?? '').toString()
+        );
         if (actionRecId !== recId) continue;
         return (fmt as any)?.label?.toString?.().trim?.() || formatKey;
       }
@@ -1484,13 +1640,20 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     return title === 'access online' || title === 'open online';
   }
 
-  formatSortComparator = (a: KeyValue<string, any>, b: KeyValue<string, any>): number => {
+  formatSortComparator = (
+    a: KeyValue<string, any>,
+    b: KeyValue<string, any>
+  ): number => {
     const aDigital = this.isLikelyDigitalFormat(a.key, a.value);
     const bDigital = this.isLikelyDigitalFormat(b.key, b.value);
     if (aDigital !== bDigital) return aDigital ? 1 : -1;
 
-    const aLabel = ((a.value?.label ?? a.key) as string).toString().toLowerCase();
-    const bLabel = ((b.value?.label ?? b.key) as string).toString().toLowerCase();
+    const aLabel = ((a.value?.label ?? a.key) as string)
+      .toString()
+      .toLowerCase();
+    const bLabel = ((b.value?.label ?? b.key) as string)
+      .toString()
+      .toLowerCase();
     return aLabel.localeCompare(bLabel);
   };
 
@@ -1508,7 +1671,9 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
         return;
       }
 
-      const recordId = this.items.extractIlsIdFromOnclick((action?.onclick ?? '').toString());
+      const recordId = this.items.extractIlsIdFromOnclick(
+        (action?.onclick ?? '').toString()
+      );
       if (!recordId) {
         this.toast.presentToast('Could not determine record id for this hold.');
         return;
@@ -1519,7 +1684,9 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     }
 
     if (action?.onclick) {
-      this.toast.presentToast('This action requires the web catalog UI (wiring later).');
+      this.toast.presentToast(
+        'This action requires the web catalog UI (wiring later).'
+      );
       return;
     }
 
@@ -1558,7 +1725,9 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
       const mediaId = mediaMatch[1].trim();
       if (!library || !mediaId) return null;
 
-      return `https://libbyapp.com/library/${encodeURIComponent(library)}/media/${encodeURIComponent(mediaId)}`;
+      return `https://libbyapp.com/library/${encodeURIComponent(
+        library
+      )}/media/${encodeURIComponent(mediaId)}`;
     } catch {
       return null;
     }
@@ -1566,7 +1735,9 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
 
   private async promptAndPlaceHold(recordId: string) {
     if (this.holdActionBusy) return;
-    const loggedIn = await this.ensureLoggedInForInteractiveAction('Log in to place hold');
+    const loggedIn = await this.ensureLoggedInForInteractiveAction(
+      'Log in to place hold'
+    );
     if (!loggedIn) return;
 
     const defaultPickupBranch = await this.defaultPickupBranchCode();
@@ -1576,10 +1747,12 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     }
 
     // Fallback to picker only if no default preference is available.
-    const buttons: ActionSheetButton[] = this.globals.pickupLocations.map((loc) => ({
-      text: loc.name,
-      handler: () => this.placeHoldNow(recordId, loc.code),
-    }));
+    const buttons: ActionSheetButton[] = this.globals.pickupLocations.map(
+      (loc) => ({
+        text: loc.name,
+        handler: () => this.placeHoldNow(recordId, loc.code),
+      })
+    );
     buttons.push({ text: 'Close', role: 'cancel' });
 
     const sheet = await this.actionSheet.create({
@@ -1606,8 +1779,9 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
 
           this.needsHoldsRefresh = true;
           this.auth.adjustActiveProfileCounts({ holds: 1, holdsRequested: 1 });
-          void this.toast.presentHoldPlacedToast(`Hold placed: ${this.itemDisplayTitle()}`, () =>
-            this.openHoldsPage(),
+          void this.toast.presentHoldPlacedToast(
+            `Hold placed: ${this.itemDisplayTitle()}`,
+            () => this.openHoldsPage()
           );
           this.insertOptimisticPlacedHold(recordId, pickupBranch);
           void this.refreshHoldForThisItemFromFreshFetch();
@@ -1623,31 +1797,44 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
       });
   }
 
-  private async retryPlaceHoldAfterLogin(recordId: string, pickupBranch: string): Promise<void> {
-    const ok = await this.ensureLoggedInForInteractiveAction('Log in to place hold');
+  private async retryPlaceHoldAfterLogin(
+    recordId: string,
+    pickupBranch: string
+  ): Promise<void> {
+    const ok = await this.ensureLoggedInForInteractiveAction(
+      'Log in to place hold'
+    );
     if (!ok) return;
     this.placeHoldNow(recordId, pickupBranch);
   }
 
   private async defaultPickupBranchCode(): Promise<string | null> {
-    const activeId = (this.auth.snapshot()?.activeAccountId ?? '').toString().trim();
+    const activeId = (this.auth.snapshot()?.activeAccountId ?? '')
+      .toString()
+      .trim();
     if (!activeId) return null;
 
     try {
-      const prefs = await this.accountPreferences.getCachedPreferences(activeId);
+      const prefs = await this.accountPreferences.getCachedPreferences(
+        activeId
+      );
       const legacyCode = (prefs?.pickup_library ?? '').toString().trim();
       if (!legacyCode) return null;
 
-      const loc = this.globals.pickupLocationFromLegacyPreferencesCode(legacyCode);
+      const loc =
+        this.globals.pickupLocationFromLegacyPreferencesCode(legacyCode);
       return loc?.code ?? null;
     } catch {
       return null;
     }
   }
 
-  private async ensureLoggedInForInteractiveAction(header: string): Promise<boolean> {
+  private async ensureLoggedInForInteractiveAction(
+    header: string
+  ): Promise<boolean> {
     const snap = this.auth.snapshot();
-    if (snap?.isLoggedIn && snap?.activeAccountId && snap?.activeAccountMeta) return true;
+    if (snap?.isLoggedIn && snap?.activeAccountId && snap?.activeAccountMeta)
+      return true;
     const priorModalState = this.globals.modal_open;
     const modal = await this.modalCtrl.create({
       component: SwitchUserModalComponent,
@@ -1658,7 +1845,11 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     this.globals.modal_open = priorModalState || this.globals.modal_open;
 
     const next = this.auth.snapshot();
-    return !!(next?.isLoggedIn && next?.activeAccountId && next?.activeAccountMeta);
+    return !!(
+      next?.isLoggedIn &&
+      next?.activeAccountId &&
+      next?.activeAccountMeta
+    );
   }
 
   private loadHoldingsCountsForWork(work: AspenGroupedWork | null) {
@@ -1692,7 +1883,9 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     if (!requests.length) return;
 
     const calls = requests.map((r) =>
-      this.items.getIlsItemAvailability(r.ilsId).pipe(catchError(() => of(null))),
+      this.items
+        .getIlsItemAvailability(r.ilsId)
+        .pipe(catchError(() => of(null)))
     );
 
     forkJoin(calls).subscribe({
@@ -1714,13 +1907,27 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
               total += arr.length;
 
               for (const raw of arr) {
-                const location = (raw?.libraryDisplayName ?? raw?.location ?? '').toString().trim();
+                const location = (
+                  raw?.libraryDisplayName ??
+                  raw?.location ??
+                  ''
+                )
+                  .toString()
+                  .trim();
                 const callNumber = (raw?.callnumber ?? '').toString().trim();
-                const status = (raw?.statusFull ?? raw?.statusfull ?? raw?.status ?? '').toString().trim();
+                const status = (
+                  raw?.statusFull ??
+                  raw?.statusfull ??
+                  raw?.status ??
+                  ''
+                )
+                  .toString()
+                  .trim();
                 const availabilityRaw = raw?.availability;
-                const availability = availabilityRaw === true
-                  ? true
-                  : availabilityRaw === false
+                const availability =
+                  availabilityRaw === true
+                    ? true
+                    : availabilityRaw === false
                     ? false
                     : null;
                 if (!location && !callNumber && !status) continue;
@@ -1758,7 +1965,8 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
       if (this.requestedVariations.has(requestKey)) continue;
       this.requestedVariations.add(requestKey);
 
-      this.items.getFormatVariations(groupedWorkId, formatKey)
+      this.items
+        .getFormatVariations(groupedWorkId, formatKey)
         .pipe(catchError(() => of(null)))
         .subscribe({
           next: (res) => {
@@ -1783,7 +1991,9 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     }
   }
 
-  private extractDigitalProviderStatuses(result: AspenFormatVariationsResult | null): FormatProviderStatus[] {
+  private extractDigitalProviderStatuses(
+    result: AspenFormatVariationsResult | null
+  ): FormatProviderStatus[] {
     if (!result?.variations || typeof result.variations !== 'object') return [];
 
     const out: FormatProviderStatus[] = [];
@@ -1793,10 +2003,14 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
       const status = variation?.statusIndicator;
       const hasOnlineAvailability = !!status?.isAvailableOnline;
       const isEContent = !!status?.isEContent;
-      const hasProviderActions = Array.isArray(variation?.actions) && variation.actions.some((action: any) => {
-        const url = (action?.url ?? action?.redirectUrl ?? '').toString().trim();
-        return !!url && !this.isPreviewAction(action);
-      });
+      const hasProviderActions =
+        Array.isArray(variation?.actions) &&
+        variation.actions.some((action: any) => {
+          const url = (action?.url ?? action?.redirectUrl ?? '')
+            .toString()
+            .trim();
+          return !!url && !this.isPreviewAction(action);
+        });
       const isDigitalProvider =
         !!source ||
         !!providerLabel ||
@@ -1807,10 +2021,15 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
       if (!isDigitalProvider) continue;
 
       out.push({
-        providerLabel: providerLabel || (variation?.source ?? '').toString().trim() || 'Provider',
+        providerLabel:
+          providerLabel ||
+          (variation?.source ?? '').toString().trim() ||
+          'Provider',
         source,
         groupedStatus: (status?.groupedStatus ?? '').toString().trim(),
-        numCopiesMessage: this.normalizeCopiesMessage((status?.numCopiesMessage ?? '').toString().trim()),
+        numCopiesMessage: this.normalizeCopiesMessage(
+          (status?.numCopiesMessage ?? '').toString().trim()
+        ),
         isAvailable: !!(status?.isAvailableOnline ?? status?.isAvailable),
       });
     }
@@ -1845,11 +2064,23 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   private isLikelyDigitalFormat(formatKey: string, fmt: any): boolean {
     const key = (formatKey ?? '').toString().toLowerCase();
     const category = ((fmt as any)?.category ?? '').toString().toLowerCase();
-    const actions: any[] = Array.isArray((fmt as any)?.actions) ? (fmt as any).actions : [];
+    const actions: any[] = Array.isArray((fmt as any)?.actions)
+      ? (fmt as any).actions
+      : [];
 
     if (key.startsWith('e')) return true;
-    if (key.includes('kindle') || key.includes('ebook') || key.includes('eaudiobook')) return true;
-    if (category.startsWith('e') || category.includes('ebook') || category.includes('stream')) return true;
+    if (
+      key.includes('kindle') ||
+      key.includes('ebook') ||
+      key.includes('eaudiobook')
+    )
+      return true;
+    if (
+      category.startsWith('e') ||
+      category.includes('ebook') ||
+      category.includes('stream')
+    )
+      return true;
 
     for (const a of actions) {
       const title = (a?.title ?? '').toString().toLowerCase();
@@ -1857,20 +2088,27 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
       const url = (a?.url ?? a?.redirectUrl ?? '').toString().toLowerCase();
       if (title.includes('libby') || title.includes('hoopla')) return true;
       if (type.includes('overdrive') || type.includes('hoopla')) return true;
-      if (url.includes('overdrive.com') || url.includes('hoopladigital.com')) return true;
-      if ((title === 'access online' || title === 'open online') && !!url) return true;
+      if (url.includes('overdrive.com') || url.includes('hoopladigital.com'))
+        return true;
+      if ((title === 'access online' || title === 'open online') && !!url)
+        return true;
     }
 
     return false;
   }
 
-  private extractDigitalProviderActions(result: AspenFormatVariationsResult | null): FormatProviderAction[] {
+  private extractDigitalProviderActions(
+    result: AspenFormatVariationsResult | null
+  ): FormatProviderAction[] {
     if (!result?.variations || typeof result.variations !== 'object') return [];
 
     const out: FormatProviderAction[] = [];
     for (const [label, variation] of Object.entries(result.variations)) {
       const source = (variation?.source ?? '').toString().trim().toLowerCase();
-      const providerLabel = (label ?? '').toString().trim() || (variation?.source ?? '').toString().trim() || 'Provider';
+      const providerLabel =
+        (label ?? '').toString().trim() ||
+        (variation?.source ?? '').toString().trim() ||
+        'Provider';
       const status = variation?.statusIndicator;
       const isDigitalProvider =
         !!source ||
@@ -1881,7 +2119,9 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
 
       for (const action of variation?.actions ?? []) {
         if (this.isPreviewAction(action)) continue;
-        const url = (action?.url ?? action?.redirectUrl ?? '').toString().trim();
+        const url = (action?.url ?? action?.redirectUrl ?? '')
+          .toString()
+          .trim();
         if (!url) continue;
 
         let title = (action?.title ?? '').toString().trim() || 'Open';
@@ -1901,20 +2141,25 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     const key = (this.hit?.key ?? '').toString().trim();
     if (!key) return;
 
-    if (!force && (
+    if (
+      !force &&
       this.holdsForItem.length > 0 &&
-      this.holdsForItem.every((h) => String((h as any)?.groupedWorkId ?? '').trim() === key)
-    )) return;
+      this.holdsForItem.every(
+        (h) => String((h as any)?.groupedWorkId ?? '').trim() === key
+      )
+    )
+      return;
 
     if (this.holdRefreshBusy) return;
     this.holdRefreshBusy = true;
 
-    this.holds.fetchActiveHolds()
+    this.holds
+      .fetchActiveHolds()
       .pipe(finalize(() => (this.holdRefreshBusy = false)))
       .subscribe({
         next: (list) => {
           const matches = (list ?? []).filter(
-            (h) => String((h as any)?.groupedWorkId ?? '').trim() === key,
+            (h) => String((h as any)?.groupedWorkId ?? '').trim() === key
           );
           this.holdsForItem = matches;
 
@@ -1925,7 +2170,9 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
 
           const currentId = Number((this.hold as any)?.id ?? 0) || 0;
           const keepCurrent = currentId
-            ? matches.find((h) => (Number((h as any)?.id ?? 0) || 0) === currentId) ?? null
+            ? matches.find(
+                (h) => (Number((h as any)?.id ?? 0) || 0) === currentId
+              ) ?? null
             : null;
           this.hold = keepCurrent ?? matches[0];
         },
@@ -1941,7 +2188,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     try {
       const list = await lastValueFrom(this.holds.fetchFreshActiveHolds());
       const matches = (list ?? []).filter(
-        (h) => String((h as any)?.groupedWorkId ?? '').trim() === key,
+        (h) => String((h as any)?.groupedWorkId ?? '').trim() === key
       );
       this.holdsForItem = matches;
 
@@ -1950,9 +2197,15 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
         return false;
       }
 
-      const currentId = Number((this.hold as any)?.cancelId ?? (this.hold as any)?.id ?? 0) || 0;
+      const currentId =
+        Number((this.hold as any)?.cancelId ?? (this.hold as any)?.id ?? 0) ||
+        0;
       const keepCurrent = currentId
-        ? matches.find((h) => (Number((h as any)?.cancelId ?? (h as any)?.id ?? 0) || 0) === currentId) ?? null
+        ? matches.find(
+            (h) =>
+              (Number((h as any)?.cancelId ?? (h as any)?.id ?? 0) || 0) ===
+              currentId
+          ) ?? null
         : null;
       this.hold = keepCurrent ?? matches[0];
       return true;
@@ -1967,17 +2220,25 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     const key = (this.hit?.key ?? '').toString().trim();
     if (!key) return;
 
-    if (!force && this.checkout && String((this.checkout as any)?.groupedWorkId ?? '').trim() === key) return;
+    if (
+      !force &&
+      this.checkout &&
+      String((this.checkout as any)?.groupedWorkId ?? '').trim() === key
+    )
+      return;
 
     if (this.checkoutRefreshBusy) return;
     this.checkoutRefreshBusy = true;
 
-    this.checkouts.fetchActiveCheckouts()
+    this.checkouts
+      .fetchActiveCheckouts()
       .pipe(finalize(() => (this.checkoutRefreshBusy = false)))
       .subscribe({
         next: (list) => {
           const found =
-            (list ?? []).find(c => String((c as any)?.groupedWorkId ?? '').trim() === key) ?? null;
+            (list ?? []).find(
+              (c) => String((c as any)?.groupedWorkId ?? '').trim() === key
+            ) ?? null;
 
           if (found) this.checkout = found;
           else if (force) this.checkout = null;
@@ -1986,7 +2247,10 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
       });
   }
 
-  private applyRenewMutationToCheckout(checkout: AspenCheckout | null, raw: any) {
+  private applyRenewMutationToCheckout(
+    checkout: AspenCheckout | null,
+    raw: any
+  ) {
     if (!checkout) return;
 
     const parseEpochSeconds = (v: any): number | null => {
@@ -2024,13 +2288,16 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
 
     const max = Number((checkout as any)?.maxRenewals);
     if (Number.isFinite(max) && max >= 0) {
-      (checkout as any).canRenew = Number((checkout as any).renewCount ?? 0) < max;
+      (checkout as any).canRenew =
+        Number((checkout as any).renewCount ?? 0) < max;
     }
 
     this.checkout = { ...(checkout as any) } as AspenCheckout;
   }
 
-  private extractHoldFromHit(hit: AspenSearchHit | null | undefined): AspenHold | null {
+  private extractHoldFromHit(
+    hit: AspenSearchHit | null | undefined
+  ): AspenHold | null {
     const raw: any = hit?.raw;
     if (!raw || typeof raw !== 'object') return null;
 
@@ -2042,12 +2309,14 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     return null;
   }
 
-  private extractCheckoutFromHit(hit: AspenSearchHit | null | undefined): AspenCheckout | null {
+  private extractCheckoutFromHit(
+    hit: AspenSearchHit | null | undefined
+  ): AspenCheckout | null {
     const raw: any = hit?.raw;
     if (!raw || typeof raw !== 'object') return null;
 
     const isIls = raw?.type === 'ils' || raw?.source === 'ils';
-    const hasBarcode = !!(raw?.barcode);
+    const hasBarcode = !!raw?.barcode;
     const hasDue = raw?.dueDate != null;
     const hasRecord = raw?.recordId != null;
 
@@ -2078,13 +2347,18 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   }
 
   private languageText(): string {
-    const raw = (this.work?.language ?? this.hit?.language ?? '').toString().trim();
+    const raw = (this.work?.language ?? this.hit?.language ?? '')
+      .toString()
+      .trim();
     if (!raw) return '';
     return raw.split(',')[0].trim();
   }
 
   private seriesText(): string {
-    const list = (this.work?.series ?? []) as Array<{ seriesTitle?: string; volume?: string }>;
+    const list = (this.work?.series ?? []) as Array<{
+      seriesTitle?: string;
+      volume?: string;
+    }>;
     if (!Array.isArray(list) || !list.length) return '';
     const first = list[0] ?? {};
     const title = (first?.seriesTitle ?? '').toString().trim();
@@ -2131,7 +2405,9 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     return this.discoveryUrls.normalize(value) ?? '';
   }
 
-  private dedupeShelfDetails(details: FormatShelfDetail[]): FormatShelfDetail[] {
+  private dedupeShelfDetails(
+    details: FormatShelfDetail[]
+  ): FormatShelfDetail[] {
     const out: FormatShelfDetail[] = [];
     const seen = new Set<string>();
 

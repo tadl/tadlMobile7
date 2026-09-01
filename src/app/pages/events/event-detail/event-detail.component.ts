@@ -4,7 +4,6 @@ import {
   ChangeDetectionStrategy,
   Component,
   EventEmitter,
-  Inject,
   Input,
   OnChanges,
   OnDestroy,
@@ -12,10 +11,11 @@ import {
   Output,
   SecurityContext,
   SimpleChanges,
+  inject,
 } from '@angular/core';
 import { DomSanitizer } from '@angular/platform-browser';
-import { ActionSheetController, IonicModule } from '@ionic/angular';
-import { ModalController } from '@ionic/angular/standalone';
+import { ActionSheetController, IonicModule } from '@ionic/angular/lazy';
+import { ModalController } from '@ionic/angular';
 import { ActivatedRoute } from '@angular/router';
 import { Capacitor } from '@capacitor/core';
 import { CapacitorCalendar } from '@ebarooni/capacitor-calendar';
@@ -77,6 +77,16 @@ type EventLike = {
   imports: [CommonModule, IonicModule],
 })
 export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
+  private route = inject(ActivatedRoute);
+  private eventsService = inject(EventsService);
+  private modalController = inject(ModalController);
+  private actionSheetController = inject(ActionSheetController);
+  private globals = inject(Globals);
+  private sanitizer = inject(DomSanitizer);
+  private discoveryLinks = inject(DiscoveryLinkRouterService);
+  private toast = inject(ToastService);
+  private document = inject<Document>(DOCUMENT);
+
   /** Provide an event object directly (preferred). */
   @Input() event: EventLike | null = null;
 
@@ -98,18 +108,6 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
   private descriptionHtmlCacheRaw: string | null = null;
   private descriptionHtmlCacheValue = '';
   private sub?: Subscription;
-
-  constructor(
-    private route: ActivatedRoute,
-    private eventsService: EventsService,
-    private modalController: ModalController,
-    private actionSheetController: ActionSheetController,
-    private globals: Globals,
-    private sanitizer: DomSanitizer,
-    private discoveryLinks: DiscoveryLinkRouterService,
-    private toast: ToastService,
-    @Inject(DOCUMENT) private document: Document,
-  ) {}
 
   ngOnInit(): void {
     if (!this.useRouteParam) return;
@@ -155,7 +153,11 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
   async addToCalendar() {
     if (!this.startsAtDate) return;
     const nativeCalendarLabel = this.nativeCalendarLabel();
-    const buttons: Array<{ text: string; role?: 'cancel'; handler?: () => void }> = [];
+    const buttons: Array<{
+      text: string;
+      role?: 'cancel';
+      handler?: () => void;
+    }> = [];
 
     if (nativeCalendarLabel) {
       buttons.push({
@@ -174,7 +176,9 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
         },
       },
       {
-        text: nativeCalendarLabel ? 'Other calendars (.ics)' : 'Calendar file (.ics)',
+        text: nativeCalendarLabel
+          ? 'Other calendars (.ics)'
+          : 'Calendar file (.ics)',
         handler: () => {
           void this.shareCalendarFile();
         },
@@ -182,7 +186,7 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
       {
         text: 'Cancel',
         role: 'cancel',
-      },
+      }
     );
 
     const actionSheet = await this.actionSheetController.create({
@@ -234,24 +238,18 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
    */
   get startsAt(): string | null {
     const e: any = this.event;
-    return (
-      e?.start_date ??
+    return (e?.start_date ??
       e?.startsAt ??
       e?.start ??
       e?.['startTime'] ??
-      null
-    ) as string | null;
+      null) as string | null;
   }
 
   get endsAt(): string | null {
     const e: any = this.event;
-    return (
-      e?.end_date ??
-      e?.endsAt ??
-      e?.end ??
-      e?.['endTime'] ??
-      null
-    ) as string | null;
+    return (e?.end_date ?? e?.endsAt ?? e?.end ?? e?.['endTime'] ?? null) as
+      | string
+      | null;
   }
 
   get startsAtDate(): Date | null {
@@ -263,11 +261,9 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   get location(): string | null {
-    return (
-      this.event?.location ||
-      (this.event as any)?.venue ||
-      null
-    ) as string | null;
+    return (this.event?.location || (this.event as any)?.venue || null) as
+      | string
+      | null;
   }
 
   get displayRoom(): string | null {
@@ -281,9 +277,7 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
     const raw = (this.event?.['age_group'] ?? null) as unknown;
     if (!Array.isArray(raw)) return null;
 
-    const labels = raw
-      .map((v) => `${v ?? ''}`.trim())
-      .filter((v) => !!v);
+    const labels = raw.map((v) => `${v ?? ''}`.trim()).filter((v) => !!v);
 
     if (!labels.length) return null;
     return labels.join(', ');
@@ -294,7 +288,9 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   get externalUrl(): string | null {
-    return (this.event?.registrationUrl || this.event?.url || null) as string | null;
+    return (this.event?.registrationUrl || this.event?.url || null) as
+      | string
+      | null;
   }
 
   get calendarLocation(): string {
@@ -310,11 +306,18 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   get isCancelled(): boolean {
-    return (this.event?.['moderation_state'] ?? '').toString().trim().toLowerCase() === 'cancelled';
+    return (
+      (this.event?.['moderation_state'] ?? '')
+        .toString()
+        .trim()
+        .toLowerCase() === 'cancelled'
+    );
   }
 
   get registrationStartsAtDate(): Date | null {
-    return this.parseRegistrationDate(this.event?.['registration_start'] ?? null);
+    return this.parseRegistrationDate(
+      this.event?.['registration_start'] ?? null
+    );
   }
 
   get registrationEndsAtDate(): Date | null {
@@ -380,7 +383,8 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
 
   get descriptionHtml(): string {
     const raw =
-      (this.event?.description ?? this.event?.summary ?? '')?.toString?.() ?? '';
+      (this.event?.description ?? this.event?.summary ?? '')?.toString?.() ??
+      '';
 
     if (raw === this.descriptionHtmlCacheRaw) {
       return this.descriptionHtmlCacheValue;
@@ -399,7 +403,8 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
     const s = String(value).trim();
     if (!s) return null;
     if (s === '0' || /^0+$/.test(s)) return null;
-    if (s.toLowerCase() === 'null' || s.toLowerCase() === 'undefined') return null;
+    if (s.toLowerCase() === 'null' || s.toLowerCase() === 'undefined')
+      return null;
     if (s === '0000-00-00' || s.startsWith('0000-00-00 ')) return null;
 
     // Normalize common "YYYY-MM-DD HH:MM:SS" -> "YYYY-MM-DDTHH:MM:SS"
@@ -418,7 +423,8 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
     if (!parsed) return null;
 
     // Feed sentinel values for "no registration date" can arrive as epoch-ish strings.
-    if (raw.startsWith('1969-12-31') || raw.startsWith('1970-01-01')) return null;
+    if (raw.startsWith('1969-12-31') || raw.startsWith('1970-01-01'))
+      return null;
     if (parsed.getTime() === 0) return null;
 
     return parsed;
@@ -452,11 +458,14 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
       text: this.title,
       details: this.calendarDetailsText(),
       location: this.calendarLocation,
-      dates: `${this.formatDateForCalendar(start, this.event?.allDay === true)}/${this.formatDateForCalendar(end, this.event?.allDay === true)}`,
+      dates: `${this.formatDateForCalendar(
+        start,
+        this.event?.allDay === true
+      )}/${this.formatDateForCalendar(end, this.event?.allDay === true)}`,
     });
 
     await this.globals.open_external_page(
-      `https://calendar.google.com/calendar/render?${params.toString()}`,
+      `https://calendar.google.com/calendar/render?${params.toString()}`
     );
   }
 
@@ -465,9 +474,12 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
     if (!start) return;
 
     try {
-      const permission = await CapacitorCalendar.requestWriteOnlyCalendarAccess();
+      const permission =
+        await CapacitorCalendar.requestWriteOnlyCalendarAccess();
       if (permission?.result !== 'granted') {
-        this.toast.presentToast('Calendar access was not granted. You can still use the .ics option.');
+        this.toast.presentToast(
+          'Calendar access was not granted. You can still use the .ics option.'
+        );
         return;
       }
 
@@ -482,7 +494,9 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
         url: this.externalUrl || undefined,
       });
     } catch {
-      this.toast.presentToast('Could not open the calendar app. You can still use the .ics option.');
+      this.toast.presentToast(
+        'Could not open the calendar app. You can still use the .ics option.'
+      );
     }
   }
 
@@ -496,7 +510,7 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
     const lines = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
-      'PRODID:-//TADL Mobile//Event Calendar//EN',
+      `PRODID:-//${this.escapeIcsText(this.globals.app_title)}//Event Calendar//EN`,
       'CALSCALE:GREGORIAN',
       'BEGIN:VEVENT',
       `UID:${this.calendarUid(start)}`,
@@ -515,9 +529,13 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
       'END:VCALENDAR',
     ].filter((line) => !!line);
 
-    const file = new File([lines.join('\r\n')], `${this.safeFileName(this.title)}.ics`, {
-      type: 'text/calendar;charset=utf-8',
-    });
+    const file = new File(
+      [lines.join('\r\n')],
+      `${this.safeFileName(this.title)}.ics`,
+      {
+        type: 'text/calendar;charset=utf-8',
+      }
+    );
 
     const nav = navigator as Navigator & {
       canShare?: (data?: ShareData) => boolean;
@@ -568,7 +586,7 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
     // Remove embedded CMS/media assets and any non-content blocks.
     body
       .querySelectorAll(
-        'drupal-media, img, picture, video, audio, iframe, object, embed, script, style',
+        'drupal-media, img, picture, video, audio, iframe, object, embed, script, style'
       )
       .forEach((node) => node.remove());
 
@@ -623,7 +641,8 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
 
   private descriptionPlainText(): string {
     const raw =
-      (this.event?.description ?? this.event?.summary ?? '')?.toString?.() ?? '';
+      (this.event?.description ?? this.event?.summary ?? '')?.toString?.() ??
+      '';
     if (!raw) return '';
 
     const parser = new DOMParser();
@@ -666,7 +685,13 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
       .toString()
       .trim()
       .replace(/\s+/g, '-');
-    return `${base}-${start.getTime()}@tadl.org`;
+    let uidHost = 'library-app.local';
+    try {
+      uidHost = new URL(this.globals.website_base).hostname || uidHost;
+    } catch {
+      // Keep the synthetic fallback host for a malformed profile URL.
+    }
+    return `${base}-${start.getTime()}@${uidHost}`;
   }
 
   private safeFileName(value: string): string {
@@ -732,11 +757,13 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
         typeof svc.getEvent === 'function'
           ? svc.getEvent.bind(svc)
           : typeof svc.getEventById === 'function'
-            ? svc.getEventById.bind(svc)
-            : null;
+          ? svc.getEventById.bind(svc)
+          : null;
 
       if (!fn) {
-        throw new Error('EventsService is missing getEvent(id) / getEventById(id).');
+        throw new Error(
+          'EventsService is missing getEvent(id) / getEventById(id).'
+        );
       }
 
       const result = fn(id);

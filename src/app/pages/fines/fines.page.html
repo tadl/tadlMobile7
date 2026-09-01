@@ -23,37 +23,44 @@
     </ion-card-header>
     <ion-card-content>
       <div class="total-amount">{{ totalOwedText() }}</div>
-      <ion-button *ngIf="canPayFines" expand="block" class="pay-button" (click)="payFines()">
+      @if (canPayFines) {
+      <ion-button expand="block" class="pay-button" (click)="payFines()">
         Pay fines
       </ion-button>
+      }
     </ion-card-content>
   </ion-card>
 
-  <ion-card *ngIf="hasAnyData" class="charges-card">
+  @if (hasAnyData) {
+  <ion-card class="charges-card">
     <ion-card-header>
       <ion-card-title>Charges</ion-card-title>
     </ion-card-header>
     <ion-card-content class="ion-no-padding">
       <ion-list lines="full" class="full-list">
-        <ion-item *ngFor="let fine of fines; trackBy: trackByFine">
+        @for (fine of fines; track trackByFine($index, fine)) {
+        <ion-item>
           <ion-label class="ion-text-wrap">
             <div class="reason">{{ fineReason(fine) }}</div>
-            <ion-note *ngIf="fineDateText(fine)" class="meta">{{ fineDateText(fine) }}</ion-note>
-            <ion-note *ngIf="fineOriginalAmountText(fine)" class="meta">
+            @if (fineDateText(fine)) {
+            <ion-note class="meta">{{ fineDateText(fine) }}</ion-note>
+            } @if (fineOriginalAmountText(fine)) {
+            <ion-note class="meta">
               Original amount: {{ fineOriginalAmountText(fine) }}
             </ion-note>
-            <ion-note *ngIf="fineMessageText(fine)" class="message">{{ fineMessageText(fine) }}</ion-note>
+            } @if (fineMessageText(fine)) {
+            <ion-note class="message">{{ fineMessageText(fine) }}</ion-note>
+            }
           </ion-label>
-
           <div slot="end" class="amount">{{ fineAmountText(fine) }}</div>
         </ion-item>
+        }
       </ion-list>
     </ion-card-content>
   </ion-card>
-
-  <ion-item *ngIf="!loading && !hasAnyData">
-    <ion-label class="ion-text-wrap">
-      No fines right now.
-    </ion-label>
+  } @if (!loading && !hasAnyData) {
+  <ion-item>
+    <ion-label class="ion-text-wrap"> No fines right now. </ion-label>
   </ion-item>
+  }
 </ion-content>

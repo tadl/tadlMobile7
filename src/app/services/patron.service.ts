@@ -1,5 +1,5 @@
 // src/app/services/patron.service.ts
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams, HttpHeaders } from '@angular/common/http';
 import { Observable, finalize, map, shareReplay } from 'rxjs';
 import { Globals } from '../globals';
@@ -21,13 +21,14 @@ export interface PatronBadges {
 
 @Injectable({ providedIn: 'root' })
 export class PatronService {
-  private profileFetches = new Map<string, Observable<AspenPatronProfileResponse>>();
+  private http = inject(HttpClient);
+  private globals = inject(Globals);
+  private userApiQueue = inject(UserApiQueueService);
 
-  constructor(
-    private http: HttpClient,
-    private globals: Globals,
-    private userApiQueue: UserApiQueueService,
-  ) {}
+  private profileFetches = new Map<
+    string,
+    Observable<AspenPatronProfileResponse>
+  >();
 
   /**
    * Aspen LiDA-style:
@@ -36,7 +37,11 @@ export class PatronService {
    *
    * Your proxy currently requires api=tadl-prod for ILS requests, so we include it via globals.
    */
-  getPatronProfile(username: string, password: string, queueKey?: string | null): Observable<AspenPatronProfileResponse> {
+  getPatronProfile(
+    username: string,
+    password: string,
+    queueKey?: string | null
+  ): Observable<AspenPatronProfileResponse> {
     const key = `${(username ?? '').trim()}\u0000${(password ?? '').trim()}`;
     const existing = this.profileFetches.get(key);
     if (existing) return existing;
@@ -58,10 +63,14 @@ export class PatronService {
 
     const request$ = this.userApiQueue
       .run(queueKey || `user:${(username ?? '').trim()}`, () =>
-        this.http.post<any>(`${this.globals.aspen_api_base}/UserAPI`, body.toString(), { params, headers }),
+        this.http.post<any>(
+          `${this.globals.aspen_api_base}/UserAPI`,
+          body.toString(),
+          { params, headers }
+        )
       )
       .pipe(
-        map(raw => {
+        map((raw) => {
           const r = raw?.result ?? raw;
           return {
             success: !!r?.success,
@@ -72,7 +81,7 @@ export class PatronService {
         finalize(() => {
           this.profileFetches.delete(key);
         }),
-        shareReplay({ bufferSize: 1, refCount: true }),
+        shareReplay({ bufferSize: 1, refCount: true })
       );
 
     this.profileFetches.set(key, request$);
@@ -81,12 +90,22 @@ export class PatronService {
 
   badgesFromProfile(profile: any): PatronBadges {
     // Prefer the aggregate counts (these match what you want in the menu)
-    const checkouts = this.asNumber(profile?.numCheckedOut) ?? this.asNumber(profile?.numCheckedOutIls) ?? 0;
-    const holds = this.asNumber(profile?.numHolds) ?? this.asNumber(profile?.numHoldsIls) ?? 0;
-    const ready = this.asNumber(profile?.numHoldsAvailable) ?? this.asNumber(profile?.numHoldsAvailableIls) ?? 0;
+    const checkouts =
+      this.asNumber(profile?.numCheckedOut) ??
+      this.asNumber(profile?.numCheckedOutIls) ??
+      0;
+    const holds =
+      this.asNumber(profile?.numHolds) ??
+      this.asNumber(profile?.numHoldsIls) ??
+      0;
+    const ready =
+      this.asNumber(profile?.numHoldsAvailable) ??
+      this.asNumber(profile?.numHoldsAvailableIls) ??
+      0;
 
     const finesVal = this.asNumber(profile?.finesVal) ?? 0;
-    const finesText = typeof profile?.fines === 'string' ? profile.fines : undefined;
+    const finesText =
+      typeof profile?.fines === 'string' ? profile.fines : undefined;
 
     return { checkouts, holds, ready, finesVal, finesText };
   }

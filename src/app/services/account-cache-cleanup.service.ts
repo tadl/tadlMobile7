@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 import { AccountStoreService } from './account-store.service';
 import { AppCacheService } from './app-cache.service';
@@ -6,11 +6,9 @@ import { ListLookupService } from './list-lookup.service';
 
 @Injectable({ providedIn: 'root' })
 export class AccountCacheCleanupService {
-  constructor(
-    private accounts: AccountStoreService,
-    private cache: AppCacheService,
-    private listLookup: ListLookupService,
-  ) {}
+  private accounts = inject(AccountStoreService);
+  private cache = inject(AppCacheService);
+  private listLookup = inject(ListLookupService);
 
   async clearForAccount(accountId: string | null | undefined): Promise<void> {
     const id = (accountId ?? '').toString().trim();

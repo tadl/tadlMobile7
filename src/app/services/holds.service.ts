@@ -1,7 +1,19 @@
 // src/app/services/holds.service.ts
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
-import { Observable, map, switchMap, from, throwError, concat, filter, tap, finalize, shareReplay, timer } from 'rxjs';
+import {
+  Observable,
+  map,
+  switchMap,
+  from,
+  throwError,
+  concat,
+  filter,
+  tap,
+  finalize,
+  shareReplay,
+  timer,
+} from 'rxjs';
 
 import { Globals } from '../globals';
 import { AuthService } from './auth.service';
@@ -78,29 +90,34 @@ const HELPER_BACKED_HOLD_MUTATION_METHODS = new Set([
 
 @Injectable({ providedIn: 'root' })
 export class HoldsService {
-  private activeFetch$: Observable<AspenHold[]> | null = null;
+  private http = inject(HttpClient);
+  private globals = inject(Globals);
+  private auth = inject(AuthService);
+  private accounts = inject(AccountStoreService);
+  private cache = inject(AppCacheService);
+  private discoveryUrls = inject(DiscoveryUrlService);
+  private userApiQueue = inject(UserApiQueueService);
+  private preferences = inject(AccountPreferencesService);
 
-  constructor(
-    private http: HttpClient,
-    private globals: Globals,
-    private auth: AuthService,
-    private accounts: AccountStoreService,
-    private cache: AppCacheService,
-    private discoveryUrls: DiscoveryUrlService,
-    private userApiQueue: UserApiQueueService,
-    private preferences: AccountPreferencesService,
-  ) {}
+  private activeFetch$: Observable<AspenHold[]> | null = null;
 
   // ---------- Cache ----------
 
-  async getCachedHolds(accountId: string): Promise<{ holds: AspenHold[] } | null> {
-    const holds = await this.cache.read<AspenHold[]>(PREF_HOLDS_CACHE_PREFIX + accountId);
+  async getCachedHolds(
+    accountId: string
+  ): Promise<{ holds: AspenHold[] } | null> {
+    const holds = await this.cache.read<AspenHold[]>(
+      PREF_HOLDS_CACHE_PREFIX + accountId
+    );
     if (!Array.isArray(holds)) return null;
     return { holds };
   }
 
   async setCachedHolds(accountId: string, holds: AspenHold[]): Promise<void> {
-    await this.cache.write(PREF_HOLDS_CACHE_PREFIX + accountId, (holds ?? []).map((hold) => this.normalizeHold(hold)));
+    await this.cache.write(
+      PREF_HOLDS_CACHE_PREFIX + accountId,
+      (holds ?? []).map((hold) => this.normalizeHold(hold))
+    );
   }
 
   // ---------- Fetch holds ----------
@@ -117,15 +134,17 @@ export class HoldsService {
 
     const cacheKey = PREF_HOLDS_CACHE_PREFIX + snap.activeAccountId;
     const cached$ = from(this.cache.read<AspenHold[]>(cacheKey)).pipe(
-      filter((v): v is AspenHold[] => Array.isArray(v)),
+      filter((v): v is AspenHold[] => Array.isArray(v))
     );
 
-    const network$ = this.activeFetch$ ?? this.fetchHoldsNetwork(snap, cacheKey).pipe(
-      finalize(() => {
-        this.activeFetch$ = null;
-      }),
-      shareReplay({ bufferSize: 1, refCount: true }),
-    );
+    const network$ =
+      this.activeFetch$ ??
+      this.fetchHoldsNetwork(snap, cacheKey).pipe(
+        finalize(() => {
+          this.activeFetch$ = null;
+        }),
+        shareReplay({ bufferSize: 1, refCount: true })
+      );
 
     this.activeFetch$ = network$;
 
@@ -148,8 +167,13 @@ export class HoldsService {
 
     const existing = await this.cache.read<AspenHold[]>(cacheKey);
     const current = Array.isArray(existing) ? existing : [];
-    const next = current.filter((candidate) => !this.holdMatches(candidate, hold));
-    await this.cache.write(cacheKey, next.map((hold) => this.normalizeHold(hold)));
+    const next = current.filter(
+      (candidate) => !this.holdMatches(candidate, hold)
+    );
+    await this.cache.write(
+      cacheKey,
+      next.map((hold) => this.normalizeHold(hold))
+    );
   }
 
   async upsertCachedHold(hold: AspenHold): Promise<void> {
@@ -162,11 +186,17 @@ export class HoldsService {
     const next = current.map((candidate) => {
       if (!this.holdMatches(candidate, hold)) return candidate;
       matched = true;
-      return this.normalizeHold({ ...(candidate as any), ...(hold as any) } as AspenHold);
+      return this.normalizeHold({
+        ...(candidate as any),
+        ...(hold as any),
+      } as AspenHold);
     });
 
     if (!matched) next.unshift(this.normalizeHold(hold));
-    await this.cache.write(cacheKey, next.map((candidate) => this.normalizeHold(candidate)));
+    await this.cache.write(
+      cacheKey,
+      next.map((candidate) => this.normalizeHold(candidate))
+    );
   }
 
   private normalizeHoldCollection(input: any): AspenHold[] {
@@ -223,7 +253,11 @@ export class HoldsService {
    * Place an item-level hold for the active user.
    * Aspen/LiDA does this by calling UserAPI "placeHold" with holdType=item.
    */
-  placeHold(recordId: string, pickupBranch: string, sublocation: string | null): Observable<AspenMutationResult> {
+  placeHold(
+    recordId: string,
+    pickupBranch: string,
+    sublocation: string | null
+  ): Observable<AspenMutationResult> {
     const rid = (recordId ?? '').toString().trim();
     const pb = (pickupBranch ?? '').toString().trim();
     if (!rid) return throwError(() => new Error('missing_record_id'));
@@ -247,7 +281,10 @@ export class HoldsService {
    * IMPORTANT: This now preserves “indefinite” freezes by only sending
    * reactivationDate when the caller supplies a date.
    */
-  freezeHold(hold: AspenHold, selectedReactivationDate?: Date | string | null): Observable<AspenMutationResult> {
+  freezeHold(
+    hold: AspenHold,
+    selectedReactivationDate?: Date | string | null
+  ): Observable<AspenMutationResult> {
     const holdId = this.pickHoldIdForFreeze(hold);
     if (!holdId) return throwError(() => new Error('missing_hold_id'));
     const recordId = this.pickRecordId(hold);
@@ -265,7 +302,9 @@ export class HoldsService {
       itemSource: this.pickItemSource(hold),
     };
 
-    const reactivationDate = this.computeReactivationDate(selectedReactivationDate);
+    const reactivationDate = this.computeReactivationDate(
+      selectedReactivationDate
+    );
     if (reactivationDate) {
       payload.reactivationDate = reactivationDate;
     }
@@ -297,7 +336,7 @@ export class HoldsService {
   verifyHoldFrozenStateAfterDelay(
     hold: AspenHold,
     expectedFrozen: boolean,
-    delayMs = HOLD_MUTATION_VERIFY_DELAY_MS,
+    delayMs = HOLD_MUTATION_VERIFY_DELAY_MS
   ): Observable<AspenHold | null> {
     return timer(delayMs).pipe(
       switchMap(() => this.fetchFreshActiveHolds(true)),
@@ -305,7 +344,7 @@ export class HoldsService {
         const match = this.findMatchingHold(holds ?? [], hold);
         if (!match) return null;
         return this.holdLooksFrozen(match) === expectedFrozen ? match : null;
-      }),
+      })
     );
   }
 
@@ -331,7 +370,7 @@ export class HoldsService {
   changeHoldPickUpLocation(
     holdId: number,
     newLocation: string,
-    newSublocation: string | null,
+    newSublocation: string | null
   ): Observable<AspenMutationResult> {
     if (!holdId) return throwError(() => new Error('missing_hold_id'));
     const loc = (newLocation ?? '').trim();
@@ -370,37 +409,45 @@ export class HoldsService {
   private fetchHoldsNetwork(
     snap: ReturnType<AuthService['snapshot']>,
     cacheKey: string,
-    refreshHolds = true,
+    refreshHolds = true
   ): Observable<AspenHold[]> {
-    return from(Promise.all([
-      this.preferences.getCachedToken(snap.activeAccountId!),
-      this.accounts.getPassword(snap.activeAccountId!),
-      this.cache.read<AspenHold[]>(cacheKey),
-    ])).pipe(
+    return from(
+      Promise.all([
+        this.preferences.getCachedToken(snap.activeAccountId!),
+        this.accounts.getPassword(snap.activeAccountId!),
+        this.cache.read<AspenHold[]>(cacheKey),
+      ])
+    ).pipe(
       switchMap(([token, password, cached]) => {
-        if (!token && !password) return throwError(() => new Error('missing_auth'));
+        if (!token && !password)
+          return throwError(() => new Error('missing_auth'));
         const cachedHolds = Array.isArray(cached) ? cached : [];
 
         return this.userApiQueue.run(snap.activeAccountId, () =>
           this.requestPatronHolds(snap, token, password, refreshHolds).pipe(
             switchMap((r) => {
               const holds = this.holdsFromResponse(r);
-              if (!this.isSuspiciousEmptyHolds(holds, cachedHolds)) return from([holds]);
+              if (!this.isSuspiciousEmptyHolds(holds, cachedHolds))
+                return from([holds]);
 
               return timer(SUSPICIOUS_EMPTY_HOLDS_RETRY_DELAY_MS).pipe(
-                switchMap(() => this.requestPatronHolds(snap, token, password, true)),
+                switchMap(() =>
+                  this.requestPatronHolds(snap, token, password, true)
+                ),
                 map((retryResponse) => {
                   const retryHolds = this.holdsFromResponse(retryResponse);
-                  return this.isSuspiciousEmptyHolds(retryHolds, cachedHolds) ? cachedHolds : retryHolds;
-                }),
+                  return this.isSuspiciousEmptyHolds(retryHolds, cachedHolds)
+                    ? cachedHolds
+                    : retryHolds;
+                })
               );
             }),
             tap((holds) => {
               this.cache.write(cacheKey, holds).catch(() => {});
-            }),
-          ),
+            })
+          )
         );
-      }),
+      })
     );
   }
 
@@ -408,21 +455,25 @@ export class HoldsService {
     snap: ReturnType<AuthService['snapshot']>,
     token: string | null,
     password: string | null,
-    refreshHolds = true,
+    refreshHolds = true
   ): Observable<PatronHoldsResponse> {
-    let params = new HttpParams()
-      .set('method', 'getPatronHolds');
+    let params = new HttpParams().set('method', 'getPatronHolds');
     if (refreshHolds) params = params.set('refreshHolds', 'true');
 
     const body = this.authBodyFor(snap, token, password);
 
-    const headers = new HttpHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' });
+    const headers = new HttpHeaders({
+      'Content-Type': 'application/x-www-form-urlencoded',
+    });
 
     return this.http
-      .post<any>(`${this.globals.aspen_api_base}/UserAPI`, body.toString(), { params, headers })
+      .post<any>(`${this.globals.aspen_api_base}/UserAPI`, body.toString(), {
+        params,
+        headers,
+      })
       .pipe(
-        map(raw => (raw?.result ?? raw) as PatronHoldsResponse),
-        tap((result) => this.persistReturnedHelperToken(snap, result)),
+        map((raw) => (raw?.result ?? raw) as PatronHoldsResponse),
+        tap((result) => this.persistReturnedHelperToken(snap, result))
       );
   }
 
@@ -433,20 +484,31 @@ export class HoldsService {
       ...this.normalizeHoldCollection(r?.holds?.unavailable),
     ];
     return all
-      .filter(h => (h?.type === 'ils' || h?.source === 'ils'))
+      .filter((h) => h?.type === 'ils' || h?.source === 'ils')
       .map((hold) => this.normalizeHold(hold));
   }
 
-  private isSuspiciousEmptyHolds(holds: AspenHold[], cachedHolds: AspenHold[]): boolean {
-    return holds.length === 0 && cachedHolds.length >= SUSPICIOUS_EMPTY_HOLDS_CACHE_THRESHOLD;
+  private isSuspiciousEmptyHolds(
+    holds: AspenHold[],
+    cachedHolds: AspenHold[]
+  ): boolean {
+    return (
+      holds.length === 0 &&
+      cachedHolds.length >= SUSPICIOUS_EMPTY_HOLDS_CACHE_THRESHOLD
+    );
   }
 
-  private findMatchingHold(holds: AspenHold[], target: AspenHold): AspenHold | null {
+  private findMatchingHold(
+    holds: AspenHold[],
+    target: AspenHold
+  ): AspenHold | null {
     const targetKeys = this.holdMatchKeys(target);
-    return (holds ?? []).find((hold) => {
-      const keys = this.holdMatchKeys(hold);
-      return keys.some((key) => targetKeys.includes(key));
-    }) ?? null;
+    return (
+      (holds ?? []).find((hold) => {
+        const keys = this.holdMatchKeys(hold);
+        return keys.some((key) => targetKeys.includes(key));
+      }) ?? null
+    );
   }
 
   private holdMatchKeys(hold: AspenHold): string[] {
@@ -454,34 +516,47 @@ export class HoldsService {
       (hold as any)?.cancelId ? `cancel:${(hold as any).cancelId}` : '',
       (hold as any)?.id ? `id:${(hold as any).id}` : '',
       (hold as any)?.recordId ? `record:${(hold as any).recordId}` : '',
-      (hold as any)?.groupedWorkId ? `grouped:${(hold as any).groupedWorkId}` : '',
+      (hold as any)?.groupedWorkId
+        ? `grouped:${(hold as any).groupedWorkId}`
+        : '',
     ];
     return keys.map((key) => key.toString().trim()).filter(Boolean);
   }
 
   private holdLooksFrozen(hold: AspenHold): boolean {
     if ((hold as any)?.frozen === true) return true;
-    const status = `${hold?.statusMessage ?? ''} ${hold?.status ?? ''}`.toLowerCase();
-    return status.includes('frozen') || status.includes('suspend') || status.includes('suspended');
+    const status = `${hold?.statusMessage ?? ''} ${
+      hold?.status ?? ''
+    }`.toLowerCase();
+    return (
+      status.includes('frozen') ||
+      status.includes('suspend') ||
+      status.includes('suspended')
+    );
   }
 
   // ---------- Core mutation plumbing ----------
 
-  private callUserApiMutation(method: string, extraParams: Record<string, string>): Observable<AspenMutationResult> {
+  private callUserApiMutation(
+    method: string,
+    extraParams: Record<string, string>
+  ): Observable<AspenMutationResult> {
     const snap = this.auth.snapshot();
     if (!snap.isLoggedIn || !snap.activeAccountId || !snap.activeAccountMeta) {
       return throwError(() => new Error('not_logged_in'));
     }
 
-    return from(Promise.all([
-      this.preferences.getCachedToken(snap.activeAccountId),
-      this.accounts.getPassword(snap.activeAccountId),
-    ])).pipe(
+    return from(
+      Promise.all([
+        this.preferences.getCachedToken(snap.activeAccountId),
+        this.accounts.getPassword(snap.activeAccountId),
+      ])
+    ).pipe(
       switchMap(([token, password]) => {
-        if (!token && !password) return throwError(() => new Error('missing_auth'));
+        if (!token && !password)
+          return throwError(() => new Error('missing_auth'));
 
-        let params = new HttpParams()
-          .set('method', method);
+        let params = new HttpParams().set('method', method);
         if (HELPER_BACKED_HOLD_MUTATION_METHODS.has(method)) {
           params = params.set('userApiBackend', 'helper');
         }
@@ -491,32 +566,40 @@ export class HoldsService {
 
         const body = this.authBodyFor(snap, token, password);
 
-        const headers = new HttpHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' });
+        const headers = new HttpHeaders({
+          'Content-Type': 'application/x-www-form-urlencoded',
+        });
 
         return this.userApiQueue.run(snap.activeAccountId, () =>
-          this.http.post<any>(`${this.globals.aspen_api_base}/UserAPI`, body.toString(), { params, headers })
+          this.http
+            .post<any>(
+              `${this.globals.aspen_api_base}/UserAPI`,
+              body.toString(),
+              { params, headers }
+            )
             .pipe(
-              map(raw => raw?.result ?? raw),
+              map((raw) => raw?.result ?? raw),
               tap((r) => this.persistReturnedHelperToken(snap, r)),
               map((r: any) => {
                 const success = r?.success !== undefined ? !!r.success : true;
                 return {
                   success,
                   title: typeof r?.title === 'string' ? r.title : undefined,
-                  message: typeof r?.message === 'string' ? r.message : undefined,
+                  message:
+                    typeof r?.message === 'string' ? r.message : undefined,
                   raw: r,
                 } satisfies AspenMutationResult;
-              }),
-            ),
+              })
+            )
         );
-      }),
+      })
     );
   }
 
   private authBodyFor(
     snap: ReturnType<AuthService['snapshot']>,
     token: string | null,
-    password: string | null,
+    password: string | null
   ): URLSearchParams {
     const body = new URLSearchParams();
     if (token) body.set('token', token);
@@ -525,10 +608,17 @@ export class HoldsService {
     return body;
   }
 
-  private persistReturnedHelperToken(snap: ReturnType<AuthService['snapshot']>, result: any): void {
-    const token = (result?.helperToken ?? result?.token ?? '').toString().trim();
+  private persistReturnedHelperToken(
+    snap: ReturnType<AuthService['snapshot']>,
+    result: any
+  ): void {
+    const token = (result?.helperToken ?? result?.token ?? '')
+      .toString()
+      .trim();
     if (!token || !snap.activeAccountId) return;
-    this.preferences.persistTokenForAccount(snap.activeAccountId, token).catch(() => {});
+    this.preferences
+      .persistTokenForAccount(snap.activeAccountId, token)
+      .catch(() => {});
   }
 
   // ---------- Small helpers ----------
@@ -553,7 +643,9 @@ export class HoldsService {
 
   private compactFormat(value: any): string | string[] | undefined {
     if (Array.isArray(value)) {
-      const items = value.map((item) => this.stringOrUndefined(item)).filter((item): item is string => !!item);
+      const items = value
+        .map((item) => this.stringOrUndefined(item))
+        .filter((item): item is string => !!item);
       return items.length ? items : undefined;
     }
     return this.stringOrUndefined(value);
@@ -565,7 +657,9 @@ export class HoldsService {
   }
 
   private pickItemSource(hold: AspenHold): string {
-    const s = ((hold as any)?.source ?? (hold as any)?.type ?? 'ils').toString().trim();
+    const s = ((hold as any)?.source ?? (hold as any)?.type ?? 'ils')
+      .toString()
+      .trim();
     return s || 'ils';
   }
 
@@ -585,7 +679,10 @@ export class HoldsService {
     return accountId ? PREF_HOLDS_CACHE_PREFIX + accountId : null;
   }
 
-  private holdMatches(a: AspenHold | null | undefined, b: AspenHold | null | undefined): boolean {
+  private holdMatches(
+    a: AspenHold | null | undefined,
+    b: AspenHold | null | undefined
+  ): boolean {
     if (!a || !b) return false;
     const aCancelId = this.pickCancelId(a);
     const bCancelId = this.pickCancelId(b);
@@ -599,14 +696,22 @@ export class HoldsService {
     const bRecordId = this.pickRecordId(b);
     const aGrouped = ((a as any)?.groupedWorkId ?? '').toString().trim();
     const bGrouped = ((b as any)?.groupedWorkId ?? '').toString().trim();
-    return !!aRecordId && !!bRecordId && aRecordId === bRecordId && !!aGrouped && aGrouped === bGrouped;
+    return (
+      !!aRecordId &&
+      !!bRecordId &&
+      aRecordId === bRecordId &&
+      !!aGrouped &&
+      aGrouped === bGrouped
+    );
   }
 
   /**
    * If selected is null/undefined => return null so we OMIT reactivationDate.
    * If selected is provided => return YYYY-MM-DD.
    */
-  private computeReactivationDate(selected: Date | string | null | undefined): string | null {
+  private computeReactivationDate(
+    selected: Date | string | null | undefined
+  ): string | null {
     if (selected === null || selected === undefined) return null;
 
     let d: Date | null = null;

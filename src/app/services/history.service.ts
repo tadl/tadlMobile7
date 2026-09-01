@@ -1,6 +1,16 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
-import { Observable, concat, filter as rxFilter, from, map, of, switchMap, tap, throwError } from 'rxjs';
+import {
+  Observable,
+  concat,
+  filter as rxFilter,
+  from,
+  map,
+  of,
+  switchMap,
+  tap,
+  throwError,
+} from 'rxjs';
 
 import { Globals } from '../globals';
 import { AuthService } from './auth.service';
@@ -37,33 +47,33 @@ export interface AspenReadingHistoryPage {
 
 @Injectable({ providedIn: 'root' })
 export class HistoryService {
-  constructor(
-    private http: HttpClient,
-    private globals: Globals,
-    private auth: AuthService,
-    private accounts: AccountStoreService,
-    private cache: AppCacheService,
-    private discoveryUrls: DiscoveryUrlService,
-    private userApiQueue: UserApiQueueService,
-  ) {}
+  private http = inject(HttpClient);
+  private globals = inject(Globals);
+  private auth = inject(AuthService);
+  private accounts = inject(AccountStoreService);
+  private cache = inject(AppCacheService);
+  private discoveryUrls = inject(DiscoveryUrlService);
+  private userApiQueue = inject(UserApiQueueService);
 
   fetchReadingHistoryPage(
     page = 1,
     pageSize = 20,
     sort = 'checkedOut',
     queryFilter = '',
-    useCache = true,
+    useCache = true
   ): Observable<AspenReadingHistoryPage> {
     const snap = this.auth.snapshot();
     if (!snap.isLoggedIn || !snap.activeAccountId || !snap.activeAccountMeta) {
-      return from([{
-        success: true,
-        items: [],
-        totalResults: 0,
-        pageCurrent: 1,
-        pageTotal: 1,
-        sort,
-      } satisfies AspenReadingHistoryPage]);
+      return from([
+        {
+          success: true,
+          items: [],
+          totalResults: 0,
+          pageCurrent: 1,
+          pageTotal: 1,
+          sort,
+        } satisfies AspenReadingHistoryPage,
+      ]);
     }
 
     const p = Math.max(1, Number(page) || 1);
@@ -72,12 +82,14 @@ export class HistoryService {
 
     const cached$ = useCache
       ? from(this.cache.read<AspenReadingHistoryPage>(cacheKey)).pipe(
-        rxFilter((v): v is AspenReadingHistoryPage => !!v && Array.isArray(v.items)),
-      )
+          rxFilter(
+            (v): v is AspenReadingHistoryPage => !!v && Array.isArray(v.items)
+          )
+        )
       : of<AspenReadingHistoryPage>();
 
     const network$ = from(this.accounts.getPassword(snap.activeAccountId)).pipe(
-      switchMap(password => {
+      switchMap((password) => {
         if (!password) return throwError(() => new Error('missing_password'));
 
         let params = new HttpParams()
@@ -94,43 +106,66 @@ export class HistoryService {
         body.set('username', snap.activeAccountMeta!.username);
         body.set('password', password);
 
-        const headers = new HttpHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' });
+        const headers = new HttpHeaders({
+          'Content-Type': 'application/x-www-form-urlencoded',
+        });
 
         return this.userApiQueue
           .run(snap.activeAccountId, () =>
-            this.http.post<any>(`${this.globals.aspen_api_base}/UserAPI`, body.toString(), { params, headers }),
+            this.http.post<any>(
+              `${this.globals.aspen_api_base}/UserAPI`,
+              body.toString(),
+              { params, headers }
+            )
           )
           .pipe(
-            map(raw => raw?.result ?? raw),
-            map((r: any) => ({
-              success: !!r?.success,
-              items: Array.isArray(r?.readingHistory)
-                ? (r.readingHistory as AspenReadingHistoryItem[]).map((item) => this.normalizeHistoryItem(item))
-                : [],
-              totalResults: Number.isFinite(Number(r?.totalResults)) ? Number(r.totalResults) : 0,
-              pageCurrent: Number.isFinite(Number(r?.page_current)) ? Number(r.page_current) : p,
-              pageTotal: Number.isFinite(Number(r?.page_total)) ? Number(r.page_total) : 1,
-              sort: (r?.sort ?? sort).toString(),
-              message: typeof r?.message === 'string' ? r.message : undefined,
-            }) satisfies AspenReadingHistoryPage),
+            map((raw) => raw?.result ?? raw),
+            map(
+              (r: any) =>
+                ({
+                  success: !!r?.success,
+                  items: Array.isArray(r?.readingHistory)
+                    ? (r.readingHistory as AspenReadingHistoryItem[]).map(
+                        (item) => this.normalizeHistoryItem(item)
+                      )
+                    : [],
+                  totalResults: Number.isFinite(Number(r?.totalResults))
+                    ? Number(r.totalResults)
+                    : 0,
+                  pageCurrent: Number.isFinite(Number(r?.page_current))
+                    ? Number(r.page_current)
+                    : p,
+                  pageTotal: Number.isFinite(Number(r?.page_total))
+                    ? Number(r.page_total)
+                    : 1,
+                  sort: (r?.sort ?? sort).toString(),
+                  message:
+                    typeof r?.message === 'string' ? r.message : undefined,
+                } satisfies AspenReadingHistoryPage)
+            ),
             tap((pageResult) => {
-              if (pageResult?.success) this.cache.write(cacheKey, pageResult).catch(() => {});
-            }),
+              if (pageResult?.success)
+                this.cache.write(cacheKey, pageResult).catch(() => {});
+            })
           );
-      }),
+      })
     );
 
     return concat(cached$, network$);
   }
 
-  private normalizeHistoryItem(item: AspenReadingHistoryItem): AspenReadingHistoryItem {
+  private normalizeHistoryItem(
+    item: AspenReadingHistoryItem
+  ): AspenReadingHistoryItem {
     const raw: any = item ?? {};
     return {
       id: this.stringOrUndefined(raw?.id),
       recordId: this.stringOrUndefined(raw?.recordId),
       groupedWorkId: this.stringOrUndefined(raw?.groupedWorkId),
       permanentId: this.stringOrUndefined(raw?.permanentId),
-      groupedWorkPermanentId: this.stringOrUndefined(raw?.groupedWorkPermanentId),
+      groupedWorkPermanentId: this.stringOrUndefined(
+        raw?.groupedWorkPermanentId
+      ),
       title: this.stringOrUndefined(raw?.title),
       author: this.stringOrUndefined(raw?.author),
       format: this.compactFormat(raw?.format) as any,
@@ -166,7 +201,9 @@ export class HistoryService {
 
   private compactFormat(value: any): string | string[] | undefined {
     if (Array.isArray(value)) {
-      const items = value.map((item) => this.stringOrUndefined(item)).filter((item): item is string => !!item);
+      const items = value
+        .map((item) => this.stringOrUndefined(item))
+        .filter((item): item is string => !!item);
       return items.length ? items : undefined;
     }
     return this.stringOrUndefined(value);

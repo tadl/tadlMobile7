@@ -1,12 +1,21 @@
-import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, inject } from '@angular/core';
+
 import { ActivatedRoute, Router } from '@angular/router';
-import { IonicModule, ModalController, ActionSheetController, AlertController, type ActionSheetButton } from '@ionic/angular';
+import {
+  IonicModule,
+  ModalController,
+  ActionSheetController,
+  AlertController,
+  type ActionSheetButton,
+} from '@ionic/angular/lazy';
 import { finalize } from 'rxjs';
 
 import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
-import { FeaturedService, type FeaturedRecord } from '../../services/featured.service';
+import {
+  FeaturedService,
+  type FeaturedRecord,
+} from '../../services/featured.service';
 import { ItemDetailComponent } from '../../components/item-detail/item-detail.component';
 import type { AspenSearchHit } from '../../services/search.service';
 import { ListsService, type AspenUserList } from '../../services/lists.service';
@@ -15,16 +24,34 @@ import { AuthService } from '../../services/auth.service';
 import { FormatFamilyService } from '../../services/format-family.service';
 import { ListLookupService } from '../../services/list-lookup.service';
 import { SwitchUserModalComponent } from '../../components/switch-user-modal/switch-user-modal.component';
-import { HoldSupportService, HoldTargetOption } from '../../services/hold-support.service';
+import {
+  HoldSupportService,
+  HoldTargetOption,
+} from '../../services/hold-support.service';
 
 @Component({
   standalone: true,
   selector: 'app-featured-category',
   templateUrl: './featured-category.page.html',
   styleUrls: ['./featured-category.page.scss'],
-  imports: [CommonModule, IonicModule],
+  imports: [IonicModule],
 })
 export class FeaturedCategoryPage {
+  globals = inject(Globals);
+  private route = inject(ActivatedRoute);
+  private featured = inject(FeaturedService);
+  private toast = inject(ToastService);
+  private modalCtrl = inject(ModalController);
+  private actionSheetController = inject(ActionSheetController);
+  private alertCtrl = inject(AlertController);
+  private listsService = inject(ListsService);
+  private listLookup = inject(ListLookupService);
+  private holds = inject(HoldsService);
+  private auth = inject(AuthService);
+  private formatFamily = inject(FormatFamilyService);
+  private holdSupport = inject(HoldSupportService);
+  private router = inject(Router);
+
   loading = false;
   loadingMore = false;
 
@@ -37,26 +64,13 @@ export class FeaturedCategoryPage {
   infiniteDisabled = true;
   actionBusyByKey: Record<string, boolean> = {};
 
-  constructor(
-    public globals: Globals,
-    private route: ActivatedRoute,
-    private featured: FeaturedService,
-    private toast: ToastService,
-    private modalCtrl: ModalController,
-    private actionSheetController: ActionSheetController,
-    private alertCtrl: AlertController,
-    private listsService: ListsService,
-    private listLookup: ListLookupService,
-    private holds: HoldsService,
-    private auth: AuthService,
-    private formatFamily: FormatFamilyService,
-    private holdSupport: HoldSupportService,
-    private router: Router,
-  ) {}
-
   ionViewWillEnter() {
-    this.categoryId = (this.route.snapshot.paramMap.get('id') ?? '').toString().trim();
-    const label = (this.route.snapshot.queryParamMap.get('label') ?? '').toString().trim();
+    this.categoryId = (this.route.snapshot.paramMap.get('id') ?? '')
+      .toString()
+      .trim();
+    const label = (this.route.snapshot.queryParamMap.get('label') ?? '')
+      .toString()
+      .trim();
     if (label) this.categoryTitle = label;
     this.refresh();
   }
@@ -77,19 +91,26 @@ export class FeaturedCategoryPage {
     this.totalPages = 1;
     this.infiniteDisabled = true;
 
-    this.featured.fetchBrowseCategoryPage(this.categoryId, this.page, this.pageSize)
-      .pipe(finalize(() => {
-        this.loading = false;
-        ev?.target?.complete?.();
-      }))
+    this.featured
+      .fetchBrowseCategoryPage(this.categoryId, this.page, this.pageSize)
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+          ev?.target?.complete?.();
+        })
+      )
       .subscribe({
         next: (res) => {
           if (!res?.success) {
             this.items = [];
-            this.toast.presentToast(res?.message || 'Could not load featured titles.');
+            this.toast.presentToast(
+              res?.message || 'Could not load featured titles.'
+            );
             return;
           }
-          this.categoryTitle = (res?.title ?? this.categoryTitle).toString().trim() || this.categoryTitle;
+          this.categoryTitle =
+            (res?.title ?? this.categoryTitle).toString().trim() ||
+            this.categoryTitle;
           this.page = Number(res.pageCurrent || 1);
           this.totalPages = Number(res.pageTotal || 1);
           this.items = Array.isArray(res.items) ? res.items : [];
@@ -115,15 +136,20 @@ export class FeaturedCategoryPage {
 
     this.loadingMore = true;
     const nextPage = this.page + 1;
-    this.featured.fetchBrowseCategoryPage(this.categoryId, nextPage, this.pageSize)
-      .pipe(finalize(() => {
-        this.loadingMore = false;
-        ev?.target?.complete?.();
-      }))
+    this.featured
+      .fetchBrowseCategoryPage(this.categoryId, nextPage, this.pageSize)
+      .pipe(
+        finalize(() => {
+          this.loadingMore = false;
+          ev?.target?.complete?.();
+        })
+      )
       .subscribe({
         next: (res) => {
           if (!res?.success) {
-            this.toast.presentToast(res?.message || 'Could not load more featured titles.');
+            this.toast.presentToast(
+              res?.message || 'Could not load more featured titles.'
+            );
             return;
           }
           this.page = Number(res.pageCurrent || nextPage);
@@ -131,7 +157,8 @@ export class FeaturedCategoryPage {
           this.items = [...this.items, ...(res.items ?? [])];
           this.infiniteDisabled = !(this.page < this.totalPages);
         },
-        error: () => this.toast.presentToast('Could not load more featured titles.'),
+        error: () =>
+          this.toast.presentToast('Could not load more featured titles.'),
       });
   }
 
@@ -157,7 +184,9 @@ export class FeaturedCategoryPage {
 
     const hit = this.asSearchHit(i);
     if (!hit) {
-      this.toast.presentToast('No record link available for this featured item.');
+      this.toast.presentToast(
+        'No record link available for this featured item.'
+      );
       return;
     }
 
@@ -173,7 +202,10 @@ export class FeaturedCategoryPage {
       const sheet = await this.actionSheetController.create({
         header: this.titleText(i),
         buttons: [
-          { text: 'Open Event', handler: () => this.globals.open_page(eventUrl) },
+          {
+            text: 'Open Event',
+            handler: () => this.globals.open_page(eventUrl),
+          },
           { text: 'Close', role: 'cancel' },
         ],
       });
@@ -183,7 +215,9 @@ export class FeaturedCategoryPage {
 
     const hit = this.asSearchHit(i);
     if (!hit) {
-      this.toast.presentToast('No record link available for this featured item.');
+      this.toast.presentToast(
+        'No record link available for this featured item.'
+      );
       return;
     }
 
@@ -209,7 +243,7 @@ export class FeaturedCategoryPage {
         text: 'View Details',
         handler: () => this.openRecordDetails(hit),
       },
-      { text: 'Close', role: 'cancel' },
+      { text: 'Close', role: 'cancel' }
     );
 
     if (this.auth.snapshot()?.isLoggedIn) {
@@ -263,8 +297,10 @@ export class FeaturedCategoryPage {
       summary: (i?.summary ?? '').toString().trim() || undefined,
       language: undefined,
       format: undefined,
-      itemList: Array.isArray(i?.itemList) ? i.itemList as any : [],
-      catalogUrl: `${this.globals.aspen_discovery_base}/GroupedWork/${encodeURIComponent(key)}`,
+      itemList: Array.isArray(i?.itemList) ? (i.itemList as any) : [],
+      catalogUrl: `${
+        this.globals.aspen_discovery_base
+      }/GroupedWork/${encodeURIComponent(key)}`,
       raw: i?.raw ?? i,
     };
   }
@@ -313,12 +349,16 @@ export class FeaturedCategoryPage {
 
     const sheet = await this.actionSheetController.create({
       header: 'Add to which list?',
-      subHeader: lastListUsed ? 'Most recently used list is shown first.' : undefined,
+      subHeader: lastListUsed
+        ? 'Most recently used list is shown first.'
+        : undefined,
       buttons: [
-        ...lists.map((list): ActionSheetButton => ({
-          text: this.actionListLabel(list),
-          handler: () => this.addRecordToNamedList(list, hit),
-        })),
+        ...lists.map(
+          (list): ActionSheetButton => ({
+            text: this.actionListLabel(list),
+            handler: () => this.addRecordToNamedList(list, hit),
+          })
+        ),
         { text: 'Close', role: 'cancel' },
       ],
     });
@@ -337,13 +377,18 @@ export class FeaturedCategoryPage {
     const recordId = (hit?.key ?? '').toString().trim();
     if (!listId || !recordId) return;
     if (this.rowActionBusyForKey(recordId)) return;
-    if (this.listLookup.cachedMembershipsForRecord(recordId).some((m) => m.listId === listId)) {
+    if (
+      this.listLookup
+        .cachedMembershipsForRecord(recordId)
+        .some((m) => m.listId === listId)
+    ) {
       this.toast.presentToast('Already on this list.');
       return;
     }
 
     this.setRowBusy(recordId, true);
-    this.listsService.addTitlesToList(listId, [recordId])
+    this.listsService
+      .addTitlesToList(listId, [recordId])
       .pipe(finalize(() => this.setRowBusy(recordId, false)))
       .subscribe({
         next: (res) => {
@@ -351,7 +396,8 @@ export class FeaturedCategoryPage {
             this.toast.presentToast(res?.message || 'Could not add to list.');
             return;
           }
-          const listTitle = (list?.title ?? '').toString().trim() || 'Untitled list';
+          const listTitle =
+            (list?.title ?? '').toString().trim() || 'Untitled list';
           this.listLookup.upsertMembership(recordId, listId, listTitle);
           this.toast.presentToast(res?.message || 'Added to list.');
         },
@@ -359,7 +405,10 @@ export class FeaturedCategoryPage {
       });
   }
 
-  private orderListsForAction(lists: AspenUserList[], lastListUsed: string | null): AspenUserList[] {
+  private orderListsForAction(
+    lists: AspenUserList[],
+    lastListUsed: string | null
+  ): AspenUserList[] {
     const preferred = (lastListUsed ?? '').toString().trim();
     if (!preferred) return (lists ?? []).slice();
 
@@ -391,7 +440,8 @@ export class FeaturedCategoryPage {
     if (this.rowActionBusyForKey(key)) return;
 
     this.setRowBusy(key, true);
-    this.listsService.createList(basics.title, basics.description, isPublic)
+    this.listsService
+      .createList(basics.title, basics.description, isPublic)
       .pipe(finalize(() => this.setRowBusy(key, false)))
       .subscribe({
         next: (res) => {
@@ -417,7 +467,7 @@ export class FeaturedCategoryPage {
   private async promptListBasics(
     header: string,
     initialTitle = '',
-    initialDescription = '',
+    initialDescription = ''
   ): Promise<{ title: string; description: string } | null> {
     return new Promise(async (resolve) => {
       const alert = await this.alertCtrl.create({
@@ -457,7 +507,9 @@ export class FeaturedCategoryPage {
     });
   }
 
-  private async promptVisibility(initialPublic: boolean): Promise<boolean | null> {
+  private async promptVisibility(
+    initialPublic: boolean
+  ): Promise<boolean | null> {
     return new Promise(async (resolve) => {
       const alert = await this.alertCtrl.create({
         header: 'List Visibility',
@@ -491,13 +543,17 @@ export class FeaturedCategoryPage {
     });
   }
 
-  private async placeHoldFromHit(hit: AspenSearchHit, precomputedTargets?: HoldTargetOption[]): Promise<void> {
+  private async placeHoldFromHit(
+    hit: AspenSearchHit,
+    precomputedTargets?: HoldTargetOption[]
+  ): Promise<void> {
     const loggedIn = await this.ensureLoggedInForHoldAction();
     if (!loggedIn) return;
     const groupedKey = (hit?.key ?? '').toString().trim();
     if (this.rowActionBusyForKey(groupedKey)) return;
 
-    const holdTargets = precomputedTargets ?? await this.holdTargetsWithStatusForHit(hit);
+    const holdTargets =
+      precomputedTargets ?? (await this.holdTargetsWithStatusForHit(hit));
     const availableTargets = holdTargets.filter((x) => !x.isOnHold);
 
     if (!availableTargets.length) {
@@ -514,14 +570,27 @@ export class FeaturedCategoryPage {
 
     const defaultPickup = await this.holdSupport.defaultPickupBranchCode();
     if (defaultPickup) {
-      this.placeHoldNow(hit, selectedTarget.recordId, defaultPickup, selectedTarget.formatLabel || selectedTarget.label);
+      this.placeHoldNow(
+        hit,
+        selectedTarget.recordId,
+        defaultPickup,
+        selectedTarget.formatLabel || selectedTarget.label
+      );
       return;
     }
 
-    const buttons: ActionSheetButton[] = this.globals.pickupLocations.map((loc) => ({
-      text: loc.name,
-      handler: () => this.placeHoldNow(hit, selectedTarget.recordId, loc.code, selectedTarget.formatLabel || selectedTarget.label),
-    }));
+    const buttons: ActionSheetButton[] = this.globals.pickupLocations.map(
+      (loc) => ({
+        text: loc.name,
+        handler: () =>
+          this.placeHoldNow(
+            hit,
+            selectedTarget.recordId,
+            loc.code,
+            selectedTarget.formatLabel || selectedTarget.label
+          ),
+      })
+    );
     buttons.push({ text: 'Close', role: 'cancel' });
 
     const sheet = await this.actionSheetController.create({
@@ -533,7 +602,8 @@ export class FeaturedCategoryPage {
 
   private async ensureLoggedInForHoldAction(): Promise<boolean> {
     const snap = this.auth.snapshot();
-    if (snap?.isLoggedIn && snap?.activeAccountId && snap?.activeAccountMeta) return true;
+    if (snap?.isLoggedIn && snap?.activeAccountId && snap?.activeAccountMeta)
+      return true;
 
     const priorModalState = this.globals.modal_open;
     const modal = await this.modalCtrl.create({
@@ -545,21 +615,26 @@ export class FeaturedCategoryPage {
     this.globals.modal_open = priorModalState || this.globals.modal_open;
 
     const next = this.auth.snapshot();
-    return !!(next?.isLoggedIn && next?.activeAccountId && next?.activeAccountMeta);
+    return !!(
+      next?.isLoggedIn &&
+      next?.activeAccountId &&
+      next?.activeAccountMeta
+    );
   }
 
   private placeHoldNow(
     hit: AspenSearchHit,
     recordId: string,
     pickupBranch: string,
-    selectedFormatLabel?: string,
+    selectedFormatLabel?: string
   ): void {
     const key = (hit?.key ?? '').toString().trim();
     if (!key) return;
     if (this.rowActionBusyForKey(key)) return;
 
     this.setRowBusy(key, true);
-    this.holds.placeHold(recordId, pickupBranch, null)
+    this.holds
+      .placeHold(recordId, pickupBranch, null)
       .pipe(finalize(() => this.setRowBusy(key, false)))
       .subscribe({
         next: (res) => {
@@ -568,30 +643,42 @@ export class FeaturedCategoryPage {
             return;
           }
           this.auth.adjustActiveProfileCounts({ holds: 1, holdsRequested: 1 });
-          void this.holdSupport.cacheOptimisticPlacedHold({
-            groupedKey: hit.key,
-            itemList: hit.itemList,
-            rawItemList: (hit.raw as any)?.itemList,
-            title: hit.title,
-            author: hit.author,
-            coverUrl: hit.coverUrl,
-          }, recordId, selectedFormatLabel);
+          void this.holdSupport.cacheOptimisticPlacedHold(
+            {
+              groupedKey: hit.key,
+              itemList: hit.itemList,
+              rawItemList: (hit.raw as any)?.itemList,
+              title: hit.title,
+              author: hit.author,
+              coverUrl: hit.coverUrl,
+            },
+            recordId,
+            selectedFormatLabel
+          );
           const title = (hit?.title ?? '').toString().trim() || 'this title';
           if (selectedFormatLabel) {
-            void this.toast.presentHoldPlacedToast(`Hold placed: ${title} (${selectedFormatLabel})`, () => {
-              void this.router.navigate(['/holds']);
-            });
+            void this.toast.presentHoldPlacedToast(
+              `Hold placed: ${title} (${selectedFormatLabel})`,
+              () => {
+                void this.router.navigate(['/holds']);
+              }
+            );
             return;
           }
-          void this.toast.presentHoldPlacedToast(`Hold placed: ${title}`, () => {
-            void this.router.navigate(['/holds']);
-          });
+          void this.toast.presentHoldPlacedToast(
+            `Hold placed: ${title}`,
+            () => {
+              void this.router.navigate(['/holds']);
+            }
+          );
         },
         error: () => this.toast.presentToast('Could not place hold.'),
       });
   }
 
-  private async holdTargetsWithStatusForHit(hit: AspenSearchHit): Promise<HoldTargetOption[]> {
+  private async holdTargetsWithStatusForHit(
+    hit: AspenSearchHit
+  ): Promise<HoldTargetOption[]> {
     if (!this.canPlaceHoldFromHit(hit)) return [];
     return this.holdSupport.holdTargetsWithStatus({
       groupedKey: hit.key,
@@ -603,13 +690,17 @@ export class FeaturedCategoryPage {
     });
   }
 
-  private async pickHoldTarget(options: HoldTargetOption[]): Promise<HoldTargetOption | null> {
+  private async pickHoldTarget(
+    options: HoldTargetOption[]
+  ): Promise<HoldTargetOption | null> {
     return new Promise(async (resolve) => {
       const sorted = [...options].sort((a, b) => {
         const aHeld = !!a.isOnHold;
         const bHeld = !!b.isOnHold;
         if (aHeld !== bHeld) return aHeld ? -1 : 1;
-        return (a.label || '').localeCompare((b.label || ''), undefined, { sensitivity: 'base' });
+        return (a.label || '').localeCompare(b.label || '', undefined, {
+          sensitivity: 'base',
+        });
       });
       const sheet = await this.actionSheetController.create({
         header: 'Place hold on which format?',
@@ -641,7 +732,9 @@ export class FeaturedCategoryPage {
     });
   }
 
-  private async hasCachedHoldForGroupedWork(hit: AspenSearchHit): Promise<boolean> {
+  private async hasCachedHoldForGroupedWork(
+    hit: AspenSearchHit
+  ): Promise<boolean> {
     return this.holdSupport.hasCachedHoldForGroupedKey(hit.key);
   }
 

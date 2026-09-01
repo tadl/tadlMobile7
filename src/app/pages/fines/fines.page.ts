@@ -1,6 +1,6 @@
-import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { IonicModule } from '@ionic/angular';
+import { Component, inject } from '@angular/core';
+
+import { IonicModule } from '@ionic/angular/lazy';
 import { finalize } from 'rxjs';
 
 import { Globals } from '../../globals';
@@ -13,19 +13,17 @@ import { AspenFine, FinesService } from '../../services/fines.service';
   selector: 'app-fines',
   templateUrl: './fines.page.html',
   styleUrls: ['./fines.page.scss'],
-  imports: [CommonModule, IonicModule],
+  imports: [IonicModule],
 })
 export class FinesPage {
+  globals = inject(Globals);
+  private auth = inject(AuthService);
+  private finesService = inject(FinesService);
+  private toast = inject(ToastService);
+
   loading = false;
   fines: AspenFine[] = [];
   totalOwed = 0;
-
-  constructor(
-    public globals: Globals,
-    private auth: AuthService,
-    private finesService: FinesService,
-    private toast: ToastService,
-  ) {}
 
   ionViewWillEnter() {
     this.refresh();
@@ -52,14 +50,18 @@ export class FinesPage {
         finalize(() => {
           this.loading = false;
           ev?.target?.complete?.();
-        }),
+        })
       )
       .subscribe({
         next: (res) => {
           if (!res?.success) {
             this.fines = [];
             this.totalOwed = 0;
-            if (res?.message && res.message !== 'missing_password' && res.message !== 'not_logged_in') {
+            if (
+              res?.message &&
+              res.message !== 'missing_password' &&
+              res.message !== 'not_logged_in'
+            ) {
               this.toast.presentToast('Could not load fines.');
             }
             return;
@@ -100,13 +102,16 @@ export class FinesPage {
   }
 
   fineAmountText(fine: AspenFine): string {
-    const outstanding = (fine?.amountOutstanding ?? fine?.amount ?? '').toString().trim();
+    const outstanding = (fine?.amountOutstanding ?? fine?.amount ?? '')
+      .toString()
+      .trim();
     if (outstanding) return outstanding;
 
-    const numeric =
-      Number.isFinite(Number(fine?.amountOutstandingVal)) ? Number(fine?.amountOutstandingVal) :
-      Number.isFinite(Number(fine?.amountVal)) ? Number(fine?.amountVal) :
-      0;
+    const numeric = Number.isFinite(Number(fine?.amountOutstandingVal))
+      ? Number(fine?.amountOutstandingVal)
+      : Number.isFinite(Number(fine?.amountVal))
+      ? Number(fine?.amountVal)
+      : 0;
     return this.currencyText(numeric);
   }
 
@@ -127,7 +132,9 @@ export class FinesPage {
   }
 
   trackByFine = (index: number, fine: AspenFine) => {
-    return `${this.fineReason(fine)}|${this.fineDateText(fine)}|${this.fineAmountText(fine)}|${index}`;
+    return `${this.fineReason(fine)}|${this.fineDateText(
+      fine
+    )}|${this.fineAmountText(fine)}|${index}`;
   };
 
   private currencyText(amount: number): string {

@@ -13,28 +13,28 @@
 </ion-header>
 
 <ion-content class="account-content">
-<ng-container *ngIf="auth.authState() | async as s">
-  <ng-container *ngIf="!s.isLoggedIn; else loggedInMenu">
-    <ion-item *ngIf="storedAccounts.length > 0" lines="none" class="stored-accounts-header">
-      <ion-label class="section-title">Stored Accounts</ion-label>
-    </ion-item>
-
-    <ion-list *ngIf="storedAccounts.length > 0" lines="full" class="full-list">
-      <ion-item
-        button
-        *ngFor="let a of storedAccounts"
-        (click)="tapStoredAccount(a)"
-      >
-        <ion-label class="ion-text-wrap">
-          <div class="acct-title">{{ accountLabel(a) }}</div>
-          <ion-note>{{ a.username }}</ion-note>
-        </ion-label>
-
-        <ion-badge *ngIf="s.isLoggedIn && s.activeAccountId === a.id" slot="end">
-          Active
-        </ion-badge>
+@if (auth.authState() | async; as s) {
+  @if (!s.isLoggedIn) {
+    @if (storedAccounts.length > 0) {
+      <ion-item lines="none" class="stored-accounts-header">
+        <ion-label class="section-title">Stored Accounts</ion-label>
       </ion-item>
-    </ion-list>
+
+      <ion-list lines="full" class="full-list">
+        @for (a of storedAccounts; track a.id) {
+          <ion-item button (click)="tapStoredAccount(a)">
+            <ion-label class="ion-text-wrap">
+              <div class="acct-title">{{ accountLabel(a) }}</div>
+              <ion-note>{{ a.username }}</ion-note>
+            </ion-label>
+
+            @if (s.isLoggedIn && s.activeAccountId === a.id) {
+              <ion-badge slot="end">Active</ion-badge>
+            }
+          </ion-item>
+        }
+      </ion-list>
+    }
 
     <div class="section-header login-header">
       <div class="section-title">Log in</div>
@@ -94,70 +94,54 @@
         <ion-button expand="block" fill="clear" type="button" (click)="troubleLoggingIn()">Trouble logging in?</ion-button>
       </div>
     </form>
-  </ng-container>
-
-  <!-- LOGGED IN NORMAL MENU -->
-  <ng-template #loggedInMenu>
+  } @else {
     <div class="section-header logged-in-header">
       <div class="logged-in-header-row">
         <div>
           <div class="logged-in-name">{{ loggedInName(s.profile) }}</div>
-          <div class="logged-in-as" *ngIf="loggedInIlsUsername(s.profile) as ils">({{ ils }})</div>
+          @if (loggedInIlsUsername(s.profile); as ils) {
+            <div class="logged-in-as">({{ ils }})</div>
+          }
         </div>
         <ion-button size="small" class="section-action" (click)="showCard()">View Card</ion-button>
       </div>
     </div>
 
-    <ng-container *ngIf="patron.badgesFromProfile(s.profile) as b">
+    @if (patron.badgesFromProfile(s.profile); as b) {
       <ion-list lines="full" class="full-list">
-        <ion-item
-          button
-          (click)="goCheckouts()"
-        >
+        <ion-item button (click)="goCheckouts()">
           <ion-label
             class="ion-text-wrap menu-row-label"
             [class.menu-row-label--single]="overdueCount(s.profile) <= 0"
             [class.menu-row-label--double]="overdueCount(s.profile) > 0"
           >
             <div class="menu-row-title">Checkouts</div>
-            <ion-note *ngIf="overdueCount(s.profile) > 0" class="menu-subnote">
-              {{ overdueCount(s.profile) }} overdue
-            </ion-note>
+            @if (overdueCount(s.profile) > 0) {
+              <ion-note class="menu-subnote">{{ overdueCount(s.profile) }} overdue</ion-note>
+            }
           </ion-label>
-          <ion-badge
-            slot="end"
-            [color]="b.checkouts === 0 ? 'medium' : undefined"
-          >
+          <ion-badge slot="end" [color]="b.checkouts === 0 ? 'medium' : undefined">
             {{ b.checkouts }}
           </ion-badge>
         </ion-item>
 
-        <ion-item
-          button
-          (click)="goHolds()"
-        >
+        <ion-item button (click)="goHolds()">
           <ion-label
             class="ion-text-wrap menu-row-label"
             [class.menu-row-label--single]="b.ready <= 0"
             [class.menu-row-label--double]="b.ready > 0"
           >
             <div class="menu-row-title">Holds</div>
-            <ion-note *ngIf="b.ready > 0" class="menu-subnote">
-              {{ b.ready }} ready for pickup
-            </ion-note>
+            @if (b.ready > 0) {
+              <ion-note class="menu-subnote">{{ b.ready }} ready for pickup</ion-note>
+            }
           </ion-label>
-          <ion-badge
-            slot="end"
-            [color]="b.holds === 0 ? 'medium' : undefined"
-          >
+          <ion-badge slot="end" [color]="b.holds === 0 ? 'medium' : undefined">
             {{ b.holds }}
           </ion-badge>
         </ion-item>
 
-        <ion-item
-          button
-          (click)="goFines()"
-        >
+        <ion-item button (click)="goFines()">
           <ion-label class="menu-row-label menu-row-label--single">
             <div class="menu-row-title">Fines</div>
           </ion-label>
@@ -187,13 +171,12 @@
           </ion-label>
         </ion-item>
       </ion-list>
-    </ng-container>
+    }
 
     <div class="actions actions--split">
       <ion-button color="medium" (click)="showLogoutActions()">Logout</ion-button>
       <ion-button fill="clear" (click)="openSwitchUserModal()">Switch User</ion-button>
     </div>
-  </ng-template>
-
-</ng-container>
+  }
+}
 </ion-content>

@@ -27,12 +27,13 @@
     debounce="0"
   ></ion-searchbar>
 
-  <ion-list *ngIf="hasAnyVisibleData" lines="full" class="full-list">
+  @if (hasAnyVisibleData) {
+  <ion-list lines="full" class="full-list">
     <ion-item class="checkouts-summary-item">
       <ion-label class="ion-text-wrap">
-        {{ filteredIlsCheckouts.length }} item{{ filteredIlsCheckouts.length === 1 ? '' : 's' }} checked out
+        {{ filteredIlsCheckouts.length }} item{{ filteredIlsCheckouts.length ===
+        1 ? '' : 's' }} checked out
       </ion-label>
-
       <ion-button
         slot="end"
         size="small"
@@ -45,39 +46,47 @@
         <ion-icon name="ellipsis-vertical" slot="icon-only"></ion-icon>
       </ion-button>
     </ion-item>
-
+    @for (c of filteredIlsCheckouts; track trackByCheckout($index, c)) {
     <ion-item
       button
       detail="false"
       class="checkout-row"
-      *ngFor="let c of filteredIlsCheckouts; trackBy: trackByCheckout"
       (click)="openCheckout(c)"
     >
-      <ion-thumbnail slot="start" *ngIf="c.coverUrl">
+      @if (c.coverUrl) {
+      <ion-thumbnail slot="start">
         <img [src]="c.coverUrl" alt="" />
       </ion-thumbnail>
-      <ion-thumbnail slot="start" *ngIf="showMelcatPlaceholder(c)" class="melcat-placeholder-thumb">
+      } @if (showMelcatPlaceholder(c)) {
+      <ion-thumbnail slot="start" class="melcat-placeholder-thumb">
         <img [src]="melcatPlaceholderImage" alt="MeLCat" />
       </ion-thumbnail>
-
+      }
       <ion-label class="ion-text-wrap">
         <div class="result-title">
-          <ion-icon [name]="mediaIconNameForCheckout(c)" aria-hidden="true"></ion-icon>
+          <ion-icon
+            [name]="mediaIconNameForCheckout(c)"
+            aria-hidden="true"
+          ></ion-icon>
           <span class="title">{{ checkoutTitle(c) }}</span>
         </div>
-        <div class="sub" *ngIf="checkoutAuthor(c)">{{ checkoutAuthor(c) }}</div>
-
-        <ion-note *ngIf="dueText(c)" class="checkout-meta">
-          Due: {{ dueText(c) }}
-        </ion-note>
-        <ion-note *ngIf="checkoutRenewInfoText(c)" class="checkout-meta">
+        @if (checkoutAuthor(c)) {
+        <div class="sub">{{ checkoutAuthor(c) }}</div>
+        } @if (dueText(c)) {
+        <ion-note class="checkout-meta"> Due: {{ dueText(c) }} </ion-note>
+        } @if (checkoutRenewInfoText(c)) {
+        <ion-note class="checkout-meta">
           {{ checkoutRenewInfoText(c) }}
         </ion-note>
-
-        <ion-note *ngIf="c.overdue" class="overdue">Overdue</ion-note>
+        } @if (c.overdue) {
+        <ion-note class="overdue">Overdue</ion-note>
+        }
       </ion-label>
-
-      <div slot="end" class="checkout-actions" (click)="$event.stopPropagation()">
+      <div
+        slot="end"
+        class="checkout-actions"
+        (click)="$event.stopPropagation()"
+      >
         <ion-button
           fill="clear"
           size="small"
@@ -90,11 +99,14 @@
         </ion-button>
       </div>
     </ion-item>
+    }
   </ion-list>
-
-  <ion-item *ngIf="!loading && !hasAnyVisibleData">
+  } @if (!loading && !hasAnyVisibleData) {
+  <ion-item>
     <ion-label class="ion-text-wrap">
-      {{ hasActiveQuery ? 'No checkouts match your filter.' : 'No checkouts right now.' }}
+      {{ hasActiveQuery ? 'No checkouts match your filter.' : 'No checkouts
+      right now.' }}
     </ion-label>
   </ion-item>
+  }
 </ion-content>

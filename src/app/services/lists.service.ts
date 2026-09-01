@@ -1,6 +1,17 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
-import { Observable, from, map, switchMap, throwError, concat, filter, tap, finalize, shareReplay } from 'rxjs';
+import {
+  Observable,
+  from,
+  map,
+  switchMap,
+  throwError,
+  concat,
+  filter,
+  tap,
+  finalize,
+  shareReplay,
+} from 'rxjs';
 
 import { Globals } from '../globals';
 import { AuthService } from './auth.service';
@@ -56,16 +67,14 @@ export interface AspenListMutationResult {
 
 @Injectable({ providedIn: 'root' })
 export class ListsService {
-  private userListsFetch$: Observable<AspenUserList[]> | null = null;
+  private http = inject(HttpClient);
+  private globals = inject(Globals);
+  private auth = inject(AuthService);
+  private accounts = inject(AccountStoreService);
+  private cache = inject(AppCacheService);
+  private discoveryUrls = inject(DiscoveryUrlService);
 
-  constructor(
-    private http: HttpClient,
-    private globals: Globals,
-    private auth: AuthService,
-    private accounts: AccountStoreService,
-    private cache: AppCacheService,
-    private discoveryUrls: DiscoveryUrlService,
-  ) {}
+  private userListsFetch$: Observable<AspenUserList[]> | null = null;
 
   fetchUserLists(): Observable<AspenUserList[]> {
     const snap = this.auth.snapshot();
@@ -73,42 +82,51 @@ export class ListsService {
     const cacheKey = `lists:user:${accountId || 'none'}`;
 
     const cached$ = from(this.cache.read<AspenUserList[]>(cacheKey)).pipe(
-      filter((v): v is AspenUserList[] => Array.isArray(v)),
+      filter((v): v is AspenUserList[] => Array.isArray(v))
     );
 
-    const network$ = this.userListsFetch$ ?? this.callListApi('getUserLists').pipe(
-      map((r: any) => {
-        if (!r?.success) return [];
-        const lists = Array.isArray(r?.lists) ? r.lists : [];
-        return lists.map((list: AspenUserList) => ({
-          ...list,
-          cover: this.normalizeDiscoveryUrl(list?.cover),
-        })) as AspenUserList[];
-      }),
-      tap((lists) => {
-        if (accountId) this.cache.write(cacheKey, lists).catch(() => {});
-      }),
-      finalize(() => {
-        this.userListsFetch$ = null;
-      }),
-      shareReplay({ bufferSize: 1, refCount: true }),
-    );
+    const network$ =
+      this.userListsFetch$ ??
+      this.callListApi('getUserLists').pipe(
+        map((r: any) => {
+          if (!r?.success) return [];
+          const lists = Array.isArray(r?.lists) ? r.lists : [];
+          return lists.map((list: AspenUserList) => ({
+            ...list,
+            cover: this.normalizeDiscoveryUrl(list?.cover),
+          })) as AspenUserList[];
+        }),
+        tap((lists) => {
+          if (accountId) this.cache.write(cacheKey, lists).catch(() => {});
+        }),
+        finalize(() => {
+          this.userListsFetch$ = null;
+        }),
+        shareReplay({ bufferSize: 1, refCount: true })
+      );
 
     this.userListsFetch$ = network$;
 
     return concat(cached$, network$);
   }
 
-  fetchListTitles(listId: string | number, page = 1, numTitles = 20): Observable<AspenListTitlesResult> {
+  fetchListTitles(
+    listId: string | number,
+    page = 1,
+    numTitles = 20
+  ): Observable<AspenListTitlesResult> {
     const id = (listId ?? '').toString().trim();
     if (!id) return throwError(() => new Error('missing_list_id'));
 
     const snap = this.auth.snapshot();
     const accountId = (snap?.activeAccountId ?? '').toString().trim();
-    const cacheKey = `lists:titles:${accountId || 'none'}:${id}:${Math.max(1, Number(page) || 1)}:${Math.max(1, Number(numTitles) || 50)}`;
+    const cacheKey = `lists:titles:${accountId || 'none'}:${id}:${Math.max(
+      1,
+      Number(page) || 1
+    )}:${Math.max(1, Number(numTitles) || 50)}`;
 
     const cached$ = from(this.cache.read<AspenListTitlesResult>(cacheKey)).pipe(
-      filter((v): v is AspenListTitlesResult => !!v && Array.isArray(v.titles)),
+      filter((v): v is AspenListTitlesResult => !!v && Array.isArray(v.titles))
     );
 
     const network$ = this.callListApi('getListTitles', {
@@ -119,63 +137,81 @@ export class ListsService {
       map((r: any) => ({
         success: !!r?.success,
         listTitle: typeof r?.listTitle === 'string' ? r.listTitle : undefined,
-        listDescription: typeof r?.listDescription === 'string' ? r.listDescription : undefined,
+        listDescription:
+          typeof r?.listDescription === 'string'
+            ? r.listDescription
+            : undefined,
         titles: Array.isArray(r?.titles)
-          ? (r.titles as AspenListTitle[]).map(t => ({
-            ...t,
-            image: this.normalizeDiscoveryUrl((t as any)?.image),
-            small_image: this.normalizeDiscoveryUrl((t as any)?.small_image),
-          }))
+          ? (r.titles as AspenListTitle[]).map((t) => ({
+              ...t,
+              image: this.normalizeDiscoveryUrl((t as any)?.image),
+              small_image: this.normalizeDiscoveryUrl((t as any)?.small_image),
+            }))
           : [],
-        totalResults: Number.isFinite(Number(r?.totalResults)) ? Number(r.totalResults) : undefined,
-        page_current: Number.isFinite(Number(r?.page_current)) ? Number(r.page_current) : undefined,
-        page_total: Number.isFinite(Number(r?.page_total)) ? Number(r.page_total) : undefined,
+        totalResults: Number.isFinite(Number(r?.totalResults))
+          ? Number(r.totalResults)
+          : undefined,
+        page_current: Number.isFinite(Number(r?.page_current))
+          ? Number(r.page_current)
+          : undefined,
+        page_total: Number.isFinite(Number(r?.page_total))
+          ? Number(r.page_total)
+          : undefined,
         message: typeof r?.message === 'string' ? r.message : undefined,
       })),
       tap((result) => {
-        if (accountId && result?.success) this.cache.write(cacheKey, result).catch(() => {});
-      }),
+        if (accountId && result?.success)
+          this.cache.write(cacheKey, result).catch(() => {});
+      })
     );
 
     return concat(cached$, network$);
   }
 
-  removeTitlesFromList(listId: string | number, recordIds: Array<string | number>): Observable<AspenListMutationResult> {
+  removeTitlesFromList(
+    listId: string | number,
+    recordIds: Array<string | number>
+  ): Observable<AspenListMutationResult> {
     const id = (listId ?? '').toString().trim();
     const records = (recordIds ?? [])
-      .map(r => (r ?? '').toString().trim())
-      .filter(r => !!r);
+      .map((r) => (r ?? '').toString().trim())
+      .filter((r) => !!r);
 
     if (!id) return throwError(() => new Error('missing_list_id'));
-    if (!records.length) return throwError(() => new Error('missing_record_ids'));
+    if (!records.length)
+      return throwError(() => new Error('missing_record_ids'));
 
     return this.callListApi('removeTitlesFromList', {
       listId: id,
       recordIds: records.join(','),
-    }).pipe(
-      map((r: any) => this.mapMutationResult(r)),
-    );
+    }).pipe(map((r: any) => this.mapMutationResult(r)));
   }
 
-  addTitlesToList(listId: string | number, recordIds: Array<string | number>): Observable<AspenListMutationResult> {
+  addTitlesToList(
+    listId: string | number,
+    recordIds: Array<string | number>
+  ): Observable<AspenListMutationResult> {
     const id = (listId ?? '').toString().trim();
     const records = (recordIds ?? [])
-      .map(r => (r ?? '').toString().trim())
-      .filter(r => !!r);
+      .map((r) => (r ?? '').toString().trim())
+      .filter((r) => !!r);
 
     if (!id) return throwError(() => new Error('missing_list_id'));
-    if (!records.length) return throwError(() => new Error('missing_record_ids'));
+    if (!records.length)
+      return throwError(() => new Error('missing_record_ids'));
 
     return this.callListApi('addTitlesToList', {
       listId: id,
       recordIds: records.join(','),
       source: 'GroupedWork',
-    }).pipe(
-      map((r: any) => this.mapMutationResult(r)),
-    );
+    }).pipe(map((r: any) => this.mapMutationResult(r)));
   }
 
-  createList(title: string, description = '', isPublic = false): Observable<AspenListMutationResult> {
+  createList(
+    title: string,
+    description = '',
+    isPublic = false
+  ): Observable<AspenListMutationResult> {
     const t = (title ?? '').toString().trim();
     if (!t) return throwError(() => new Error('missing_title'));
 
@@ -183,27 +219,28 @@ export class ListsService {
       title: t,
       description: (description ?? '').toString().trim(),
       public: isPublic ? '1' : '0',
-    }).pipe(
-      map((r: any) => this.mapMutationResult(r)),
-    );
+    }).pipe(map((r: any) => this.mapMutationResult(r)));
   }
 
   editList(
     listId: string | number,
-    updates: { title?: string; description?: string; isPublic?: boolean },
+    updates: { title?: string; description?: string; isPublic?: boolean }
   ): Observable<AspenListMutationResult> {
     const id = (listId ?? '').toString().trim();
     if (!id) return throwError(() => new Error('missing_list_id'));
 
     const params: Record<string, string> = { id };
-    if (updates?.title !== undefined) params['title'] = (updates.title ?? '').toString().trim();
-    if (updates?.description !== undefined) params['description'] = (updates.description ?? '').toString().trim();
+    if (updates?.title !== undefined)
+      params['title'] = (updates.title ?? '').toString().trim();
+    if (updates?.description !== undefined)
+      params['description'] = (updates.description ?? '').toString().trim();
     // Backend quirk: docs/api/ListAPI.php editList() does not treat string "0" as false.
     // Send explicit booleans-as-strings for editList only.
-    if (updates?.isPublic !== undefined) params['public'] = updates.isPublic ? 'true' : 'false';
+    if (updates?.isPublic !== undefined)
+      params['public'] = updates.isPublic ? 'true' : 'false';
 
     return this.callListApi('editList', params).pipe(
-      map((r: any) => this.mapMutationResult(r)),
+      map((r: any) => this.mapMutationResult(r))
     );
   }
 
@@ -214,9 +251,7 @@ export class ListsService {
     return this.callListApi('deleteList', {
       id,
       optOutOfSoftDeletion: 'false',
-    }).pipe(
-      map((r: any) => this.mapMutationResult(r)),
-    );
+    }).pipe(map((r: any) => this.mapMutationResult(r)));
   }
 
   private mapMutationResult(r: any): AspenListMutationResult {
@@ -235,14 +270,17 @@ export class ListsService {
     return this.discoveryUrls.normalize(input);
   }
 
-  private callListApi(method: string, extraParams?: Record<string, string>): Observable<any> {
+  private callListApi(
+    method: string,
+    extraParams?: Record<string, string>
+  ): Observable<any> {
     const snap = this.auth.snapshot();
     if (!snap.isLoggedIn || !snap.activeAccountId || !snap.activeAccountMeta) {
       return throwError(() => new Error('not_logged_in'));
     }
 
     return from(this.accounts.getPassword(snap.activeAccountId)).pipe(
-      switchMap(password => {
+      switchMap((password) => {
         if (!password) return throwError(() => new Error('missing_password'));
 
         let params = new HttpParams().set('method', method);
@@ -254,12 +292,18 @@ export class ListsService {
         body.set('username', snap.activeAccountMeta!.username);
         body.set('password', password);
 
-        const headers = new HttpHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' });
+        const headers = new HttpHeaders({
+          'Content-Type': 'application/x-www-form-urlencoded',
+        });
 
         return this.http
-          .post<any>(`${this.globals.aspen_api_base}/ListAPI`, body.toString(), { params, headers })
-          .pipe(map(raw => raw?.result ?? raw));
-      }),
+          .post<any>(
+            `${this.globals.aspen_api_base}/ListAPI`,
+            body.toString(),
+            { params, headers }
+          )
+          .pipe(map((raw) => raw?.result ?? raw));
+      })
     );
   }
 }

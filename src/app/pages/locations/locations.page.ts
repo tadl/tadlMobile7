@@ -1,10 +1,10 @@
-import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { IonicModule } from '@ionic/angular';
+import { Component, inject } from '@angular/core';
+
+import { IonicModule } from '@ionic/angular/lazy';
 import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
 import { LocationDetailComponent } from './location-detail/location-detail.component';
-import { ModalController } from '@ionic/angular/standalone';
+import { ModalController } from '@ionic/angular';
 import {
   LocationsService,
   type AppLocation,
@@ -27,9 +27,14 @@ type LocationStatusDisplay = {
   selector: 'app-locations',
   templateUrl: './locations.page.html',
   styleUrls: ['./locations.page.scss'],
-  imports: [CommonModule, IonicModule],
+  imports: [IonicModule],
 })
 export class LocationsPage {
+  globals = inject(Globals);
+  toast = inject(ToastService);
+  private locationsService = inject(LocationsService);
+  private modalController = inject(ModalController);
+
   url: string;
   locations: Location[] = [];
   loadingLocations = false;
@@ -38,17 +43,14 @@ export class LocationsPage {
   readonly placeholderImage = 'assets/placeholder.png';
   private brokenLocationImages = new WeakSet<Location>();
 
-  constructor(
-    public globals: Globals,
-    public toast: ToastService,
-    private locationsService: LocationsService,
-    private modalController: ModalController,
-  ) {
+  constructor() {
     this.url = this.globals.locations_list_url;
   }
 
   ionViewWillEnter() {
-    const latest = this.sortedLocations(this.locationsService.getLatestLocationsSnapshot());
+    const latest = this.sortedLocations(
+      this.locationsService.getLatestLocationsSnapshot()
+    );
     if (latest.length) {
       this.locations = latest;
     }
@@ -79,13 +81,16 @@ export class LocationsPage {
   }
 
   private sortedLocations(locations: Location[]): Location[] {
-    return (locations ?? []).slice().sort((a, b) =>
-      (a.fullname || '').localeCompare(b.fullname || ''),
-    );
+    return (locations ?? [])
+      .slice()
+      .sort((a, b) => (a.fullname || '').localeCompare(b.fullname || ''));
   }
 
   private todayKey(): LocationWeekdayKey | null {
-    const fromGlobals = (this.globals.day_today?.() || '').toString().toLowerCase().trim();
+    const fromGlobals = (this.globals.day_today?.() || '')
+      .toString()
+      .toLowerCase()
+      .trim();
     const map: Record<string, LocationWeekdayKey> = {
       sunday: 'sunday',
       monday: 'monday',
@@ -98,20 +103,32 @@ export class LocationsPage {
     if (fromGlobals && map[fromGlobals]) return map[fromGlobals];
 
     const d = new Date().getDay();
-    return (['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][
-      d
-    ] as LocationWeekdayKey) ?? null;
+    return (
+      ([
+        'sunday',
+        'monday',
+        'tuesday',
+        'wednesday',
+        'thursday',
+        'friday',
+        'saturday',
+      ][d] as LocationWeekdayKey) ?? null
+    );
   }
 
   locationStatus(loc: Location): LocationStatusDisplay | null {
-    const todayException = this.exceptionForDate(loc, this.globals.easternDateString());
+    const todayException = this.exceptionForDate(
+      loc,
+      this.globals.easternDateString()
+    );
     if (todayException) {
       const todayDisplay = this.formatStatusDisplay(
         todayException.hours,
         'today',
-        todayException.reason,
+        todayException.reason
       );
-      if (!this.isPastExceptionClosingHours(todayException.hours)) return todayDisplay;
+      if (!this.isPastExceptionClosingHours(todayException.hours))
+        return todayDisplay;
       return this.tomorrowStatus(loc) || todayDisplay;
     }
 
@@ -154,7 +171,9 @@ export class LocationsPage {
     ];
 
     const url =
-      candidates.find((v) => typeof v === 'string' && v.trim().length > 0)?.trim() ?? null;
+      candidates
+        .find((v) => typeof v === 'string' && v.trim().length > 0)
+        ?.trim() ?? null;
 
     return url || this.placeholderImage;
   }
@@ -163,7 +182,10 @@ export class LocationsPage {
     this.brokenLocationImages.add(loc);
   }
 
-  private exceptionForDate(loc: Location, dateKey: string): AppLocationException | null {
+  private exceptionForDate(
+    loc: Location,
+    dateKey: string
+  ): AppLocationException | null {
     const exceptions = Array.isArray(loc?.exceptions) ? loc.exceptions : [];
     for (const ex of exceptions) {
       if ((ex?.date ?? '').toString().trim() === dateKey) return ex;
@@ -172,24 +194,30 @@ export class LocationsPage {
   }
 
   private tomorrowStatus(loc: Location): LocationStatusDisplay | null {
-    const tomorrowException = this.exceptionForDate(loc, this.globals.easternDateStringPlusDays(1));
+    const tomorrowException = this.exceptionForDate(
+      loc,
+      this.globals.easternDateStringPlusDays(1)
+    );
     if (tomorrowException) {
       return this.formatStatusDisplay(
         tomorrowException.hours,
         'tomorrow',
-        tomorrowException.reason,
+        tomorrowException.reason
       );
     }
 
     const tomorrowKey = this.weekdayKeyPlusDays(1);
     if (!tomorrowKey) return null;
 
-    return this.formatStatusDisplay(formatLocationDayHours(loc, tomorrowKey), 'tomorrow');
+    return this.formatStatusDisplay(
+      formatLocationDayHours(loc, tomorrowKey),
+      'tomorrow'
+    );
   }
 
   private weekdayKeyPlusDays(days: number): LocationWeekdayKey | null {
     const weekday = this.globals.easternWeekdayKey(
-      new Date(Date.now() + days * 24 * 60 * 60 * 1000),
+      new Date(Date.now() + days * 24 * 60 * 60 * 1000)
     );
     const map: Record<string, LocationWeekdayKey> = {
       sunday: 'sunday',
@@ -206,12 +234,13 @@ export class LocationsPage {
   private formatStatusDisplay(
     rawHours: unknown,
     dayLabel: 'today' | 'tomorrow',
-    reason?: unknown,
+    reason?: unknown
   ): LocationStatusDisplay {
     const hours = (rawHours ?? '').toString().trim();
     const reasonText = (reason ?? '').toString().trim();
     if (!hours) {
-      const label = dayLabel === 'today' ? 'Hours Updated Today' : 'Hours Updated Tomorrow';
+      const label =
+        dayLabel === 'today' ? 'Hours Updated Today' : 'Hours Updated Tomorrow';
       return {
         label,
         detail: reasonText,
@@ -226,8 +255,8 @@ export class LocationsPage {
         ? 'Closed Today'
         : 'Closed Tomorrow'
       : dayLabel === 'today'
-        ? 'Open Today'
-        : 'Open Tomorrow';
+      ? 'Open Today'
+      : 'Open Tomorrow';
 
     const detail = [isClosed ? '' : hours, reasonText ? `(${reasonText})` : '']
       .filter(Boolean)
@@ -241,7 +270,10 @@ export class LocationsPage {
     };
   }
 
-  private isPastClosingHours(loc: Location, weekday: LocationWeekdayKey): boolean {
+  private isPastClosingHours(
+    loc: Location,
+    weekday: LocationWeekdayKey
+  ): boolean {
     if (isLocationClosed(loc, weekday)) return false;
 
     const closeTime = getLocationClosingMinutes(loc, weekday);
@@ -265,7 +297,9 @@ export class LocationsPage {
     const lower = trimmed.toLowerCase();
     if (lower.includes('midnight')) return 24 * 60;
 
-    const match = trimmed.match(/(?:to|-|–|—)\s*([0-9]{1,2})(?::([0-9]{2}))?\s*([AaPp][Mm])/);
+    const match = trimmed.match(
+      /(?:to|-|–|—)\s*([0-9]{1,2})(?::([0-9]{2}))?\s*([AaPp][Mm])/
+    );
     if (!match) return null;
 
     const hour12 = Number(match[1]);
@@ -286,8 +320,12 @@ export class LocationsPage {
       hour12: false,
     }).formatToParts(new Date());
 
-    const hour = Number(parts.find((part) => part.type === 'hour')?.value ?? '0');
-    const minute = Number(parts.find((part) => part.type === 'minute')?.value ?? '0');
+    const hour = Number(
+      parts.find((part) => part.type === 'hour')?.value ?? '0'
+    );
+    const minute = Number(
+      parts.find((part) => part.type === 'minute')?.value ?? '0'
+    );
     if (!Number.isFinite(hour) || !Number.isFinite(minute)) return 0;
     return hour * 60 + minute;
   }

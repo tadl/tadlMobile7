@@ -1,7 +1,13 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, OnDestroy, OnInit, inject } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
-import { IonicModule, ModalController, ActionSheetController, AlertController, type ActionSheetButton } from '@ionic/angular';
+import {
+  IonicModule,
+  ModalController,
+  ActionSheetController,
+  AlertController,
+  type ActionSheetButton,
+} from '@ionic/angular/lazy';
 import { ActivatedRoute, ParamMap } from '@angular/router';
 import { Router } from '@angular/router';
 import { finalize } from 'rxjs';
@@ -11,7 +17,12 @@ import { Keyboard } from '@capacitor/keyboard';
 
 import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
-import { SearchService, AspenSearchHit, AspenSearchIndex, AspenSearchSort } from '../../services/search.service';
+import {
+  SearchService,
+  AspenSearchHit,
+  AspenSearchIndex,
+  AspenSearchSort,
+} from '../../services/search.service';
 import { ItemDetailComponent } from '../../components/item-detail/item-detail.component';
 import { FormatFamilyService } from '../../services/format-family.service';
 import { ListsService, AspenUserList } from '../../services/lists.service';
@@ -19,7 +30,10 @@ import { HoldsService } from '../../services/holds.service';
 import { AuthService } from '../../services/auth.service';
 import { ListLookupService } from '../../services/list-lookup.service';
 import { SwitchUserModalComponent } from '../../components/switch-user-modal/switch-user-modal.component';
-import { HoldSupportService, HoldTargetOption } from '../../services/hold-support.service';
+import {
+  HoldSupportService,
+  HoldTargetOption,
+} from '../../services/hold-support.service';
 
 interface SearchFacetOption {
   filter: string;
@@ -48,9 +62,24 @@ interface SearchSortOption {
   selector: 'app-search',
   templateUrl: './search.page.html',
   styleUrls: ['./search.page.scss'],
-  imports: [CommonModule, FormsModule, IonicModule],
+  imports: [FormsModule, IonicModule],
 })
 export class SearchPage implements OnInit, OnDestroy {
+  globals = inject(Globals);
+  toast = inject(ToastService);
+  private searchService = inject(SearchService);
+  private modalController = inject(ModalController);
+  private actionSheetController = inject(ActionSheetController);
+  private alertCtrl = inject(AlertController);
+  private formatFamily = inject(FormatFamilyService);
+  private listsService = inject(ListsService);
+  private listLookup = inject(ListLookupService);
+  private holds = inject(HoldsService);
+  private auth = inject(AuthService);
+  private holdSupport = inject(HoldSupportService);
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
+
   lookfor = '';
   hits: AspenSearchHit[] = [];
   lastExecutedQuery = '';
@@ -93,23 +122,6 @@ export class SearchPage implements OnInit, OnDestroy {
   private pendingExternalFilters: string[] = [];
   private pendingMappedFilterSearch = false;
 
-  constructor(
-    public globals: Globals,
-    public toast: ToastService,
-    private searchService: SearchService,
-    private modalController: ModalController,
-    private actionSheetController: ActionSheetController,
-    private alertCtrl: AlertController,
-    private formatFamily: FormatFamilyService,
-    private listsService: ListsService,
-    private listLookup: ListLookupService,
-    private holds: HoldsService,
-    private auth: AuthService,
-    private holdSupport: HoldSupportService,
-    private route: ActivatedRoute,
-    private router: Router,
-  ) {}
-
   ngOnInit() {
     this.queryParamSub = this.route.queryParamMap.subscribe((qp) => {
       this.applyRouteQueryParams(qp);
@@ -129,7 +141,9 @@ export class SearchPage implements OnInit, OnDestroy {
   async searchMelcat() {
     const q = (this.lookfor ?? '').trim();
     if (!q) {
-      this.toast.presentToast('To search MeLCat, please provide a search query.');
+      this.toast.presentToast(
+        'To search MeLCat, please provide a search query.'
+      );
       return;
     }
     await this.globals.open_page(this.globals.melcatSearchUrl(q));
@@ -163,12 +177,17 @@ export class SearchPage implements OnInit, OnDestroy {
     const q = (qp.get('lookfor') ?? '').trim();
 
     const advancedParam = (qp.get('advanced') ?? '').trim();
-    const advanced = advancedParam === '1' || advancedParam.toLowerCase() === 'true';
+    const advanced =
+      advancedParam === '1' || advancedParam.toLowerCase() === 'true';
 
-    const incomingSearchIndex = (qp.get('searchIndex') ?? '').trim() as AspenSearchIndex;
+    const incomingSearchIndex = (
+      qp.get('searchIndex') ?? ''
+    ).trim() as AspenSearchIndex;
     const nextSearchIndex = incomingSearchIndex || 'Keyword';
 
-    const nextSort = this.normalizedSortValue((qp.get('sort') ?? '').trim() as AspenSearchSort);
+    const nextSort = this.normalizedSortValue(
+      (qp.get('sort') ?? '').trim() as AspenSearchSort
+    );
 
     const incomingFilters = qp
       .getAll('filter')
@@ -180,11 +199,16 @@ export class SearchPage implements OnInit, OnDestroy {
       .map((x) => x.trim())
       .filter((x) => !!x);
     const nextExternalFilters = Array.from(new Set(incomingExternalFilters));
-    const normalizedExternalFilters = this.normalizeInitialExternalFilters(nextExternalFilters);
-    const effectiveFilters = nextFilters.length ? nextFilters : normalizedExternalFilters;
+    const normalizedExternalFilters =
+      this.normalizeInitialExternalFilters(nextExternalFilters);
+    const effectiveFilters = nextFilters.length
+      ? nextFilters
+      : normalizedExternalFilters;
 
-    const hasSearchCriteria = !!q || effectiveFilters.length > 0 || nextExternalFilters.length > 0;
-    const shouldShowAdvanced = advanced || effectiveFilters.length > 0 || nextExternalFilters.length > 0;
+    const hasSearchCriteria =
+      !!q || effectiveFilters.length > 0 || nextExternalFilters.length > 0;
+    const shouldShowAdvanced =
+      advanced || effectiveFilters.length > 0 || nextExternalFilters.length > 0;
 
     const nextCoreStateKey = JSON.stringify({
       q,
@@ -193,7 +217,8 @@ export class SearchPage implements OnInit, OnDestroy {
       filters: effectiveFilters,
     });
 
-    const deepLinkTriggered = !!deepLinkToken && deepLinkToken !== this.lastHandledDeepLinkToken;
+    const deepLinkTriggered =
+      !!deepLinkToken && deepLinkToken !== this.lastHandledDeepLinkToken;
     if (deepLinkTriggered) {
       this.lastHandledDeepLinkToken = deepLinkToken;
     }
@@ -204,7 +229,10 @@ export class SearchPage implements OnInit, OnDestroy {
       nextSort !== this.sort ||
       !this.sameStringArray(effectiveFilters, this.filters);
 
-    if (!deepLinkTriggered && nextCoreStateKey === this.lastAppliedRouteCoreState) {
+    if (
+      !deepLinkTriggered &&
+      nextCoreStateKey === this.lastAppliedRouteCoreState
+    ) {
       return;
     }
     this.lastAppliedRouteCoreState = nextCoreStateKey;
@@ -242,14 +270,18 @@ export class SearchPage implements OnInit, OnDestroy {
 
   async scanIsbn() {
     if (Capacitor.getPlatform() === 'ios') {
-      this.toast.presentToast('ISBN scanning is temporarily unavailable on iPhone in this diagnostic build.');
+      this.toast.presentToast(
+        'ISBN scanning is temporarily unavailable on iPhone in this diagnostic build.'
+      );
       return;
     }
 
     if (!Capacitor.isNativePlatform()) {
       this.showAdvanced = true;
       this.searchIndex = 'ISBN';
-      this.toast.presentToast('ISBN scanning is available in iOS/Android app builds.');
+      this.toast.presentToast(
+        'ISBN scanning is available in iOS/Android app builds.'
+      );
       return;
     }
 
@@ -257,7 +289,9 @@ export class SearchPage implements OnInit, OnDestroy {
     this.scanningIsbn = true;
 
     try {
-      this.toast.presentToast('ISBN scanning is temporarily unavailable in this diagnostic build.');
+      this.toast.presentToast(
+        'ISBN scanning is temporarily unavailable in this diagnostic build.'
+      );
     } catch (err: any) {
       this.toast.presentToast(err?.message || 'Could not scan barcode.');
     } finally {
@@ -281,10 +315,13 @@ export class SearchPage implements OnInit, OnDestroy {
 
   runSearch(reset: boolean) {
     const q = (this.lookfor ?? '').trim();
-    this.filters = this.filters.filter(f => this.filterField(f) !== 'sort_by');
+    this.filters = this.filters.filter(
+      (f) => this.filterField(f) !== 'sort_by'
+    );
     const sortValue = this.normalizedSortValue(this.sort);
     if (sortValue !== this.sort) this.sort = sortValue;
-    const hasSearchCriteria = !!q || this.filters.length > 0 || this.pendingExternalFilters.length > 0;
+    const hasSearchCriteria =
+      !!q || this.filters.length > 0 || this.pendingExternalFilters.length > 0;
 
     if (!hasSearchCriteria) {
       this.lastExecutedQuery = '';
@@ -326,15 +363,17 @@ export class SearchPage implements OnInit, OnDestroy {
         includeSortList: true,
         filters: this.filters,
       })
-      .pipe(finalize(() => {
-        this.globals.api_loading = false;
-        if (this.pendingMappedFilterSearch) {
-          this.pendingMappedFilterSearch = false;
-          this.runSearch(true);
-        }
-      }))
+      .pipe(
+        finalize(() => {
+          this.globals.api_loading = false;
+          if (this.pendingMappedFilterSearch) {
+            this.pendingMappedFilterSearch = false;
+            this.runSearch(true);
+          }
+        })
+      )
       .subscribe({
-        next: res => {
+        next: (res) => {
           if (!res.success) {
             this.toast.presentToast('Search failed. Please try again.');
             this.hits = reset ? [] : this.hits;
@@ -347,7 +386,7 @@ export class SearchPage implements OnInit, OnDestroy {
           const allGroups = this.buildFacetGroups(res.facets);
           this.applySortOptionsFromGroups(allGroups);
           if (this.facetsEnabled) {
-            this.facetGroups = allGroups.filter(g => g.field !== 'sort_by');
+            this.facetGroups = allGroups.filter((g) => g.field !== 'sort_by');
             this.reconcileCollapsedFacetGroups();
             this.rebuildFacetDisplayMap();
             if (this.tryApplyPendingExternalFilters()) {
@@ -410,10 +449,10 @@ export class SearchPage implements OnInit, OnDestroy {
         finalize(() => {
           this.globals.api_loading = false;
           ev?.target?.complete();
-        }),
+        })
       )
       .subscribe({
-        next: res => {
+        next: (res) => {
           if (!res.success) {
             // roll back page if it failed
             this.page = Math.max(1, this.page - 1);
@@ -480,18 +519,22 @@ export class SearchPage implements OnInit, OnDestroy {
     this.showAdvanced = !this.showAdvanced;
   }
 
-  onFacetToggled(group: SearchFacetGroup, option: SearchFacetOption, checked: boolean) {
+  onFacetToggled(
+    group: SearchFacetGroup,
+    option: SearchFacetOption,
+    checked: boolean
+  ) {
     let next = [...this.filters];
 
     if (checked) {
       if (!group.multiSelect) {
-        next = next.filter(f => this.filterField(f) !== option.field);
+        next = next.filter((f) => this.filterField(f) !== option.field);
       }
       if (!next.includes(option.filter)) {
         next.push(option.filter);
       }
     } else {
-      next = next.filter(f => f !== option.filter);
+      next = next.filter((f) => f !== option.filter);
     }
 
     this.filters = next;
@@ -510,7 +553,7 @@ export class SearchPage implements OnInit, OnDestroy {
 
   removeFilter(filter: string) {
     if (!this.filters.includes(filter)) return;
-    this.filters = this.filters.filter(f => f !== filter);
+    this.filters = this.filters.filter((f) => f !== filter);
     this.runSearch(true);
   }
 
@@ -531,7 +574,7 @@ export class SearchPage implements OnInit, OnDestroy {
   }
 
   selectedOptionsForGroup(group: SearchFacetGroup): SearchFacetOption[] {
-    return group.options.filter(opt => this.isFacetSelected(opt.filter));
+    return group.options.filter((opt) => this.isFacetSelected(opt.filter));
   }
 
   async openDetail(hit: AspenSearchHit) {
@@ -577,7 +620,7 @@ export class SearchPage implements OnInit, OnDestroy {
         text: 'View Details',
         handler: () => this.openDetail(hit),
       },
-      { text: 'Close', role: 'cancel' },
+      { text: 'Close', role: 'cancel' }
     );
 
     if (this.auth.snapshot()?.isLoggedIn) {
@@ -640,7 +683,9 @@ export class SearchPage implements OnInit, OnDestroy {
     return parsed.toLocaleDateString();
   }
 
-  private buildFacetGroups(rawFacets?: Record<string, any>): SearchFacetGroup[] {
+  private buildFacetGroups(
+    rawFacets?: Record<string, any>
+  ): SearchFacetGroup[] {
     if (!rawFacets || typeof rawFacets !== 'object') return [];
 
     const groups: SearchFacetGroup[] = [];
@@ -650,7 +695,11 @@ export class SearchPage implements OnInit, OnDestroy {
       const multiSelect = !!(facetInfo as any)?.multiSelect;
       const groupField = (facetInfo as any)?.field?.toString?.().trim?.() || '';
       const list = (facetInfo as any)?.list ?? (facetInfo as any)?.facets;
-      const listValues = Array.isArray(list) ? list : (list && typeof list === 'object' ? Object.values(list) : []);
+      const listValues = Array.isArray(list)
+        ? list
+        : list && typeof list === 'object'
+        ? Object.values(list)
+        : [];
       const options: SearchFacetOption[] = [];
 
       for (const rawOption of listValues as any[]) {
@@ -670,13 +719,23 @@ export class SearchPage implements OnInit, OnDestroy {
       }
 
       if (!options.length) continue;
-      groups.push({ key: facetKey, field: groupField || facetKey, label, multiSelect, options });
+      groups.push({
+        key: facetKey,
+        field: groupField || facetKey,
+        label,
+        multiSelect,
+        options,
+      });
     }
 
     return groups;
   }
 
-  private inferFacetField(facetKey: string, rawOption: any, groupField?: string): string {
+  private inferFacetField(
+    facetKey: string,
+    rawOption: any,
+    groupField?: string
+  ): string {
     if (groupField) return groupField;
     const explicitField = (rawOption?.field ?? '').toString().trim();
     if (explicitField) return explicitField;
@@ -693,7 +752,10 @@ export class SearchPage implements OnInit, OnDestroy {
     this.facetDisplayByFilter.clear();
     for (const group of this.facetGroups) {
       for (const option of group.options) {
-        this.facetDisplayByFilter.set(option.filter, `${group.label}: ${option.display}`);
+        this.facetDisplayByFilter.set(
+          option.filter,
+          `${group.label}: ${option.display}`
+        );
       }
     }
   }
@@ -709,7 +771,10 @@ export class SearchPage implements OnInit, OnDestroy {
 
   private decodeLabel(input: any): string {
     if (typeof input !== 'string') return '';
-    let s = input.replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+    let s = input
+      .replace(/&nbsp;/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
     try {
       const txt = document.createElement('textarea');
       txt.innerHTML = s;
@@ -739,22 +804,22 @@ export class SearchPage implements OnInit, OnDestroy {
   }
 
   private applySortOptionsFromGroups(groups: SearchFacetGroup[]) {
-    const sortGroup = groups.find(g => g.field === 'sort_by');
+    const sortGroup = groups.find((g) => g.field === 'sort_by');
     if (!sortGroup?.options?.length) return;
 
-    const options: SearchSortOption[] = sortGroup.options.map(o => ({
+    const options: SearchSortOption[] = sortGroup.options.map((o) => ({
       value: o.value,
       label: o.display || o.value,
     }));
     this.sortOptions = options;
 
-    const applied = sortGroup.options.find(o => o.isApplied);
+    const applied = sortGroup.options.find((o) => o.isApplied);
     if (applied?.value) {
       this.sort = applied.value;
       return;
     }
 
-    if (!options.some(o => o.value === this.sort)) {
+    if (!options.some((o) => o.value === this.sort)) {
       this.sort = options[0].value;
     }
   }
@@ -801,12 +866,16 @@ export class SearchPage implements OnInit, OnDestroy {
 
     const sheet = await this.actionSheetController.create({
       header: 'Add to which list?',
-      subHeader: lastListUsed ? 'Most recently used list is shown first.' : undefined,
+      subHeader: lastListUsed
+        ? 'Most recently used list is shown first.'
+        : undefined,
       buttons: [
-        ...lists.map((list): ActionSheetButton => ({
-          text: this.actionListLabel(list),
-          handler: () => this.addRecordToNamedList(list, hit),
-        })),
+        ...lists.map(
+          (list): ActionSheetButton => ({
+            text: this.actionListLabel(list),
+            handler: () => this.addRecordToNamedList(list, hit),
+          })
+        ),
         { text: 'Close', role: 'cancel' },
       ],
     });
@@ -825,13 +894,18 @@ export class SearchPage implements OnInit, OnDestroy {
     const recordId = (hit?.key ?? '').toString().trim();
     if (!listId || !recordId) return;
     if (this.rowActionBusy(hit)) return;
-    if (this.listLookup.cachedMembershipsForRecord(recordId).some((m) => m.listId === listId)) {
+    if (
+      this.listLookup
+        .cachedMembershipsForRecord(recordId)
+        .some((m) => m.listId === listId)
+    ) {
       this.toast.presentToast('Already on this list.');
       return;
     }
 
     this.setRowBusy(hit, true);
-    this.listsService.addTitlesToList(listId, [recordId])
+    this.listsService
+      .addTitlesToList(listId, [recordId])
       .pipe(finalize(() => this.setRowBusy(hit, false)))
       .subscribe({
         next: (res) => {
@@ -839,7 +913,8 @@ export class SearchPage implements OnInit, OnDestroy {
             this.toast.presentToast(res?.message || 'Could not add to list.');
             return;
           }
-          const listTitle = (list?.title ?? '').toString().trim() || 'Untitled list';
+          const listTitle =
+            (list?.title ?? '').toString().trim() || 'Untitled list';
           this.listLookup.upsertMembership(recordId, listId, listTitle);
           this.toast.presentToast(res?.message || 'Added to list.');
         },
@@ -847,7 +922,10 @@ export class SearchPage implements OnInit, OnDestroy {
       });
   }
 
-  private orderListsForAction(lists: AspenUserList[], lastListUsed: string | null): AspenUserList[] {
+  private orderListsForAction(
+    lists: AspenUserList[],
+    lastListUsed: string | null
+  ): AspenUserList[] {
     const preferred = (lastListUsed ?? '').toString().trim();
     if (!preferred) return (lists ?? []).slice();
 
@@ -877,7 +955,8 @@ export class SearchPage implements OnInit, OnDestroy {
 
     if (this.rowActionBusy(hit)) return;
     this.setRowBusy(hit, true);
-    this.listsService.createList(basics.title, basics.description, isPublic)
+    this.listsService
+      .createList(basics.title, basics.description, isPublic)
       .pipe(finalize(() => this.setRowBusy(hit, false)))
       .subscribe({
         next: (res) => {
@@ -902,7 +981,7 @@ export class SearchPage implements OnInit, OnDestroy {
   private async promptListBasics(
     header: string,
     initialTitle = '',
-    initialDescription = '',
+    initialDescription = ''
   ): Promise<{ title: string; description: string } | null> {
     return new Promise(async (resolve) => {
       const alert = await this.alertCtrl.create({
@@ -942,7 +1021,9 @@ export class SearchPage implements OnInit, OnDestroy {
     });
   }
 
-  private async promptVisibility(initialPublic: boolean): Promise<boolean | null> {
+  private async promptVisibility(
+    initialPublic: boolean
+  ): Promise<boolean | null> {
     return new Promise(async (resolve) => {
       const alert = await this.alertCtrl.create({
         header: 'List Visibility',
@@ -976,16 +1057,22 @@ export class SearchPage implements OnInit, OnDestroy {
     });
   }
 
-  private async placeHoldFromHit(hit: AspenSearchHit, precomputedTargets?: HoldTargetOption[]): Promise<void> {
+  private async placeHoldFromHit(
+    hit: AspenSearchHit,
+    precomputedTargets?: HoldTargetOption[]
+  ): Promise<void> {
     const loggedIn = await this.ensureLoggedInForHoldAction();
     if (!loggedIn) return;
     if (!this.canPlaceHoldFromHit(hit)) {
-      this.toast.presentToast('No physical holdable format found for this result.');
+      this.toast.presentToast(
+        'No physical holdable format found for this result.'
+      );
       return;
     }
     if (this.rowActionBusy(hit)) return;
 
-    const holdTargets = precomputedTargets ?? await this.holdTargetsWithStatusForHit(hit);
+    const holdTargets =
+      precomputedTargets ?? (await this.holdTargetsWithStatusForHit(hit));
     const availableTargets = holdTargets.filter((x) => !x.isOnHold);
 
     if (!availableTargets.length) {
@@ -1002,14 +1089,27 @@ export class SearchPage implements OnInit, OnDestroy {
 
     const defaultPickup = await this.holdSupport.defaultPickupBranchCode();
     if (defaultPickup) {
-      this.placeHoldNow(hit, selectedTarget.recordId, defaultPickup, selectedTarget.formatLabel || selectedTarget.label);
+      this.placeHoldNow(
+        hit,
+        selectedTarget.recordId,
+        defaultPickup,
+        selectedTarget.formatLabel || selectedTarget.label
+      );
       return;
     }
 
-    const buttons: ActionSheetButton[] = this.globals.pickupLocations.map((loc) => ({
-      text: loc.name,
-      handler: () => this.placeHoldNow(hit, selectedTarget.recordId, loc.code, selectedTarget.formatLabel || selectedTarget.label),
-    }));
+    const buttons: ActionSheetButton[] = this.globals.pickupLocations.map(
+      (loc) => ({
+        text: loc.name,
+        handler: () =>
+          this.placeHoldNow(
+            hit,
+            selectedTarget.recordId,
+            loc.code,
+            selectedTarget.formatLabel || selectedTarget.label
+          ),
+      })
+    );
     buttons.push({ text: 'Close', role: 'cancel' });
 
     const sheet = await this.actionSheetController.create({
@@ -1021,7 +1121,8 @@ export class SearchPage implements OnInit, OnDestroy {
 
   private async ensureLoggedInForHoldAction(): Promise<boolean> {
     const snap = this.auth.snapshot();
-    if (snap?.isLoggedIn && snap?.activeAccountId && snap?.activeAccountMeta) return true;
+    if (snap?.isLoggedIn && snap?.activeAccountId && snap?.activeAccountMeta)
+      return true;
 
     const priorModalState = this.globals.modal_open;
     const modal = await this.modalController.create({
@@ -1033,18 +1134,23 @@ export class SearchPage implements OnInit, OnDestroy {
     this.globals.modal_open = priorModalState || this.globals.modal_open;
 
     const next = this.auth.snapshot();
-    return !!(next?.isLoggedIn && next?.activeAccountId && next?.activeAccountMeta);
+    return !!(
+      next?.isLoggedIn &&
+      next?.activeAccountId &&
+      next?.activeAccountMeta
+    );
   }
 
   private placeHoldNow(
     hit: AspenSearchHit,
     recordId: string,
     pickupBranch: string,
-    selectedFormatLabel?: string,
+    selectedFormatLabel?: string
   ): void {
     if (this.rowActionBusy(hit)) return;
     this.setRowBusy(hit, true);
-    this.holds.placeHold(recordId, pickupBranch, null)
+    this.holds
+      .placeHold(recordId, pickupBranch, null)
       .pipe(finalize(() => this.setRowBusy(hit, false)))
       .subscribe({
         next: (res) => {
@@ -1053,30 +1159,42 @@ export class SearchPage implements OnInit, OnDestroy {
             return;
           }
           this.auth.adjustActiveProfileCounts({ holds: 1, holdsRequested: 1 });
-          void this.holdSupport.cacheOptimisticPlacedHold({
-            groupedKey: hit.key,
-            itemList: hit.itemList,
-            rawItemList: (hit.raw as any)?.itemList,
-            title: hit.title,
-            author: hit.author,
-            coverUrl: hit.coverUrl,
-          }, recordId, selectedFormatLabel);
+          void this.holdSupport.cacheOptimisticPlacedHold(
+            {
+              groupedKey: hit.key,
+              itemList: hit.itemList,
+              rawItemList: (hit.raw as any)?.itemList,
+              title: hit.title,
+              author: hit.author,
+              coverUrl: hit.coverUrl,
+            },
+            recordId,
+            selectedFormatLabel
+          );
           const title = (hit?.title ?? '').toString().trim() || 'this title';
           if (selectedFormatLabel) {
-            void this.toast.presentHoldPlacedToast(`Hold placed: ${title} (${selectedFormatLabel})`, () => {
-              void this.router.navigate(['/holds']);
-            });
+            void this.toast.presentHoldPlacedToast(
+              `Hold placed: ${title} (${selectedFormatLabel})`,
+              () => {
+                void this.router.navigate(['/holds']);
+              }
+            );
             return;
           }
-          void this.toast.presentHoldPlacedToast(`Hold placed: ${title}`, () => {
-            void this.router.navigate(['/holds']);
-          });
+          void this.toast.presentHoldPlacedToast(
+            `Hold placed: ${title}`,
+            () => {
+              void this.router.navigate(['/holds']);
+            }
+          );
         },
         error: () => this.toast.presentToast('Could not place hold.'),
       });
   }
 
-  private async holdTargetsWithStatusForHit(hit: AspenSearchHit): Promise<HoldTargetOption[]> {
+  private async holdTargetsWithStatusForHit(
+    hit: AspenSearchHit
+  ): Promise<HoldTargetOption[]> {
     if (!this.canPlaceHoldFromHit(hit)) return [];
     return this.holdSupport.holdTargetsWithStatus({
       groupedKey: hit.key,
@@ -1088,13 +1206,17 @@ export class SearchPage implements OnInit, OnDestroy {
     });
   }
 
-  private async pickHoldTarget(options: HoldTargetOption[]): Promise<HoldTargetOption | null> {
+  private async pickHoldTarget(
+    options: HoldTargetOption[]
+  ): Promise<HoldTargetOption | null> {
     return new Promise(async (resolve) => {
       const sorted = [...options].sort((a, b) => {
         const aHeld = !!a.isOnHold;
         const bHeld = !!b.isOnHold;
         if (aHeld !== bHeld) return aHeld ? -1 : 1;
-        return (a.label || '').localeCompare((b.label || ''), undefined, { sensitivity: 'base' });
+        return (a.label || '').localeCompare(b.label || '', undefined, {
+          sensitivity: 'base',
+        });
       });
       const sheet = await this.actionSheetController.create({
         header: 'Place hold on which format?',
@@ -1126,7 +1248,9 @@ export class SearchPage implements OnInit, OnDestroy {
     });
   }
 
-  private async hasCachedHoldForGroupedWork(hit: AspenSearchHit): Promise<boolean> {
+  private async hasCachedHoldForGroupedWork(
+    hit: AspenSearchHit
+  ): Promise<boolean> {
     return this.holdSupport.hasCachedHoldForGroupedKey(hit.key);
   }
 
@@ -1136,9 +1260,18 @@ export class SearchPage implements OnInit, OnDestroy {
     const hasSearchCriteria = hasQuery || this.filters.length > 0;
     const queryParams: Record<string, any> = {
       lookfor: hasSearchCriteria ? lookfor : null,
-      advanced: hasSearchCriteria && (this.showAdvanced || this.filters.length > 0) ? '1' : null,
-      searchIndex: hasSearchCriteria && this.searchIndex && this.searchIndex !== 'Keyword' ? this.searchIndex : null,
-      sort: hasSearchCriteria && this.sort && this.sort !== 'relevance' ? this.sort : null,
+      advanced:
+        hasSearchCriteria && (this.showAdvanced || this.filters.length > 0)
+          ? '1'
+          : null,
+      searchIndex:
+        hasSearchCriteria && this.searchIndex && this.searchIndex !== 'Keyword'
+          ? this.searchIndex
+          : null,
+      sort:
+        hasSearchCriteria && this.sort && this.sort !== 'relevance'
+          ? this.sort
+          : null,
       filter: hasSearchCriteria && this.filters.length ? this.filters : null,
       extFilter: null,
       dl: null,
@@ -1166,11 +1299,13 @@ export class SearchPage implements OnInit, OnDestroy {
       return false;
     }
 
-    const supported = Array.from(new Set(
-      this.pendingExternalFilters
-        .map((filter) => this.resolveExternalFilter(filter))
-        .filter((value): value is string => !!value),
-    ));
+    const supported = Array.from(
+      new Set(
+        this.pendingExternalFilters
+          .map((filter) => this.resolveExternalFilter(filter))
+          .filter((value): value is string => !!value)
+      )
+    );
     this.pendingExternalFilters = [];
     if (!supported.length) return false;
     if (this.sameStringArray(supported, this.filters)) return false;
@@ -1188,7 +1323,8 @@ export class SearchPage implements OnInit, OnDestroy {
       for (const option of group.options) {
         if (
           this.externalFilterFieldMatches(parsed.field, option.field) &&
-          this.normalizeExternalFilterToken(parsed.value) === this.normalizeExternalFilterToken(option.value)
+          this.normalizeExternalFilterToken(parsed.value) ===
+            this.normalizeExternalFilterToken(option.value)
         ) {
           return option.filter;
         }
@@ -1199,11 +1335,13 @@ export class SearchPage implements OnInit, OnDestroy {
   }
 
   private normalizeInitialExternalFilters(filters: string[]): string[] {
-    return Array.from(new Set(
-      (filters ?? [])
-        .map((filter) => this.normalizeExternalFilterCandidate(filter))
-        .filter((value): value is string => !!value),
-    ));
+    return Array.from(
+      new Set(
+        (filters ?? [])
+          .map((filter) => this.normalizeExternalFilterCandidate(filter))
+          .filter((value): value is string => !!value)
+      )
+    );
   }
 
   private normalizeExternalFilterCandidate(filter: string): string | null {
@@ -1215,12 +1353,16 @@ export class SearchPage implements OnInit, OnDestroy {
       field = 'local_time_since_added_tadl';
     }
 
-    const value = this.decodeExternalFilterValue(parsed.value).replace(/^"+|"+$/g, '').trim();
+    const value = this.decodeExternalFilterValue(parsed.value)
+      .replace(/^"+|"+$/g, '')
+      .trim();
     if (!field || !value) return null;
     return `${field}:${value}`;
   }
 
-  private parseExternalFilter(filter: string): { field: string; value: string } | null {
+  private parseExternalFilter(
+    filter: string
+  ): { field: string; value: string } | null {
     const raw = this.decodeExternalFilterValue(filter);
     const idx = raw.indexOf(':');
     if (idx <= 0) return null;
@@ -1246,14 +1388,20 @@ export class SearchPage implements OnInit, OnDestroy {
     return current.replace(/\+/g, ' ');
   }
 
-  private externalFilterFieldMatches(incomingField: string, optionField: string): boolean {
+  private externalFilterFieldMatches(
+    incomingField: string,
+    optionField: string
+  ): boolean {
     const left = this.normalizeExternalFilterToken(incomingField);
     const right = this.normalizeExternalFilterToken(optionField);
     if (left === right) return true;
 
     // Discovery links sometimes carry branch-specific "added in the last" fields
     // while SearchAPI facets return the shared TADL field name.
-    return left.startsWith('local_time_since_added_') && right.startsWith('local_time_since_added_');
+    return (
+      left.startsWith('local_time_since_added_') &&
+      right.startsWith('local_time_since_added_')
+    );
   }
 
   private normalizeExternalFilterToken(input: string): string {

@@ -1,6 +1,6 @@
-import { Component, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { IonicModule } from '@ionic/angular';
+import { Component, OnInit, inject } from '@angular/core';
+
+import { IonicModule } from '@ionic/angular/lazy';
 import { finalize } from 'rxjs';
 
 import { Globals } from '../../globals';
@@ -17,16 +17,14 @@ interface WebcamStreamViewModel {
   selector: 'app-webcams',
   templateUrl: './webcams.page.html',
   styleUrls: ['./webcams.page.scss'],
-  imports: [CommonModule, IonicModule],
+  imports: [IonicModule],
 })
 export class WebcamsPage implements OnInit {
+  globals = inject(Globals);
+  private webcamsService = inject(WebcamsService);
+
   webcams: WebcamStreamViewModel[] = [];
   loading = false;
-
-  constructor(
-    public globals: Globals,
-    private webcamsService: WebcamsService,
-  ) {}
 
   ngOnInit() {
     this.refresh();
@@ -40,10 +38,12 @@ export class WebcamsPage implements OnInit {
     this.loading = true;
     this.webcamsService
       .getWebcams()
-      .pipe(finalize(() => {
-        this.loading = false;
-        event?.detail?.complete?.();
-      }))
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+          event?.detail?.complete?.();
+        })
+      )
       .subscribe({
         next: (items) => {
           this.webcams = items.map((item) => this.toStream(item));

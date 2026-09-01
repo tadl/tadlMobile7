@@ -1,11 +1,14 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { lastValueFrom } from 'rxjs';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 
 import { AuthService } from './auth.service';
 import { AccountStoreService } from './account-store.service';
 import { ListsService } from './lists.service';
-import { AccountPreferences, AccountPreferencesService } from './account-preferences.service';
+import {
+  AccountPreferences,
+  AccountPreferencesService,
+} from './account-preferences.service';
 import { AppCacheService } from './app-cache.service';
 import { Globals } from '../globals';
 import { AspenUserList } from './lists.service';
@@ -13,20 +16,18 @@ import { LocationsService } from './locations.service';
 
 @Injectable({ providedIn: 'root' })
 export class CacheWarmService {
+  private http = inject(HttpClient);
+  private globals = inject(Globals);
+  private auth = inject(AuthService);
+  private accounts = inject(AccountStoreService);
+  private lists = inject(ListsService);
+  private preferences = inject(AccountPreferencesService);
+  private cache = inject(AppCacheService);
+  private locations = inject(LocationsService);
+
   private readonly warmThrottleMs = 5 * 60 * 1000;
   private lastWarmAt = 0;
   private lastWarmAccountId: string | null = null;
-
-  constructor(
-    private http: HttpClient,
-    private globals: Globals,
-    private auth: AuthService,
-    private accounts: AccountStoreService,
-    private lists: ListsService,
-    private preferences: AccountPreferencesService,
-    private cache: AppCacheService,
-    private locations: LocationsService,
-  ) {}
 
   warmForActiveAccount(): void {
     const snap = this.auth.snapshot();
@@ -78,21 +79,25 @@ export class CacheWarmService {
   private async warmPreferencesForActiveAccount(): Promise<void> {
     const snap = this.auth.snapshot();
     const accountId = (snap?.activeAccountId ?? '').toString().trim();
-    const username = (snap?.activeAccountMeta?.username ?? '').toString().trim();
+    const username = (snap?.activeAccountMeta?.username ?? '')
+      .toString()
+      .trim();
     if (!accountId || !username) return;
 
     const password = await this.accounts.getPassword(accountId);
     if (!password) return;
 
     await lastValueFrom(
-      this.preferences.fetchForAccount(accountId, username, password),
+      this.preferences.fetchForAccount(accountId, username, password)
     );
   }
 
   private async warmFromBundledEndpoint(): Promise<boolean> {
     const snap = this.auth.snapshot();
     const accountId = (snap?.activeAccountId ?? '').toString().trim();
-    const username = (snap?.activeAccountMeta?.username ?? '').toString().trim();
+    const username = (snap?.activeAccountMeta?.username ?? '')
+      .toString()
+      .trim();
     if (!accountId || !username) return false;
 
     const password = await this.accounts.getPassword(accountId);
@@ -101,12 +106,18 @@ export class CacheWarmService {
     const body = new URLSearchParams();
     body.set('username', username);
     body.set('password', password);
-    const headers = new HttpHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' });
+    const headers = new HttpHeaders({
+      'Content-Type': 'application/x-www-form-urlencoded',
+    });
 
     let raw: any;
     try {
       raw = await lastValueFrom(
-        this.http.post<any>(`${this.globals.aspen_api_base}/CacheWarm`, body.toString(), { headers }),
+        this.http.post<any>(
+          `${this.globals.aspen_api_base}/CacheWarm`,
+          body.toString(),
+          { headers }
+        )
       );
     } catch {
       return false;
@@ -135,7 +146,7 @@ export class CacheWarmService {
     if (prefsRaw && typeof prefsRaw === 'object') {
       await this.preferences.persistPreferencesForAccount(
         accountId,
-        prefsRaw as AccountPreferences,
+        prefsRaw as AccountPreferences
       );
     }
 

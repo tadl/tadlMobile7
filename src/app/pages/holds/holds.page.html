@@ -28,104 +28,115 @@
   ></ion-searchbar>
 
   <!-- READY section only if > 0 -->
-  <ng-container *ngIf="filteredIlsReady.length > 0">
-    <div class="section-title">
-      Ready for pickup
-      <ion-badge class="count-badge">{{ filteredIlsReady.length }}</ion-badge>
-    </div>
-
-    <ion-list lines="full" class="full-list">
-      <ion-item
-        button
-        detail="false"
-        class="hold-row"
-        *ngFor="let h of filteredIlsReady; trackBy: trackByHold"
-        (click)="openHold(h)"
-      >
-        <ion-thumbnail slot="start" *ngIf="h.coverUrl">
-          <img [src]="h.coverUrl" alt="" />
-        </ion-thumbnail>
-        <ion-thumbnail slot="start" *ngIf="showMelcatPlaceholder(h)" class="melcat-placeholder-thumb">
-          <img [src]="melcatPlaceholderImage" alt="MeLCat" />
-        </ion-thumbnail>
-
-        <ion-label class="ion-text-wrap">
-          <div class="result-title">
-            <ion-icon [name]="mediaIconNameForHold(h)" aria-hidden="true"></ion-icon>
-            <span class="title">{{ holdTitle(h) }}</span>
-          </div>
-          <div class="sub" *ngIf="holdAuthor(h)">{{ holdAuthor(h) }}</div>
-          <ion-note class="status" [ngClass]="holdStatusClass(h)">{{ readyPickupDeadline(h) || holdStatus(h) }}</ion-note>
-          <ion-note *ngIf="h.pickupLocationName" class="pickup">{{ h.pickupLocationName }}</ion-note>
-        </ion-label>
-
-        <div slot="end" class="hold-actions" (click)="$event.stopPropagation()">
-          <ion-button
-            fill="clear"
-            size="small"
-            class="hold-actions-btn"
-            [disabled]="isHoldActionBusy(h)"
-            (click)="openHoldActions(h, $event)"
-            aria-label="Hold actions"
-          >
-            <ion-icon name="ellipsis-vertical" slot="icon-only"></ion-icon>
-          </ion-button>
+  @if (filteredIlsReady.length > 0) {
+  <div class="section-title">
+    Ready for pickup
+    <ion-badge class="count-badge">{{ filteredIlsReady.length }}</ion-badge>
+  </div>
+  <ion-list lines="full" class="full-list">
+    @for (h of filteredIlsReady; track trackByHold($index, h)) {
+    <ion-item button detail="false" class="hold-row" (click)="openHold(h)">
+      @if (h.coverUrl) {
+      <ion-thumbnail slot="start">
+        <img [src]="h.coverUrl" alt="" />
+      </ion-thumbnail>
+      } @if (showMelcatPlaceholder(h)) {
+      <ion-thumbnail slot="start" class="melcat-placeholder-thumb">
+        <img [src]="melcatPlaceholderImage" alt="MeLCat" />
+      </ion-thumbnail>
+      }
+      <ion-label class="ion-text-wrap">
+        <div class="result-title">
+          <ion-icon
+            [name]="mediaIconNameForHold(h)"
+            aria-hidden="true"
+          ></ion-icon>
+          <span class="title">{{ holdTitle(h) }}</span>
         </div>
-      </ion-item>
-    </ion-list>
-  </ng-container>
-
-  <ng-container *ngIf="filteredIlsNotReady.length > 0">
-    <div class="section-title">
-      Not ready
-      <ion-badge class="count-badge">{{ filteredIlsNotReady.length }}</ion-badge>
-    </div>
-
-    <ion-list lines="full" class="full-list">
-      <ion-item
-        button
-        detail="false"
-        class="hold-row"
-        *ngFor="let h of filteredIlsNotReady; trackBy: trackByHold"
-        (click)="openHold(h)"
-      >
-        <ion-thumbnail slot="start" *ngIf="h.coverUrl">
-          <img [src]="h.coverUrl" alt="" />
-        </ion-thumbnail>
-        <ion-thumbnail slot="start" *ngIf="showMelcatPlaceholder(h)" class="melcat-placeholder-thumb">
-          <img [src]="melcatPlaceholderImage" alt="MeLCat" />
-        </ion-thumbnail>
-
-        <ion-label class="ion-text-wrap">
-          <div class="result-title">
-            <ion-icon [name]="mediaIconNameForHold(h)" aria-hidden="true"></ion-icon>
-            <span class="title">{{ holdTitle(h) }}</span>
-          </div>
-          <div class="sub" *ngIf="holdAuthor(h)">{{ holdAuthor(h) }}</div>
-          <ion-note class="status" [ngClass]="holdStatusClass(h)">{{ holdStatus(h) }}</ion-note>
-          <ion-note *ngIf="h.pickupLocationName" class="pickup">{{ h.pickupLocationName }}</ion-note>
-        </ion-label>
-
-        <div slot="end" class="hold-actions" (click)="$event.stopPropagation()">
-          <ion-button
-            fill="clear"
-            size="small"
-            class="hold-actions-btn"
-            [disabled]="isHoldActionBusy(h)"
-            (click)="openHoldActions(h, $event)"
-            aria-label="Hold actions"
-          >
-            <ion-icon name="ellipsis-vertical" slot="icon-only"></ion-icon>
-          </ion-button>
+        @if (holdAuthor(h)) {
+        <div class="sub">{{ holdAuthor(h) }}</div>
+        }
+        <ion-note class="status" [ngClass]="holdStatusClass(h)"
+          >{{ readyPickupDeadline(h) || holdStatus(h) }}</ion-note
+        >
+        @if (h.pickupLocationName) {
+        <ion-note class="pickup">{{ h.pickupLocationName }}</ion-note>
+        }
+      </ion-label>
+      <div slot="end" class="hold-actions" (click)="$event.stopPropagation()">
+        <ion-button
+          fill="clear"
+          size="small"
+          class="hold-actions-btn"
+          [disabled]="isHoldActionBusy(h)"
+          (click)="openHoldActions(h, $event)"
+          aria-label="Hold actions"
+        >
+          <ion-icon name="ellipsis-vertical" slot="icon-only"></ion-icon>
+        </ion-button>
+      </div>
+    </ion-item>
+    }
+  </ion-list>
+  } @if (filteredIlsNotReady.length > 0) {
+  <div class="section-title">
+    Not ready
+    <ion-badge class="count-badge">{{ filteredIlsNotReady.length }}</ion-badge>
+  </div>
+  <ion-list lines="full" class="full-list">
+    @for (h of filteredIlsNotReady; track trackByHold($index, h)) {
+    <ion-item button detail="false" class="hold-row" (click)="openHold(h)">
+      @if (h.coverUrl) {
+      <ion-thumbnail slot="start">
+        <img [src]="h.coverUrl" alt="" />
+      </ion-thumbnail>
+      } @if (showMelcatPlaceholder(h)) {
+      <ion-thumbnail slot="start" class="melcat-placeholder-thumb">
+        <img [src]="melcatPlaceholderImage" alt="MeLCat" />
+      </ion-thumbnail>
+      }
+      <ion-label class="ion-text-wrap">
+        <div class="result-title">
+          <ion-icon
+            [name]="mediaIconNameForHold(h)"
+            aria-hidden="true"
+          ></ion-icon>
+          <span class="title">{{ holdTitle(h) }}</span>
         </div>
-      </ion-item>
-    </ion-list>
-  </ng-container>
+        @if (holdAuthor(h)) {
+        <div class="sub">{{ holdAuthor(h) }}</div>
+        }
+        <ion-note class="status" [ngClass]="holdStatusClass(h)"
+          >{{ holdStatus(h) }}</ion-note
+        >
+        @if (h.pickupLocationName) {
+        <ion-note class="pickup">{{ h.pickupLocationName }}</ion-note>
+        }
+      </ion-label>
+      <div slot="end" class="hold-actions" (click)="$event.stopPropagation()">
+        <ion-button
+          fill="clear"
+          size="small"
+          class="hold-actions-btn"
+          [disabled]="isHoldActionBusy(h)"
+          (click)="openHoldActions(h, $event)"
+          aria-label="Hold actions"
+        >
+          <ion-icon name="ellipsis-vertical" slot="icon-only"></ion-icon>
+        </ion-button>
+      </div>
+    </ion-item>
+    }
+  </ion-list>
+  }
 
   <!-- If we have data and both sections empty, show nothing; but if fully empty after load, show a friendly note -->
-  <ion-item *ngIf="!loading && !hasAnyVisibleData">
+  @if (!loading && !hasAnyVisibleData) {
+  <ion-item>
     <ion-label class="ion-text-wrap">
-      {{ hasActiveQuery ? 'No holds match your filter.' : 'No holds right now.' }}
+      {{ hasActiveQuery ? 'No holds match your filter.' : 'No holds right now.'
+      }}
     </ion-label>
   </ion-item>
+  }
 </ion-content>

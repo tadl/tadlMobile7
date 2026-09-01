@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { lastValueFrom } from 'rxjs';
 
 import { AuthService } from './auth.service';
@@ -26,24 +26,26 @@ export interface HoldableEntryContext {
 
 @Injectable({ providedIn: 'root' })
 export class HoldSupportService {
-  constructor(
-    private auth: AuthService,
-    private holds: HoldsService,
-    private items: ItemService,
-    private accountPreferences: AccountPreferencesService,
-    private formatFamily: FormatFamilyService,
-    private globals: Globals,
-  ) {}
+  private auth = inject(AuthService);
+  private holds = inject(HoldsService);
+  private items = inject(ItemService);
+  private accountPreferences = inject(AccountPreferencesService);
+  private formatFamily = inject(FormatFamilyService);
+  private globals = inject(Globals);
 
   async hasCachedHoldForGroupedKey(groupedKey: string): Promise<boolean> {
     const normalized = this.normalizeGroupedKey(groupedKey);
     if (!normalized) return false;
 
     const holds = await this.cachedHoldsForLookup();
-    return (holds ?? []).some((hold) => this.normalizeGroupedKey(hold?.groupedWorkId) === normalized);
+    return (holds ?? []).some(
+      (hold) => this.normalizeGroupedKey(hold?.groupedWorkId) === normalized
+    );
   }
 
-  async holdTargetsWithStatus(entry: HoldableEntryContext): Promise<HoldTargetOption[]> {
+  async holdTargetsWithStatus(
+    entry: HoldableEntryContext
+  ): Promise<HoldTargetOption[]> {
     const groupedKey = this.normalizeGroupedKey(entry.groupedKey);
     if (!groupedKey) return [];
 
@@ -65,14 +67,19 @@ export class HoldSupportService {
   }
 
   async defaultPickupBranchCode(): Promise<string | null> {
-    const activeId = (this.auth.snapshot()?.activeAccountId ?? '').toString().trim();
+    const activeId = (this.auth.snapshot()?.activeAccountId ?? '')
+      .toString()
+      .trim();
     if (!activeId) return null;
 
     try {
-      const prefs = await this.accountPreferences.getCachedPreferences(activeId);
+      const prefs = await this.accountPreferences.getCachedPreferences(
+        activeId
+      );
       const legacyCode = (prefs?.pickup_library ?? '').toString().trim();
       if (!legacyCode) return null;
-      const loc = this.globals.pickupLocationFromLegacyPreferencesCode(legacyCode);
+      const loc =
+        this.globals.pickupLocationFromLegacyPreferencesCode(legacyCode);
       return loc?.code ?? null;
     } catch {
       return null;
@@ -82,7 +89,7 @@ export class HoldSupportService {
   async cacheOptimisticPlacedHold(
     entry: HoldableEntryContext,
     recordId: string,
-    selectedFormatLabel?: string,
+    selectedFormatLabel?: string
   ): Promise<void> {
     const groupedKey = this.normalizeGroupedKey(entry.groupedKey);
     if (!groupedKey) return;
@@ -99,7 +106,9 @@ export class HoldSupportService {
     } as any);
   }
 
-  private async resolveIlsHoldTargets(entry: HoldableEntryContext): Promise<HoldTargetOption[]> {
+  private async resolveIlsHoldTargets(
+    entry: HoldableEntryContext
+  ): Promise<HoldTargetOption[]> {
     const groupedKey = this.normalizeGroupedKey(entry.groupedKey);
     if (!groupedKey) return [];
 
@@ -119,16 +128,22 @@ export class HoldSupportService {
         const cls = this.formatFamily.classifyFormatLabel(formatLabel);
 
         for (const action of fmt?.actions ?? []) {
-          const id = this.items.extractIlsIdFromOnclick((action as any)?.onclick);
+          const id = this.items.extractIlsIdFromOnclick(
+            (action as any)?.onclick
+          );
           if (!id) continue;
 
           const actionTitle = ((action as any)?.title ?? '').toString().trim();
           const isPlainPlaceHold = actionTitle.toLowerCase() === 'place hold';
-          const label = actionTitle && !isPlainPlaceHold ? `${formatLabel} (${actionTitle})` : formatLabel;
+          const label =
+            actionTitle && !isPlainPlaceHold
+              ? `${formatLabel} (${actionTitle})`
+              : formatLabel;
           const target: HoldTargetOption = { recordId: id, label, formatLabel };
 
           if (!anyById.has(id)) anyById.set(id, target);
-          if ((cls.physical || isPlainPlaceHold) && !physicalById.has(id)) physicalById.set(id, target);
+          if ((cls.physical || isPlainPlaceHold) && !physicalById.has(id))
+            physicalById.set(id, target);
         }
       }
 
@@ -140,30 +155,37 @@ export class HoldSupportService {
     }
   }
 
-  private resolveIlsHoldTargetsFromItemList(entry: HoldableEntryContext): HoldTargetOption[] {
+  private resolveIlsHoldTargetsFromItemList(
+    entry: HoldableEntryContext
+  ): HoldTargetOption[] {
     const physicalById = new Map<string, HoldTargetOption>();
     const anyById = new Map<string, HoldTargetOption>();
 
     const sourceItems = this.rawItemListEntries(entry);
     for (const item of sourceItems) {
-      const source = (item?.source ?? item?.type ?? '').toString().trim().toLowerCase();
+      const source = (item?.source ?? item?.type ?? '')
+        .toString()
+        .trim()
+        .toLowerCase();
       if (source && source !== 'ils') continue;
 
       const recordId = this.extractIlsRecordIdFromItemLike(item);
       if (!recordId) continue;
 
-      const formatLabel = (
-        item?.name ??
-        item?.label ??
-        item?.format ??
-        item?.title ??
-        ''
-      ).toString().trim() || 'Format';
+      const formatLabel =
+        (item?.name ?? item?.label ?? item?.format ?? item?.title ?? '')
+          .toString()
+          .trim() || 'Format';
       const cls = this.formatFamily.classifyFormatLabel(formatLabel);
-      const target: HoldTargetOption = { recordId, label: formatLabel, formatLabel };
+      const target: HoldTargetOption = {
+        recordId,
+        label: formatLabel,
+        formatLabel,
+      };
 
       if (!anyById.has(recordId)) anyById.set(recordId, target);
-      if (cls.physical && !physicalById.has(recordId)) physicalById.set(recordId, target);
+      if (cls.physical && !physicalById.has(recordId))
+        physicalById.set(recordId, target);
     }
 
     const physical = Array.from(physicalById.values());
@@ -175,17 +197,21 @@ export class HoldSupportService {
     const rawValues = Array.isArray(entry.rawItemList)
       ? entry.rawItemList
       : entry.rawItemList && typeof entry.rawItemList === 'object'
-        ? Object.values(entry.rawItemList)
-        : [];
+      ? Object.values(entry.rawItemList)
+      : [];
     const normalized = Array.isArray(entry.itemList) ? entry.itemList : [];
     return [...rawValues, ...normalized];
   }
 
   private extractIlsRecordIdFromItemLike(item: any): string {
-    const directId = this.extractIlsRecordIdFromValue(item?.id ?? item?.recordId ?? item?.itemId);
+    const directId = this.extractIlsRecordIdFromValue(
+      item?.id ?? item?.recordId ?? item?.itemId
+    );
     if (directId) return directId;
 
-    const onclickId = this.items.extractIlsIdFromOnclick((item?.onclick ?? '').toString());
+    const onclickId = this.items.extractIlsIdFromOnclick(
+      (item?.onclick ?? '').toString()
+    );
     if (onclickId) return onclickId;
 
     return '';
@@ -207,28 +233,34 @@ export class HoldSupportService {
     return '';
   }
 
-  private async heldRecordIdsForGroupedKey(groupedKey: string): Promise<Set<string>> {
+  private async heldRecordIdsForGroupedKey(
+    groupedKey: string
+  ): Promise<Set<string>> {
     const normalized = this.normalizeGroupedKey(groupedKey);
     if (!normalized) return new Set<string>();
 
     const holds = await this.cachedHoldsForLookup();
     const ids = new Set<string>();
     for (const hold of holds ?? []) {
-      if (this.normalizeGroupedKey(hold?.groupedWorkId) !== normalized) continue;
+      if (this.normalizeGroupedKey(hold?.groupedWorkId) !== normalized)
+        continue;
       const rid = (hold?.recordId ?? '').toString().trim();
       if (rid) ids.add(rid);
     }
     return ids;
   }
 
-  private async heldFormatKeysForGroupedKey(groupedKey: string): Promise<Set<string>> {
+  private async heldFormatKeysForGroupedKey(
+    groupedKey: string
+  ): Promise<Set<string>> {
     const normalized = this.normalizeGroupedKey(groupedKey);
     if (!normalized) return new Set<string>();
 
     const holds = await this.cachedHoldsForLookup();
     const keys = new Set<string>();
     for (const hold of holds ?? []) {
-      if (this.normalizeGroupedKey(hold?.groupedWorkId) !== normalized) continue;
+      if (this.normalizeGroupedKey(hold?.groupedWorkId) !== normalized)
+        continue;
 
       const f = (hold as any)?.format;
       if (Array.isArray(f)) {
@@ -262,10 +294,6 @@ export class HoldSupportService {
   }
 
   private normalizeFormatKey(value: string): string {
-    return (value ?? '')
-      .toString()
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, ' ');
+    return (value ?? '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
   }
 }

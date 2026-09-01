@@ -1,12 +1,15 @@
-import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { IonicModule, ModalController } from '@ionic/angular';
+import { Component, inject } from '@angular/core';
+
+import { IonicModule, ModalController } from '@ionic/angular/lazy';
 import { concatMap, finalize, of } from 'rxjs';
 
 import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
 import { AuthService } from '../../services/auth.service';
-import { HistoryService, type AspenReadingHistoryItem } from '../../services/history.service';
+import {
+  HistoryService,
+  type AspenReadingHistoryItem,
+} from '../../services/history.service';
 import { ItemDetailComponent } from '../../components/item-detail/item-detail.component';
 import type { AspenSearchHit } from '../../services/search.service';
 import { FormatFamilyService } from '../../services/format-family.service';
@@ -16,9 +19,16 @@ import { FormatFamilyService } from '../../services/format-family.service';
   selector: 'app-checkout-history',
   templateUrl: './checkout-history.page.html',
   styleUrls: ['./checkout-history.page.scss'],
-  imports: [CommonModule, IonicModule],
+  imports: [IonicModule],
 })
 export class CheckoutHistoryPage {
+  globals = inject(Globals);
+  private toast = inject(ToastService);
+  private auth = inject(AuthService);
+  private history = inject(HistoryService);
+  private modalCtrl = inject(ModalController);
+  private formatFamily = inject(FormatFamilyService);
+
   loading = false;
   loadingMore = false;
 
@@ -28,15 +38,6 @@ export class CheckoutHistoryPage {
   pageSize = 20;
   sort = 'checkedOut';
   infiniteDisabled = true;
-
-  constructor(
-    public globals: Globals,
-    private toast: ToastService,
-    private auth: AuthService,
-    private history: HistoryService,
-    private modalCtrl: ModalController,
-    private formatFamily: FormatFamilyService,
-  ) {}
 
   ionViewWillEnter() {
     this.refresh();
@@ -63,7 +64,8 @@ export class CheckoutHistoryPage {
     this.totalPages = 1;
     this.infiniteDisabled = true;
 
-    this.history.fetchReadingHistoryPage(this.page, this.pageSize, this.sort, '', true)
+    this.history
+      .fetchReadingHistoryPage(this.page, this.pageSize, this.sort, '', true)
       .pipe(
         concatMap((res) => {
           if (!res?.success || !this.isLoginUnsuccessful(res?.message)) {
@@ -74,18 +76,26 @@ export class CheckoutHistoryPage {
           // on the first history request right after entering the page.
           // Retry once without the cached pass, but keep the page in loading
           // state until that retry finishes so we do not flash the empty state.
-          return this.history.fetchReadingHistoryPage(this.page, this.pageSize, this.sort, '', false);
+          return this.history.fetchReadingHistoryPage(
+            this.page,
+            this.pageSize,
+            this.sort,
+            '',
+            false
+          );
         }),
         finalize(() => {
           this.loading = false;
           ev?.target?.complete?.();
-        }),
+        })
       )
       .subscribe({
         next: (res) => {
           if (!res?.success) {
             this.items = [];
-            this.toast.presentToast(res?.message || 'Could not load checkout history.');
+            this.toast.presentToast(
+              res?.message || 'Could not load checkout history.'
+            );
             return;
           }
 
@@ -114,21 +124,29 @@ export class CheckoutHistoryPage {
 
     this.loadingMore = true;
     const nextPage = this.page + 1;
-    this.history.fetchReadingHistoryPage(nextPage, this.pageSize, this.sort, '', false)
-      .pipe(finalize(() => {
-        this.loadingMore = false;
-        ev?.target?.complete?.();
-      }))
+    this.history
+      .fetchReadingHistoryPage(nextPage, this.pageSize, this.sort, '', false)
+      .pipe(
+        finalize(() => {
+          this.loadingMore = false;
+          ev?.target?.complete?.();
+        })
+      )
       .subscribe({
         next: (res) => {
           if (!res?.success) {
-            this.toast.presentToast(res?.message || 'Could not load more history.');
+            this.toast.presentToast(
+              res?.message || 'Could not load more history.'
+            );
             return;
           }
 
           this.page = Number(res.pageCurrent || nextPage);
           this.totalPages = Number(res.pageTotal || this.totalPages);
-          this.items = [...this.items, ...this.normalizeHistoryItems(res.items ?? [])];
+          this.items = [
+            ...this.items,
+            ...this.normalizeHistoryItems(res.items ?? []),
+          ];
           this.infiniteDisabled = !(this.page < this.totalPages);
         },
         error: () => this.toast.presentToast('Could not load more history.'),
@@ -145,14 +163,21 @@ export class CheckoutHistoryPage {
   }
 
   mediaIconNameForHistoryItem(i: AspenReadingHistoryItem): string {
-    return this.formatFamily.iconNameForItem({ format: i?.format, itemList: i?.['itemList'] });
+    return this.formatFamily.iconNameForItem({
+      format: i?.format,
+      itemList: i?.['itemList'],
+    });
   }
 
   whenText(i: AspenReadingHistoryItem): string {
     const ts = this.pickUnixTimestamp(i);
     if (ts > 0) {
       const dt = new Date(ts * 1000);
-      return `Last checkout: ${dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`;
+      return `Last checkout: ${dt.toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })}`;
     }
 
     const d = (i?.lastCheckout ?? i?.checkout ?? '').toString().trim();
@@ -164,12 +189,21 @@ export class CheckoutHistoryPage {
     if (!raw) return '';
     if (/^https?:\/\//i.test(raw)) return raw;
     if (raw.startsWith('//')) return `https:${raw}`;
-    if (raw.startsWith('/')) return `${this.globals.aspen_discovery_base}${raw}`;
+    if (raw.startsWith('/'))
+      return `${this.globals.aspen_discovery_base}${raw}`;
     return `${this.globals.aspen_discovery_base}/${raw}`;
   }
 
   async openItem(i: AspenReadingHistoryItem) {
-    const key = (i?.groupedWorkId ?? i?.['permanentId'] ?? i?.['groupedWorkPermanentId'] ?? i?.id ?? '').toString().trim();
+    const key = (
+      i?.groupedWorkId ??
+      i?.['permanentId'] ??
+      i?.['groupedWorkPermanentId'] ??
+      i?.id ??
+      ''
+    )
+      .toString()
+      .trim();
     const recordId = (i?.recordId ?? '').toString().trim();
 
     if (key) {
@@ -182,7 +216,9 @@ export class CheckoutHistoryPage {
         language: undefined,
         format: i?.format,
         itemList: [],
-        catalogUrl: `${this.globals.aspen_discovery_base}/GroupedWork/${encodeURIComponent(key)}`,
+        catalogUrl: `${
+          this.globals.aspen_discovery_base
+        }/GroupedWork/${encodeURIComponent(key)}`,
         raw: i,
       };
 
@@ -196,7 +232,11 @@ export class CheckoutHistoryPage {
     }
 
     if (recordId) {
-      await this.globals.open_page(`${this.globals.aspen_discovery_base}/Record/${encodeURIComponent(recordId)}`);
+      await this.globals.open_page(
+        `${this.globals.aspen_discovery_base}/Record/${encodeURIComponent(
+          recordId
+        )}`
+      );
       return;
     }
 
@@ -204,18 +244,37 @@ export class CheckoutHistoryPage {
   }
 
   trackByItem(_idx: number, i: AspenReadingHistoryItem): string {
-    return (i?.groupedWorkId ?? i?.['permanentId'] ?? i?.['groupedWorkPermanentId'] ?? i?.recordId ?? i?.id ?? `${_idx}`).toString();
+    return (
+      i?.groupedWorkId ??
+      i?.['permanentId'] ??
+      i?.['groupedWorkPermanentId'] ??
+      i?.recordId ??
+      i?.id ??
+      `${_idx}`
+    ).toString();
   }
 
   private isLoginUnsuccessful(message?: string): boolean {
-    return (message ?? '').toString().toLowerCase().includes('login unsuccessful');
+    return (message ?? '')
+      .toString()
+      .toLowerCase()
+      .includes('login unsuccessful');
   }
 
-  private normalizeHistoryItems(items: AspenReadingHistoryItem[]): AspenReadingHistoryItem[] {
+  private normalizeHistoryItems(
+    items: AspenReadingHistoryItem[]
+  ): AspenReadingHistoryItem[] {
     const normalized = (items ?? [])
       .filter((i) => !this.isCurrentlyCheckedOut(i))
       .map((i) => {
-        const groupedWorkId = (i?.groupedWorkId ?? i?.['permanentId'] ?? i?.['groupedWorkPermanentId'] ?? '').toString().trim();
+        const groupedWorkId = (
+          i?.groupedWorkId ??
+          i?.['permanentId'] ??
+          i?.['groupedWorkPermanentId'] ??
+          ''
+        )
+          .toString()
+          .trim();
         return groupedWorkId ? { ...i, groupedWorkId } : i;
       });
 
@@ -265,17 +324,34 @@ export class CheckoutHistoryPage {
     // Aspen titles are often MARC-ish: "Title : subtitle / responsibility".
     // Normalize with loose spacing so variants render consistently.
     const withoutResponsibility = raw.split(/\s*\/\s*/)[0]?.trim() ?? raw;
-    const withoutSubtitle = withoutResponsibility.split(/\s*:\s*/)[0]?.trim() ?? withoutResponsibility;
+    const withoutSubtitle =
+      withoutResponsibility.split(/\s*:\s*/)[0]?.trim() ??
+      withoutResponsibility;
     return withoutSubtitle.replace(/[\s:\/]+$/, '').trim() || raw;
   }
 
   private historyDedupeKey(i: AspenReadingHistoryItem): string {
-    const workId = (i?.groupedWorkId ?? i?.['permanentId'] ?? i?.['groupedWorkPermanentId'] ?? '').toString().trim();
-    const title = this.normalizeTitle((i?.title ?? '').toString()).toLowerCase();
+    const workId = (
+      i?.groupedWorkId ??
+      i?.['permanentId'] ??
+      i?.['groupedWorkPermanentId'] ??
+      ''
+    )
+      .toString()
+      .trim();
+    const title = this.normalizeTitle(
+      (i?.title ?? '').toString()
+    ).toLowerCase();
     const author = (i?.author ?? '').toString().trim().toLowerCase();
     const format = (i?.format ?? '').toString().trim().toLowerCase();
-    const checkoutTs = this.pickUnixTimestampFromFields((i as any)?.checkout, (i as any)?.lastCheckout);
-    const checkinTs = this.pickUnixTimestampFromFields((i as any)?.checkin, (i as any)?.lastCheckin);
+    const checkoutTs = this.pickUnixTimestampFromFields(
+      (i as any)?.checkout,
+      (i as any)?.lastCheckout
+    );
+    const checkinTs = this.pickUnixTimestampFromFields(
+      (i as any)?.checkin,
+      (i as any)?.lastCheckin
+    );
 
     // Only collapse true duplicates from Aspen payload noise.
     // Distinct transactions on the same day should remain distinct rows.

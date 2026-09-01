@@ -1,6 +1,6 @@
-import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { IonicModule, ModalController } from '@ionic/angular';
+import { Component, inject } from '@angular/core';
+
+import { IonicModule, ModalController } from '@ionic/angular/lazy';
 import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
 import { NewsDetailComponent } from './news-detail/news-detail.component';
@@ -11,20 +11,18 @@ import { NewsService, NewsletterItem } from '../../services/news.service';
   selector: 'app-news',
   templateUrl: './news.page.html',
   styleUrls: ['./news.page.scss'],
-  imports: [CommonModule, IonicModule],
+  imports: [IonicModule],
 })
 export class NewsPage {
+  globals = inject(Globals);
+  toast = inject(ToastService);
+  private newsService = inject(NewsService);
+  private modalController = inject(ModalController);
+
   newsletters: NewsletterItem[] = [];
 
   readonly placeholderImage = 'assets/location-placeholder.png'; // reuse your existing placeholder asset if present
   private brokenImages = new WeakSet<NewsletterItem>();
-
-  constructor(
-    public globals: Globals,
-    public toast: ToastService,
-    private newsService: NewsService,
-    private modalController: ModalController,
-  ) {}
 
   ionViewDidEnter() {
     this.get_news();
@@ -38,7 +36,9 @@ export class NewsPage {
         this.globals.api_loading = false;
         this.newsletters = (Array.isArray(posts) ? posts : [])
           .slice()
-          .sort((a, b) => (b?.published_at || '').localeCompare(a?.published_at || '')); // newest first
+          .sort((a, b) =>
+            (b?.published_at || '').localeCompare(a?.published_at || '')
+          ); // newest first
       },
       error: () => {
         this.globals.api_loading = false;
@@ -78,7 +78,11 @@ export class NewsPage {
     if (normalized.length <= max) return normalized;
 
     const clipped = normalized.slice(0, max);
-    const breakAt = Math.max(clipped.lastIndexOf(' '), clipped.lastIndexOf('.'), clipped.lastIndexOf(','));
+    const breakAt = Math.max(
+      clipped.lastIndexOf(' '),
+      clipped.lastIndexOf('.'),
+      clipped.lastIndexOf(',')
+    );
     return `${(breakAt > 80 ? clipped.slice(0, breakAt) : clipped).trim()}...`;
   }
 

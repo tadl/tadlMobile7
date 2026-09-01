@@ -1,15 +1,20 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit } from '@angular/core';
-import { IonicModule } from '@ionic/angular';
-import { ModalController } from '@ionic/angular/standalone';
+import { Component, OnDestroy, OnInit, inject } from '@angular/core';
+import { IonicModule } from '@ionic/angular/lazy';
+import { ModalController } from '@ionic/angular';
 import { Subject, takeUntil } from 'rxjs';
 
 import { Globals } from '../../globals';
-import { EventsService, MobileEvent, VenueOption } from '../../services/events.service';
+import {
+  EventsService,
+  MobileEvent,
+  VenueOption,
+} from '../../services/events.service';
 import { EventDetailComponent } from './event-detail/event-detail.component';
+import { APP_PROFILE } from '../../app-profile';
 
 type VenueSelection = 'all' | number; // what EventsService expects
-type VenueCode = 'all' | string;      // what ion-select uses (string codes)
+type VenueCode = 'all' | string; // what ion-select uses (string codes)
 
 @Component({
   standalone: true,
@@ -19,6 +24,10 @@ type VenueCode = 'all' | string;      // what ion-select uses (string codes)
   imports: [CommonModule, IonicModule],
 })
 export class EventsPage implements OnInit, OnDestroy {
+  globals = inject(Globals);
+  private eventsService = inject(EventsService);
+  private modalController = inject(ModalController);
+
   loading = true;
   error: string | null = null;
 
@@ -33,12 +42,7 @@ export class EventsPage implements OnInit, OnDestroy {
   private destroyed$ = new Subject<void>();
 
   readonly placeholderImage = 'assets/placeholder.png';
-
-  constructor(
-    public globals: Globals,
-    private eventsService: EventsService,
-    private modalController: ModalController,
-  ) {}
+  readonly showVenueFilter = APP_PROFILE.events.venueFilter;
 
   ngOnInit(): void {
     this.load('all');
@@ -51,12 +55,15 @@ export class EventsPage implements OnInit, OnDestroy {
 
   refresh(event: CustomEvent): void {
     const refresher = event.target as HTMLIonRefresherElement | null;
-    this.load(this.toVenueSelection(this.selectedVenueCode), refresher ?? undefined);
+    this.load(
+      this.toVenueSelection(this.selectedVenueCode),
+      refresher ?? undefined
+    );
   }
 
   onVenueChange(value: any): void {
     const code = (value ?? 'all').toString();
-    this.selectedVenueCode = (code === 'all' ? 'all' : code);
+    this.selectedVenueCode = code === 'all' ? 'all' : code;
     this.load(this.toVenueSelection(this.selectedVenueCode));
   }
 
@@ -73,7 +80,10 @@ export class EventsPage implements OnInit, OnDestroy {
   }
 
   isCancelled(ev: MobileEvent): boolean {
-    return (ev?.moderation_state ?? '').toString().trim().toLowerCase() === 'cancelled';
+    return (
+      (ev?.moderation_state ?? '').toString().trim().toLowerCase() ===
+      'cancelled'
+    );
   }
 
   venueLabel(v: VenueOption): string {
@@ -107,7 +117,10 @@ export class EventsPage implements OnInit, OnDestroy {
     return Number.isFinite(n) ? n : 'all';
   }
 
-  private load(venue: VenueSelection, refresher?: HTMLIonRefresherElement): void {
+  private load(
+    venue: VenueSelection,
+    refresher?: HTMLIonRefresherElement
+  ): void {
     this.loading = true;
     this.error = null;
 
@@ -119,20 +132,30 @@ export class EventsPage implements OnInit, OnDestroy {
           const apiVenues = (res.all_venues || []) as VenueOption[];
 
           // Ensure only ONE "all" option in the UI.
-          const hasAll = apiVenues.some((v: any) => (v?.code ?? '').toString() === 'all');
+          const hasAll = apiVenues.some(
+            (v: any) => (v?.code ?? '').toString() === 'all'
+          );
           this.venues = hasAll
             ? apiVenues
-            : ([{ code: 'all', name: 'All Locations' } as any] as VenueOption[]).concat(apiVenues);
+            : (
+                [{ code: 'all', name: 'All Locations' } as any] as VenueOption[]
+              ).concat(apiVenues);
 
           // If our selected code is no longer present, reset to 'all'
           const selectedExists =
             this.selectedVenueCode === 'all' ||
-            this.venues.some((v: any) => (v?.code ?? '').toString() === this.selectedVenueCode);
+            this.venues.some(
+              (v: any) => (v?.code ?? '').toString() === this.selectedVenueCode
+            );
           if (!selectedExists) this.selectedVenueCode = 'all';
 
           this.events = (res.events || []).slice().sort((a, b) => {
-            const da = new Date((a.start_date || '').replace(' ', 'T')).getTime();
-            const db = new Date((b.start_date || '').replace(' ', 'T')).getTime();
+            const da = new Date(
+              (a.start_date || '').replace(' ', 'T')
+            ).getTime();
+            const db = new Date(
+              (b.start_date || '').replace(' ', 'T')
+            ).getTime();
             return da - db;
           });
 

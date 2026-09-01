@@ -1,7 +1,7 @@
-import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, inject } from '@angular/core';
+
 import { ActivatedRoute, Router } from '@angular/router';
-import { IonicModule, ModalController } from '@ionic/angular';
+import { IonicModule, ModalController } from '@ionic/angular/lazy';
 
 import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
@@ -13,18 +13,16 @@ import type { AspenSearchHit } from '../../services/search.service';
   selector: 'app-item-page',
   templateUrl: './item.page.html',
   styleUrls: ['./item.page.scss'],
-  imports: [CommonModule, IonicModule],
+  imports: [IonicModule],
 })
 export class ItemPage {
-  private opened = false;
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
+  private modalCtrl = inject(ModalController);
+  private toast = inject(ToastService);
+  globals = inject(Globals);
 
-  constructor(
-    private route: ActivatedRoute,
-    private router: Router,
-    private modalCtrl: ModalController,
-    private toast: ToastService,
-    public globals: Globals,
-  ) {}
+  private opened = false;
 
   async ionViewDidEnter() {
     if (this.opened) return;
@@ -46,7 +44,9 @@ export class ItemPage {
       language: undefined,
       format: undefined,
       itemList: [],
-      catalogUrl: `${this.globals.aspen_discovery_base}/GroupedWork/${encodeURIComponent(id)}/Home`,
+      catalogUrl: `${
+        this.globals.aspen_discovery_base
+      }/GroupedWork/${encodeURIComponent(id)}/Home`,
       raw: undefined,
     };
 
@@ -73,4 +73,3 @@ export class ItemPage {
     void this.router.navigateByUrl('/home');
   }
 }
-

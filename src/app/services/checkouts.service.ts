@@ -1,7 +1,19 @@
 // src/app/services/checkouts.service.ts
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
-import { Observable, map, switchMap, from, throwError, concat, filter, tap, finalize, shareReplay, timer } from 'rxjs';
+import {
+  Observable,
+  map,
+  switchMap,
+  from,
+  throwError,
+  concat,
+  filter,
+  tap,
+  finalize,
+  shareReplay,
+  timer,
+} from 'rxjs';
 import { Preferences } from '@capacitor/preferences';
 
 import { Globals } from '../globals';
@@ -65,19 +77,17 @@ const SUSPICIOUS_EMPTY_CHECKOUTS_RETRY_DELAY_MS = 750;
 
 @Injectable({ providedIn: 'root' })
 export class CheckoutsService {
+  private http = inject(HttpClient);
+  private globals = inject(Globals);
+  private auth = inject(AuthService);
+  private accounts = inject(AccountStoreService);
+  private cache = inject(AppCacheService);
+  private discoveryUrls = inject(DiscoveryUrlService);
+  private userApiQueue = inject(UserApiQueueService);
+  private preferences = inject(AccountPreferencesService);
+
   private sessionId: string | null = null;
   private activeFetch$: Observable<AspenCheckout[]> | null = null;
-
-  constructor(
-    private http: HttpClient,
-    private globals: Globals,
-    private auth: AuthService,
-    private accounts: AccountStoreService,
-    private cache: AppCacheService,
-    private discoveryUrls: DiscoveryUrlService,
-    private userApiQueue: UserApiQueueService,
-    private preferences: AccountPreferencesService,
-  ) {}
 
   /**
    * POST /API/UserAPI?method=getPatronCheckedOutItems
@@ -91,22 +101,26 @@ export class CheckoutsService {
 
     const cacheKey = `checkouts:${snap.activeAccountId}`;
     const cached$ = from(this.cache.read<AspenCheckout[]>(cacheKey)).pipe(
-      filter((v): v is AspenCheckout[] => Array.isArray(v)),
+      filter((v): v is AspenCheckout[] => Array.isArray(v))
     );
 
-    const network$ = this.activeFetch$ ?? this.fetchCheckoutsNetwork(snap, cacheKey).pipe(
-      finalize(() => {
-        this.activeFetch$ = null;
-      }),
-      shareReplay({ bufferSize: 1, refCount: true }),
-    );
+    const network$ =
+      this.activeFetch$ ??
+      this.fetchCheckoutsNetwork(snap, cacheKey).pipe(
+        finalize(() => {
+          this.activeFetch$ = null;
+        }),
+        shareReplay({ bufferSize: 1, refCount: true })
+      );
 
     this.activeFetch$ = network$;
 
     return concat(cached$, network$);
   }
 
-  fetchFreshActiveCheckouts(refreshCheckouts = false): Observable<AspenCheckout[]> {
+  fetchFreshActiveCheckouts(
+    refreshCheckouts = false
+  ): Observable<AspenCheckout[]> {
     const snap = this.auth.snapshot();
     if (!snap.isLoggedIn || !snap.activeAccountId || !snap.activeAccountMeta) {
       return from([[]]);
@@ -119,39 +133,54 @@ export class CheckoutsService {
   private fetchCheckoutsNetwork(
     snap: ReturnType<AuthService['snapshot']>,
     cacheKey: string,
-    refreshCheckouts = false,
+    refreshCheckouts = false
   ): Observable<AspenCheckout[]> {
-    return from(Promise.all([
-      this.preferences.getCachedToken(snap.activeAccountId!),
-      this.accounts.getPassword(snap.activeAccountId!),
-      this.cache.read<AspenCheckout[]>(cacheKey),
-    ])).pipe(
+    return from(
+      Promise.all([
+        this.preferences.getCachedToken(snap.activeAccountId!),
+        this.accounts.getPassword(snap.activeAccountId!),
+        this.cache.read<AspenCheckout[]>(cacheKey),
+      ])
+    ).pipe(
       switchMap(([token, password, cached]) => {
-        if (!token && !password) return throwError(() => new Error('missing_auth'));
+        if (!token && !password)
+          return throwError(() => new Error('missing_auth'));
         const cachedCheckouts = Array.isArray(cached) ? cached : [];
 
         return this.userApiQueue.run(snap.activeAccountId, () =>
-          this.requestPatronCheckouts(snap, token, password, refreshCheckouts).pipe(
+          this.requestPatronCheckouts(
+            snap,
+            token,
+            password,
+            refreshCheckouts
+          ).pipe(
             switchMap((r) => {
               const checkouts = this.checkoutsFromResponse(r);
-              if (!this.isSuspiciousEmptyCheckouts(checkouts, cachedCheckouts)) return from([checkouts]);
+              if (!this.isSuspiciousEmptyCheckouts(checkouts, cachedCheckouts))
+                return from([checkouts]);
 
               return timer(SUSPICIOUS_EMPTY_CHECKOUTS_RETRY_DELAY_MS).pipe(
-                switchMap(() => this.requestPatronCheckouts(snap, token, password, true)),
+                switchMap(() =>
+                  this.requestPatronCheckouts(snap, token, password, true)
+                ),
                 map((retryResponse) => {
-                  const retryCheckouts = this.checkoutsFromResponse(retryResponse);
-                  return this.isSuspiciousEmptyCheckouts(retryCheckouts, cachedCheckouts)
+                  const retryCheckouts =
+                    this.checkoutsFromResponse(retryResponse);
+                  return this.isSuspiciousEmptyCheckouts(
+                    retryCheckouts,
+                    cachedCheckouts
+                  )
                     ? cachedCheckouts
                     : retryCheckouts;
-                }),
+                })
               );
             }),
             tap((list) => {
               this.cache.write(cacheKey, list).catch(() => {});
-            }),
-          ),
+            })
+          )
         );
-      }),
+      })
     );
   }
 
@@ -159,34 +188,46 @@ export class CheckoutsService {
     snap: ReturnType<AuthService['snapshot']>,
     token: string | null,
     password: string | null,
-    refreshCheckouts = false,
+    refreshCheckouts = false
   ): Observable<any> {
-    let params = new HttpParams()
-      .set('method', 'getPatronCheckedOutItems');
+    let params = new HttpParams().set('method', 'getPatronCheckedOutItems');
     if (refreshCheckouts) params = params.set('refreshCheckouts', 'true');
 
     const body = this.authBodyFor(snap, token, password);
 
-    const headers = new HttpHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' });
+    const headers = new HttpHeaders({
+      'Content-Type': 'application/x-www-form-urlencoded',
+    });
 
     return this.http
-      .post<any>(`${this.globals.aspen_api_base}/UserAPI`, body.toString(), { params, headers })
+      .post<any>(`${this.globals.aspen_api_base}/UserAPI`, body.toString(), {
+        params,
+        headers,
+      })
       .pipe(
-        map(raw => raw?.result ?? raw),
-        tap((result) => this.persistReturnedHelperToken(snap, result)),
+        map((raw) => raw?.result ?? raw),
+        tap((result) => this.persistReturnedHelperToken(snap, result))
       );
   }
 
   private checkoutsFromResponse(r: any): AspenCheckout[] {
     if (!r?.success) return [];
-    const list = Array.isArray(r?.checkedOutItems) ? (r.checkedOutItems as AspenCheckout[]) : [];
+    const list = Array.isArray(r?.checkedOutItems)
+      ? (r.checkedOutItems as AspenCheckout[])
+      : [];
     return list
       .filter((c) => c?.type === 'ils' || c?.source === 'ils')
       .map((checkout) => this.normalizeCheckout(checkout));
   }
 
-  private isSuspiciousEmptyCheckouts(checkouts: AspenCheckout[], cachedCheckouts: AspenCheckout[]): boolean {
-    return checkouts.length === 0 && cachedCheckouts.length >= SUSPICIOUS_EMPTY_CHECKOUTS_CACHE_THRESHOLD;
+  private isSuspiciousEmptyCheckouts(
+    checkouts: AspenCheckout[],
+    cachedCheckouts: AspenCheckout[]
+  ): boolean {
+    return (
+      checkouts.length === 0 &&
+      cachedCheckouts.length >= SUSPICIOUS_EMPTY_CHECKOUTS_CACHE_THRESHOLD
+    );
   }
 
   /**
@@ -208,7 +249,10 @@ export class CheckoutsService {
     };
     if (recordId) params['recordId'] = recordId;
 
-    return this.callUserApiMutation('renewItem', params, { includeSessionId: false, includeUserId: true });
+    return this.callUserApiMutation('renewItem', params, {
+      includeSessionId: false,
+      includeUserId: true,
+    });
   }
 
   // ---------- Core mutation plumbing (same pattern as HoldsService) ----------
@@ -216,7 +260,7 @@ export class CheckoutsService {
   private callUserApiMutation(
     method: string,
     extraParams: Record<string, string>,
-    options?: { includeSessionId?: boolean; includeUserId?: boolean },
+    options?: { includeSessionId?: boolean; includeUserId?: boolean }
   ): Observable<AspenMutationResult> {
     const snap = this.auth.snapshot();
     if (!snap.isLoggedIn || !snap.activeAccountId || !snap.activeAccountMeta) {
@@ -225,22 +269,25 @@ export class CheckoutsService {
 
     const userId = this.pickPatronId(snap.profile);
 
-    return from(Promise.all([
-      this.preferences.getCachedToken(snap.activeAccountId),
-      this.accounts.getPassword(snap.activeAccountId),
-    ])).pipe(
+    return from(
+      Promise.all([
+        this.preferences.getCachedToken(snap.activeAccountId),
+        this.accounts.getPassword(snap.activeAccountId),
+      ])
+    ).pipe(
       switchMap(([token, password]) => {
-        if (!token && !password) return throwError(() => new Error('missing_auth'));
+        if (!token && !password)
+          return throwError(() => new Error('missing_auth'));
 
         return from(this.getOrCreateSessionId()).pipe(
-          switchMap(sessionId => {
-            let params = new HttpParams()
-              .set('method', method);
+          switchMap((sessionId) => {
+            let params = new HttpParams().set('method', method);
 
             const includeSessionId = options?.includeSessionId !== false;
             const includeUserId = options?.includeUserId !== false;
             if (includeSessionId) params = params.set('sessionId', sessionId);
-            if (includeUserId && userId) params = params.set('userId', String(userId));
+            if (includeUserId && userId)
+              params = params.set('userId', String(userId));
 
             for (const [k, v] of Object.entries(extraParams)) {
               params = params.set(k, (v ?? '').toString());
@@ -248,34 +295,47 @@ export class CheckoutsService {
 
             const body = this.authBodyFor(snap, token, password);
 
-            const headers = new HttpHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' });
+            const headers = new HttpHeaders({
+              'Content-Type': 'application/x-www-form-urlencoded',
+            });
 
             return this.userApiQueue.run(snap.activeAccountId, () =>
-              this.http.post<any>(`${this.globals.aspen_api_base}/UserAPI`, body.toString(), { params, headers })
+              this.http
+                .post<any>(
+                  `${this.globals.aspen_api_base}/UserAPI`,
+                  body.toString(),
+                  { params, headers }
+                )
                 .pipe(
-                  map(raw => raw?.result ?? raw),
+                  map((raw) => raw?.result ?? raw),
                   tap((r) => this.persistReturnedHelperToken(snap, r)),
                   map((r: any) => {
-                    const success = r?.success !== undefined ? !!r.success : true;
+                    const success =
+                      r?.success !== undefined ? !!r.success : true;
                     return {
                       success,
                       title: typeof r?.title === 'string' ? r.title : undefined,
-                      message: typeof r?.message === 'string' ? r.message : (typeof r?.renewMessage === 'string' ? r.renewMessage : undefined),
+                      message:
+                        typeof r?.message === 'string'
+                          ? r.message
+                          : typeof r?.renewMessage === 'string'
+                          ? r.renewMessage
+                          : undefined,
                       raw: r,
                     } satisfies AspenMutationResult;
-                  }),
-                ),
+                  })
+                )
             );
-          }),
+          })
         );
-      }),
+      })
     );
   }
 
   private authBodyFor(
     snap: ReturnType<AuthService['snapshot']>,
     token: string | null,
-    password: string | null,
+    password: string | null
   ): URLSearchParams {
     const body = new URLSearchParams();
     if (token) body.set('token', token);
@@ -284,10 +344,17 @@ export class CheckoutsService {
     return body;
   }
 
-  private persistReturnedHelperToken(snap: ReturnType<AuthService['snapshot']>, result: any): void {
-    const token = (result?.helperToken ?? result?.token ?? '').toString().trim();
+  private persistReturnedHelperToken(
+    snap: ReturnType<AuthService['snapshot']>,
+    result: any
+  ): void {
+    const token = (result?.helperToken ?? result?.token ?? '')
+      .toString()
+      .trim();
     if (!token || !snap.activeAccountId) return;
-    this.preferences.persistTokenForAccount(snap.activeAccountId, token).catch(() => {});
+    this.preferences
+      .persistTokenForAccount(snap.activeAccountId, token)
+      .catch(() => {});
   }
 
   // ---------- Session id ----------
@@ -301,7 +368,11 @@ export class CheckoutsService {
       return this.sessionId;
     }
 
-    const sid = 'sid_' + Math.random().toString(36).slice(2) + '_' + Date.now().toString(36);
+    const sid =
+      'sid_' +
+      Math.random().toString(36).slice(2) +
+      '_' +
+      Date.now().toString(36);
     await Preferences.set({ key: PREF_APP_SESSION_ID, value: sid });
     this.sessionId = sid;
     return sid;
@@ -361,7 +432,9 @@ export class CheckoutsService {
 
   private compactFormat(value: any): string | string[] | undefined {
     if (Array.isArray(value)) {
-      const items = value.map((item) => this.stringOrUndefined(item)).filter((item): item is string => !!item);
+      const items = value
+        .map((item) => this.stringOrUndefined(item))
+        .filter((item): item is string => !!item);
       return items.length ? items : undefined;
     }
     return this.stringOrUndefined(value);
@@ -399,7 +472,9 @@ export class CheckoutsService {
   }
 
   private pickItemSource(checkout: AspenCheckout): string {
-    const s = ((checkout as any)?.source ?? (checkout as any)?.type ?? 'ils').toString().trim();
+    const s = ((checkout as any)?.source ?? (checkout as any)?.type ?? 'ils')
+      .toString()
+      .trim();
     return s || 'ils';
   }
 }

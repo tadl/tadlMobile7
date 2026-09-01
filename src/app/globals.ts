@@ -1,10 +1,10 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import {
   AlertController,
   ModalController,
   MenuController,
   Platform,
-} from '@ionic/angular/standalone';
+} from '@ionic/angular';
 import { Browser } from '@capacitor/browser';
 import { Device } from '@capacitor/device';
 import { App } from '@capacitor/app';
@@ -12,6 +12,7 @@ import { AppLauncher } from '@capacitor/app-launcher';
 import { Network } from '@capacitor/network';
 import { Preferences } from '@capacitor/preferences';
 import { format } from 'date-fns';
+import { APP_PROFILE } from './app-profile';
 
 export interface PickupLocationOption {
   code: string; // e.g. "TADL-WOOD"
@@ -27,82 +28,78 @@ type LinkMode = 'app' | 'browser';
 
 @Injectable({ providedIn: 'root' })
 export class Globals {
+  private menuController = inject(MenuController);
+  private modalController = inject(ModalController);
+  private alertController = inject(AlertController);
+  private platform = inject(Platform);
+
   public readonly app_time_zone = 'America/New_York';
   private readonly theme_pref_key = 'app:theme_mode';
   private readonly link_pref_key = 'app:link_mode';
   private theme_initialized = false;
   private link_mode_initialized = false;
 
-  constructor(
-    private menuController: MenuController,
-    private modalController: ModalController,
-    private alertController: AlertController,
-    private platform: Platform,
-  ) {}
-
   // ---- app identity / toggles ----
-  public app_version: string = '7.1.0';
-  public update_version: string = '20260422';
-  public build_num: string = '07';
+  public app_version: string = '7.2.0';
+  public update_version: string = '20260901';
+  public build_num: string = '00';
 
   public device_info: any;
   public system_color: any = window.matchMedia('(prefers-color-scheme: dark)');
   public theme_mode: ThemeMode = 'system';
   public link_mode: LinkMode = 'browser';
 
-  public system_short_name: string = 'TADL';
+  public readonly app_name = APP_PROFILE.appName;
+  public readonly app_title = APP_PROFILE.appTitle;
+  public readonly library_name = APP_PROFILE.libraryName;
+  public readonly website_base = APP_PROFILE.websiteBase;
+  public readonly privacy_policy_url = APP_PROFILE.privacyPolicyUrl;
+  public readonly primary_color = APP_PROFILE.primaryColor;
+  public readonly logo = APP_PROFILE.logo;
+  public system_short_name: string = APP_PROFILE.systemShortName;
 
   // Aspen hosts:
   // - discovery host serves catalog pages and covers
   // - api host serves proxied API endpoints
-  public aspen_discovery_base: string = 'https://discover.tadl.org';
-  public aspen_api_host: string = 'https://aspen.tools.tadl.org';
+  public aspen_discovery_base: string = APP_PROFILE.aspenDiscoveryBase;
+  public aspen_api_host: string = APP_PROFILE.aspenApiHost;
   public aspen_api_base: string = this.aspen_api_host + '/API';
 
   // Back-compat alias: existing code may still reference this for discovery links.
   public aspen_base: string = this.aspen_discovery_base;
 
   // Centralized Aspen ILS API selector (your proxy requires this)
-  public aspen_api_param_api: string = 'tadl-prod';
+  public aspen_api_param_api: string = APP_PROFILE.aspenApiParam;
 
   // Pickup locations (Aspen LocationID + PickupBranch code)
   // NOTE: Aspen expects newLocation formatted as "<locationId>_<pickupBranchCode>"
-  public pickupLocations: AspenPickupLocationOption[] = [
-    { id: 7, code: 'TADL-WOOD', name: 'Woodmere (Main) Branch Library' },
-    { id: 2, code: 'TADL-EBB', name: 'East Bay Branch Library' },
-    { id: 3, code: 'TADL-FLPL', name: 'Fife Lake Public Library' },
-    { id: 4, code: 'TADL-IPL', name: 'Interlochen Public Library' },
-    { id: 5, code: 'TADL-KBL', name: 'Kingsley Branch Library' },
-    { id: 6, code: 'TADL-PCL', name: 'Peninsula Community Library' },
-  ];
+  public pickupLocations: AspenPickupLocationOption[] = APP_PROFILE.pickupLocations;
 
   // Legacy Preferences pickup_library ids -> Aspen location ids.
   // Legacy:
   // 23 Traverse City, 24 Interlochen, 25 Kingsley, 26 Peninsula, 27 Fife Lake, 28 East Bay
   // Aspen:
   // 7 Woodmere, 4 Interlochen, 5 Kingsley, 6 Peninsula, 3 Fife Lake, 2 East Bay
-  public legacyPickupLibraryToAspenLocationId: Record<string, number> = {
-    '23': 7,
-    '24': 4,
-    '25': 5,
-    '26': 6,
-    '27': 3,
-    '28': 2,
-  };
+  public legacyPickupLibraryToAspenLocationId: Record<string, number> =
+    APP_PROFILE.legacyPickupLibraryToAspenLocationId;
 
   pickupNameForCode(code: string): string | null {
     const c = (code ?? '').trim();
-    const loc = this.pickupLocations.find(x => x.code === c);
+    const loc = this.pickupLocations.find((x) => x.code === c);
     return loc ? loc.name : null;
   }
 
-  pickupLocationByAspenId(id: string | number): AspenPickupLocationOption | null {
+  pickupLocationByAspenId(
+    id: string | number
+  ): AspenPickupLocationOption | null {
     const n = Number(id);
     if (!Number.isFinite(n)) return null;
     return this.pickupLocations.find((x) => x.id === n) ?? null;
   }
 
-  pickupLocationFromLegacyPreferencesCode(legacyCode: string | number): AspenPickupLocationOption | null {
+  pickupLocationFromLegacyPreferencesCode(
+    legacyCode: string | number
+  ): AspenPickupLocationOption | null {
     const code = (legacyCode ?? '').toString().trim();
     if (!code) return null;
     const aspenId = this.legacyPickupLibraryToAspenLocationId[code];
@@ -116,28 +113,30 @@ export class Globals {
 
   // New locations host
   public locations_base: string = 'https://locations.tools.tadl.org';
-  public fines_payment_url: string = 'https://pay.catalog.tadl.org/pay';
+  public fines_payment_url: string = APP_PROFILE.finesPaymentUrl;
   public melcat_base: string = 'https://search.mel.org';
-  public melcat_search_path: string = '/iii/encore/HomePage,queryComponent.searchFormComponent.sdirect';
+  public melcat_search_path: string =
+    '/iii/encore/HomePage,queryComponent.searchFormComponent.sdirect';
   public my_melcat_url: string = 'https://dcb3.mel.org/patroninfo?agency=zv330';
-  public suggest_item_url: string = 'https://www.tadl.org/suggestion';
+  public suggest_item_url: string = APP_PROFILE.suggestItemUrl;
 
   // Locations APIs
-  public locations_group: string = 'tadl';
-  public locations_list_url: string = `${this.locations_base}/locations.json?group=${encodeURIComponent(
-    this.locations_group,
-  )}`;
+  public locations_group: string = APP_PROFILE.locationsGroup;
+  public locations_list_url: string = `${
+    this.locations_base
+  }/locations.json?group=${encodeURIComponent(this.locations_group)}`;
 
   locations_detail_url(shortname: string): string {
-    return `${this.locations_base}/locations.json?shortname=${encodeURIComponent(
-      (shortname || '').trim(),
-    )}`;
+    return `${
+      this.locations_base
+    }/locations.json?shortname=${encodeURIComponent((shortname || '').trim())}`;
   }
 
   melcatSearchUrl(query: string): string {
     const params = new URLSearchParams({
       formids: 'If_5,searchString,If_7,If_9,searchImageSumbitComponent',
-      seedids: 'ZH4sIAAAAAAAAAIVUS27bMBB1geYmWUaAHTO2u3TVtDHgNIHtosuCooY2YYqjkrQL5Uy9Rhc5TO/QoSQgomyjK1HzhjPvzYe//w6uXgaD94PB4OrPjQN7VAKuhzcl34aPwKJEA8bXZ+O5MmDp7MA5hSacytb7u+VlCTbt3HA70LpryDCvuv+gk5nMJtl0Bsl4Ms4SNmOj5AMXkyRnU8mmIybZMBCRnIihWYHmnhJ3gxhcC6tK/wier0BacLsunCLuFbiNKuCFbE9SOvBppOuMwwM3uQbbRH6L8oxaieoreiVVrHUhrxkJxl/pwXksHoDnYBcyStRFDNXax7XBfcqtXyqzf7OPIvvcROW71w6ubyOPR2oMNeM0fMm9RbNB1K5rzpUrNa+ea/SpDLV1C3kbdZEfYbNTbg3cil2PQlC8JocGDAxizU3aOZXSu29lzj2cCVDDiyLwlmfILbnZHghcgwbhkWr3TH/nKtxmEwIPxi9xq8z/tfbmccKyDDI+Tm7leJYwmbEku2MsuZsymIpsOpzxMI9fgBZBiSD4xzC0vy54fWxIUHY8UAeMVLb4qFHsu4mKqiX5CXyvIC3LpmRzCzymuKtlt0O2eVx2MY9lnSm+QdYVGLp0wuLItcrrfbq39Ai8e7VoL+EEuc8xHB4EOrk2em+3fx7AVmtqGF3vSeT5kRsBeTM0MdsYCxMeqccCQvPTJnVK87RFW51z6e0e91zjNt0hUqN6fEQUjdY8Ejrq4VUzh5D3t9va4BT7ni7ihWCXlPbtdVmjBaoLRYyLjvUfbRVjC9cFAAA',
+      seedids:
+        'ZH4sIAAAAAAAAAIVUS27bMBB1geYmWUaAHTO2u3TVtDHgNIHtosuCooY2YYqjkrQL5Uy9Rhc5TO/QoSQgomyjK1HzhjPvzYe//w6uXgaD94PB4OrPjQN7VAKuhzcl34aPwKJEA8bXZ+O5MmDp7MA5hSacytb7u+VlCTbt3HA70LpryDCvuv+gk5nMJtl0Bsl4Ms4SNmOj5AMXkyRnU8mmIybZMBCRnIihWYHmnhJ3gxhcC6tK/wier0BacLsunCLuFbiNKuCFbE9SOvBppOuMwwM3uQbbRH6L8oxaieoreiVVrHUhrxkJxl/pwXksHoDnYBcyStRFDNXax7XBfcqtXyqzf7OPIvvcROW71w6ubyOPR2oMNeM0fMm9RbNB1K5rzpUrNa+ea/SpDLV1C3kbdZEfYbNTbg3cil2PQlC8JocGDAxizU3aOZXSu29lzj2cCVDDiyLwlmfILbnZHghcgwbhkWr3TH/nKtxmEwIPxi9xq8z/tfbmccKyDDI+Tm7leJYwmbEku2MsuZsymIpsOpzxMI9fgBZBiSD4xzC0vy54fWxIUHY8UAeMVLb4qFHsu4mKqiX5CXyvIC3LpmRzCzymuKtlt0O2eVx2MY9lnSm+QdYVGLp0wuLItcrrfbq39Ai8e7VoL+EEuc8xHB4EOrk2em+3fx7AVmtqGF3vSeT5kRsBeTM0MdsYCxMeqccCQvPTJnVK87RFW51z6e0e91zjNt0hUqN6fEQUjdY8Ejrq4VUzh5D3t9va4BT7ni7ihWCXlPbtdVmjBaoLRYyLjvUfbRVjC9cFAAA',
       lang: 'eng',
       suite: 'gold',
       reservedids: 'inst,lang,suite',
@@ -167,7 +166,8 @@ export class Globals {
   private connectionChangeHandler = () => this.updateNetworkFromEnvironment();
   private browserOnlineHandler = () => this.updateNetworkFromEnvironment();
   private browserOfflineHandler = () => this.updateNetworkFromEnvironment();
-  private nativeNetworkListenerHandle: { remove: () => Promise<void> } | null = null;
+  private nativeNetworkListenerHandle: { remove: () => Promise<void> } | null =
+    null;
   private readonly systemThemeChangeHandler = () => {
     if (this.theme_mode === 'system') this.applyThemeClass('system');
   };
@@ -183,7 +183,8 @@ export class Globals {
 
     try {
       const { value } = await Preferences.get({ key: this.theme_pref_key });
-      if (value === 'light' || value === 'dark' || value === 'system') preferred = value;
+      if (value === 'light' || value === 'dark' || value === 'system')
+        preferred = value;
     } catch {
       // Fall back to system theme preference when local preferences are unavailable.
     }
@@ -216,7 +217,10 @@ export class Globals {
   }
 
   async setTheme(mode: ThemeMode) {
-    this.theme_mode = mode === 'dark' || mode === 'light' || mode === 'system' ? mode : 'system';
+    this.theme_mode =
+      mode === 'dark' || mode === 'light' || mode === 'system'
+        ? mode
+        : 'system';
     this.applyThemeClass(this.theme_mode);
     this.theme_initialized = true;
     await Preferences.set({ key: this.theme_pref_key, value: this.theme_mode });
@@ -231,7 +235,8 @@ export class Globals {
   }
 
   private applyThemeClass(mode: ThemeMode) {
-    const dark = mode === 'system' ? !!this.system_color?.matches : mode === 'dark';
+    const dark =
+      mode === 'system' ? !!this.system_color?.matches : mode === 'dark';
     const root = document.documentElement;
     root.classList.toggle('ion-palette-dark', dark);
   }
@@ -271,7 +276,9 @@ export class Globals {
   }
 
   day_today() {
-    return this.easternWeekdayKey(new Date()).replace(/^./, (ch) => ch.toUpperCase());
+    return this.easternWeekdayKey(new Date()).replace(/^./, (ch) =>
+      ch.toUpperCase()
+    );
   }
 
   easternDateString(value: Date = new Date()): string {
@@ -285,7 +292,9 @@ export class Globals {
 
   easternDateStringPlusDays(days: number, from: Date = new Date()): string {
     const parts = this.easternDateParts(from);
-    const baseUtc = new Date(Date.UTC(parts.yearNum, parts.monthNum - 1, parts.dayNum));
+    const baseUtc = new Date(
+      Date.UTC(parts.yearNum, parts.monthNum - 1, parts.dayNum)
+    );
     baseUtc.setUTCDate(baseUtc.getUTCDate() + days);
     const year = String(baseUtc.getUTCFullYear()).padStart(4, '0');
     const month = String(baseUtc.getUTCMonth() + 1).padStart(2, '0');
@@ -313,7 +322,9 @@ export class Globals {
     const year = parts.find((part) => part.type === 'year')?.value ?? '0000';
     const month = parts.find((part) => part.type === 'month')?.value ?? '01';
     const day = parts.find((part) => part.type === 'day')?.value ?? '01';
-    const weekday = (parts.find((part) => part.type === 'weekday')?.value ?? 'monday').toLowerCase();
+    const weekday = (
+      parts.find((part) => part.type === 'weekday')?.value ?? 'monday'
+    ).toLowerCase();
 
     return {
       year,
@@ -377,7 +388,8 @@ export class Globals {
   }
 
   private updateNetworkFromEnvironment() {
-    const online = typeof navigator?.onLine === 'boolean' ? navigator.onLine : true;
+    const online =
+      typeof navigator?.onLine === 'boolean' ? navigator.onLine : true;
     this.net_status = online ? 'online' : 'offline';
     this.net_type = this.pickNetworkType(online);
   }
@@ -386,15 +398,24 @@ export class Globals {
     try {
       const status = await Network.getStatus();
       this.applyNativeNetworkStatus(status.connected, status.connectionType);
-      this.nativeNetworkListenerHandle ??= await Network.addListener('networkStatusChange', status => {
-        this.applyNativeNetworkStatus(status.connected, status.connectionType);
-      });
+      this.nativeNetworkListenerHandle ??= await Network.addListener(
+        'networkStatusChange',
+        (status) => {
+          this.applyNativeNetworkStatus(
+            status.connected,
+            status.connectionType
+          );
+        }
+      );
     } catch {
       // Browser fallback remains in place when the native plugin is unavailable.
     }
   }
 
-  private applyNativeNetworkStatus(connected: boolean, connectionType?: string) {
+  private applyNativeNetworkStatus(
+    connected: boolean,
+    connectionType?: string
+  ) {
     this.net_status = connected ? 'online' : 'offline';
     this.net_type = this.normalizeNetworkType(connected, connectionType ?? '');
   }
@@ -404,7 +425,9 @@ export class Globals {
 
     const conn = this.getBrowserConnection();
     const rawTransport = ((conn?.type ?? '') as string).toLowerCase().trim();
-    const rawEffective = ((conn?.effectiveType ?? '') as string).toLowerCase().trim();
+    const rawEffective = ((conn?.effectiveType ?? '') as string)
+      .toLowerCase()
+      .trim();
     const isDesktop = this.platform.is('desktop');
 
     if (rawTransport) {
@@ -415,7 +438,12 @@ export class Globals {
     // reports "4g" even when wired, so do not classify desktop as cellular from it.
     if (rawEffective) {
       if (isDesktop) return 'ethernet';
-      if (rawEffective === '4g' || rawEffective === '3g' || rawEffective === '2g' || rawEffective === 'slow-2g') {
+      if (
+        rawEffective === '4g' ||
+        rawEffective === '3g' ||
+        rawEffective === '2g' ||
+        rawEffective === 'slow-2g'
+      ) {
         return 'cellular';
       }
       return rawEffective;
@@ -432,7 +460,14 @@ export class Globals {
     if (!online || type === 'none') return 'none';
     if (type.includes('wifi') || type === 'wlan') return 'wifi';
     if (type.includes('ethernet') || type.includes('wired')) return 'ethernet';
-    if (type.includes('cell') || type === '4g' || type === '3g' || type === '2g' || type === '5g') return 'cellular';
+    if (
+      type.includes('cell') ||
+      type === '4g' ||
+      type === '3g' ||
+      type === '2g' ||
+      type === '5g'
+    )
+      return 'cellular';
     if (type === 'unknown' || !type) {
       if (this.device_info?.isVirtual) return 'simulator';
       return online ? 'unknown' : 'none';

@@ -11,61 +11,60 @@
     </ion-buttons>
   </ion-toolbar>
 
-  <!-- Filter dropdown at top of list -->
-  <ion-toolbar>
-    <ion-item lines="none">
-      <ion-label>Location</ion-label>
-      <ion-select
-        interface="popover"
-        [value]="selectedVenueCode"
-        (ionChange)="onVenueChange($event.detail.value)"
-      >
-        <ion-select-option *ngFor="let v of venues" [value]="venueValue(v)">
-          {{ venueLabel(v) }}
-        </ion-select-option>
-      </ion-select>
-    </ion-item>
-  </ion-toolbar>
+  @if (showVenueFilter) {
+    <ion-toolbar>
+      <ion-item lines="none">
+        <ion-label>Location</ion-label>
+        <ion-select
+          interface="popover"
+          [value]="selectedVenueCode"
+          (ionChange)="onVenueChange($event.detail.value)"
+        >
+          @for (v of venues; track venueValue(v)) {
+            <ion-select-option [value]="venueValue(v)">
+              {{ venueLabel(v) }}
+            </ion-select-option>
+          }
+        </ion-select>
+      </ion-item>
+    </ion-toolbar>
+  }
 </ion-header>
 
 <ion-content>
-  <ion-refresher
-    slot="fixed"
-    (ionRefresh)="refresh($event)"
-  >
+  <ion-refresher slot="fixed" (ionRefresh)="refresh($event)">
     <ion-refresher-content></ion-refresher-content>
   </ion-refresher>
 
-  <ion-list *ngIf="!loading && !error">
-    <ion-item
-      button
-      *ngFor="let ev of events; trackBy: trackByUrl"
-      (click)="openEvent(ev)"
-      detail="true"
-    >
+  @if (!loading && !error) {
+  <ion-list>
+    @for (ev of events; track trackByUrl($index, ev)) {
+    <ion-item button (click)="openEvent(ev)" detail="true">
       <ion-thumbnail slot="start">
         <ion-img [src]="imageFor(ev)" [alt]="titleFor(ev)"></ion-img>
       </ion-thumbnail>
-
       <ion-label>
         <h2>{{ ev.title }}</h2>
-        <p *ngIf="!isCancelled(ev); else cancelledLine">{{ ev.start_date | date: 'EEE, MMM d, y · h:mm a' }}</p>
-        <ng-template #cancelledLine>
-          <p class="event-cancelled">Cancelled</p>
-        </ng-template>
+        @if (!isCancelled(ev)) {
+        <p>{{ ev.start_date | date: 'EEE, MMM d, y · h:mm a' }}</p>
+        } @else {
+        <p class="event-cancelled">Cancelled</p>
+        }
         <p>{{ ev.location }}</p>
       </ion-label>
     </ion-item>
+    }
   </ion-list>
-
-  <div class="state" *ngIf="!loading && error">
+  } @if (!loading && error) {
+  <div class="state">
     <p>{{ error }}</p>
     <ion-button expand="block" (click)="onVenueChange(selectedVenueCode)">
       Retry
     </ion-button>
   </div>
-
-  <div class="state" *ngIf="!loading && !error && events.length === 0">
+  } @if (!loading && !error && events.length === 0) {
+  <div class="state">
     <p>No events found for this location.</p>
   </div>
+  }
 </ion-content>

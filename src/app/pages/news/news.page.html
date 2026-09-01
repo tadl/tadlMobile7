@@ -13,12 +13,16 @@
 </ion-header>
 
 <ion-content>
-  <ion-refresher slot="fixed" (ionRefresh)="get_news(); $event.target.complete()">
+  <ion-refresher
+    slot="fixed"
+    (ionRefresh)="get_news(); $event.target.complete()"
+  >
     <ion-refresher-content></ion-refresher-content>
   </ion-refresher>
 
   <ion-list>
-    <ion-item button detail="true" *ngFor="let n of newsletters" (click)="view_details(n)">
+    @for (n of newsletters; track n) {
+    <ion-item button detail="true" (click)="view_details(n)">
       <ion-thumbnail slot="start">
         <ion-img
           [src]="thumbFor(n)"
@@ -26,17 +30,21 @@
           (ionError)="markImageBroken(n)"
         ></ion-img>
       </ion-thumbnail>
-
       <ion-label>
         <h2 [innerText]="titleFor(n)"></h2>
-        <p class="muted" *ngIf="dateFor(n)">{{ dateFor(n) }}</p>
-        <p class="muted" *ngIf="excerptFor(n)">{{ excerptFor(n) }}</p>
+        @if (dateFor(n)) {
+        <p class="muted">{{ dateFor(n) }}</p>
+        } @if (excerptFor(n)) {
+        <p class="muted">{{ excerptFor(n) }}</p>
+        }
       </ion-label>
     </ion-item>
+    }
   </ion-list>
 
-  <ion-item *ngIf="!globals.api_loading && newsletters.length === 0">
+  @if (!globals.api_loading && newsletters.length === 0) {
+  <ion-item>
     <ion-label>No newsletters found.</ion-label>
   </ion-item>
-
+  }
 </ion-content>

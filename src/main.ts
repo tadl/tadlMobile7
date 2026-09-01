@@ -1,3 +1,4 @@
+import { provideZoneChangeDetection } from '@angular/core';
 import { bootstrapApplication } from '@angular/platform-browser';
 import {
   PreloadAllModules,
@@ -5,10 +6,16 @@ import {
   RouteReuseStrategy,
   withPreloading,
 } from '@angular/router';
-import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
+import {
+  provideHttpClient,
+  withInterceptorsFromDi,
+} from '@angular/common/http';
 import { HTTP_INTERCEPTORS } from '@angular/common/http';
 
-import { IonicRouteStrategy, provideIonicAngular } from '@ionic/angular/standalone';
+import {
+  IonicRouteStrategy,
+  provideIonicAngular,
+} from '@ionic/angular';
 import {
   ModalController,
   AlertController,
@@ -18,7 +25,7 @@ import {
   LoadingController,
   PopoverController,
   Platform,
-} from '@ionic/angular/standalone';
+} from '@ionic/angular';
 
 import { addIcons } from 'ionicons';
 import {
@@ -110,6 +117,7 @@ addIcons({
 
 bootstrapApplication(AppComponent, {
   providers: [
+    provideZoneChangeDetection(),
     { provide: RouteReuseStrategy, useClass: IonicRouteStrategy },
 
     provideIonicAngular(),
@@ -125,11 +133,19 @@ bootstrapApplication(AppComponent, {
     Platform,
 
     // Interceptors
-    { provide: HTTP_INTERCEPTORS, useClass: AspenApiParamsInterceptor, multi: true },
-    { provide: HTTP_INTERCEPTORS, useClass: ServiceAlertInterceptor, multi: true },
+    {
+      provide: HTTP_INTERCEPTORS,
+      useClass: AspenApiParamsInterceptor,
+      multi: true,
+    },
+    {
+      provide: HTTP_INTERCEPTORS,
+      useClass: ServiceAlertInterceptor,
+      multi: true,
+    },
     { provide: HTTP_INTERCEPTORS, useClass: LoadingInterceptor, multi: true },
 
     provideRouter(routes, withPreloading(PreloadAllModules)),
     provideHttpClient(withInterceptorsFromDi()),
   ],
-}).catch(err => console.error(err));
+}).catch((err) => console.error(err));

@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import {
   HttpErrorResponse,
   HttpEvent,
@@ -14,12 +14,13 @@ import { ServiceAlertService } from './service-alert.service';
 
 @Injectable()
 export class ServiceAlertInterceptor implements HttpInterceptor {
-  constructor(
-    private globals: Globals,
-    private serviceAlerts: ServiceAlertService,
-  ) {}
+  private globals = inject(Globals);
+  private serviceAlerts = inject(ServiceAlertService);
 
-  intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
+  intercept(
+    req: HttpRequest<any>,
+    next: HttpHandler
+  ): Observable<HttpEvent<any>> {
     if (!this.isProxyRequest(req.url)) {
       return next.handle(req);
     }
@@ -33,7 +34,10 @@ export class ServiceAlertInterceptor implements HttpInterceptor {
             void this.serviceAlerts.set(alert);
             return;
           }
-          if (this.isCacheWarmRequest(req.url) && this.isConfirmedCacheWarmSuccess(event.body)) {
+          if (
+            this.isCacheWarmRequest(req.url) &&
+            this.isConfirmedCacheWarmSuccess(event.body)
+          ) {
             void this.serviceAlerts.clear();
           }
         },
@@ -43,7 +47,7 @@ export class ServiceAlertInterceptor implements HttpInterceptor {
           if (!alert) return;
           void this.serviceAlerts.set(alert);
         },
-      }),
+      })
     );
   }
 

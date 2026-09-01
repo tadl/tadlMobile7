@@ -1,149 +1,159 @@
 <ion-header>
   <ion-toolbar>
-    <ion-buttons slot="start" *ngIf="dismissStyle === 'back'">
+    @if (dismissStyle === 'back') {
+    <ion-buttons slot="start">
       <ion-button (click)="dismiss()">
         <ion-icon name="chevron-back-outline" slot="start"></ion-icon>
         Back
       </ion-button>
     </ion-buttons>
-
-    <ion-buttons slot="start" *ngIf="dismissStyle === 'close'">
+    } @if (dismissStyle === 'close') {
+    <ion-buttons slot="start">
       <ion-button (click)="dismiss()">Close</ion-button>
     </ion-buttons>
+    }
 
     <ion-title>Event Detail</ion-title>
   </ion-toolbar>
 </ion-header>
 
 <ion-content>
-  <ng-container *ngIf="loading">
-    <ion-card>
-      <ion-card-header>
-        <ion-skeleton-text animated style="width: 60%"></ion-skeleton-text>
-        <ion-skeleton-text animated style="width: 35%"></ion-skeleton-text>
-      </ion-card-header>
-      <ion-card-content>
-        <ion-skeleton-text animated style="width: 100%"></ion-skeleton-text>
-        <ion-skeleton-text animated style="width: 92%"></ion-skeleton-text>
-        <ion-skeleton-text animated style="width: 85%"></ion-skeleton-text>
-      </ion-card-content>
-    </ion-card>
-  </ng-container>
-
-  <ng-container *ngIf="!loading && error">
-    <ion-card class="error-card">
-      <ion-card-header>
-        <ion-card-title>Couldn’t load event</ion-card-title>
-      </ion-card-header>
-      <ion-card-content>
-        <p class="muted">{{ error }}</p>
-      </ion-card-content>
-    </ion-card>
-  </ng-container>
-
-  <ng-container *ngIf="!loading && !error && event">
-    <ion-card class="event-card">
-      <img *ngIf="imageUrl" class="hero" [src]="imageUrl" [alt]="title" />
-
-      <ion-card-header>
-        <ion-card-title class="title">{{ title }}</ion-card-title>
-      </ion-card-header>
-
-      <ion-card-content>
-        <div class="cancelled-banner" *ngIf="isCancelled">
-          <ion-icon name="close-circle-outline" aria-hidden="true"></ion-icon>
-          <div class="cancelled-copy">
-            <div class="cancelled-title">This event has been cancelled</div>
-            <div class="cancelled-text">Please check the event page for any updates or rescheduling details.</div>
+  @if (loading) {
+  <ion-card>
+    <ion-card-header>
+      <ion-skeleton-text animated style="width: 60%"></ion-skeleton-text>
+      <ion-skeleton-text animated style="width: 35%"></ion-skeleton-text>
+    </ion-card-header>
+    <ion-card-content>
+      <ion-skeleton-text animated style="width: 100%"></ion-skeleton-text>
+      <ion-skeleton-text animated style="width: 92%"></ion-skeleton-text>
+      <ion-skeleton-text animated style="width: 85%"></ion-skeleton-text>
+    </ion-card-content>
+  </ion-card>
+  } @if (!loading && error) {
+  <ion-card class="error-card">
+    <ion-card-header>
+      <ion-card-title>Couldn’t load event</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <p class="muted">{{ error }}</p>
+    </ion-card-content>
+  </ion-card>
+  } @if (!loading && !error && event) {
+  <ion-card class="event-card">
+    @if (imageUrl) {
+    <img class="hero" [src]="imageUrl" [alt]="title" />
+    }
+    <ion-card-header>
+      <ion-card-title class="title">{{ title }}</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      @if (isCancelled) {
+      <div class="cancelled-banner">
+        <ion-icon name="close-circle-outline" aria-hidden="true"></ion-icon>
+        <div class="cancelled-copy">
+          <div class="cancelled-title">This event has been cancelled</div>
+          <div class="cancelled-text">
+            Please check the event page for any updates or rescheduling details.
           </div>
         </div>
-
-        <div class="details">
-          <div class="when-card" *ngIf="startsAtDate; else noWhen">
-            <div class="when-main">
-              <ion-icon name="calendar-outline" aria-hidden="true"></ion-icon>
-              <div class="when-copy">
-                <div class="when-date">{{ startsAtDate | date : 'EEE, MMM d, y' }}</div>
-                <div class="when-time" *ngIf="!event?.allDay">{{ startsAtDate | date : 'h:mm a' }}</div>
-                <div class="when-time" *ngIf="event?.allDay">All day</div>
+      </div>
+      }
+      <div class="details">
+        @if (startsAtDate) {
+        <div class="when-card">
+          <div class="when-main">
+            <ion-icon name="calendar-outline" aria-hidden="true"></ion-icon>
+            <div class="when-copy">
+              <div class="when-date">
+                {{ startsAtDate | date : "EEE, MMM d, y" }}
               </div>
-            </div>
-            <ion-button fill="outline" size="small" class="calendar-button" (click)="addToCalendar()">
-              Add to calendar
-            </ion-button>
-          </div>
-
-          <ng-template #noWhen>
-            <div class="when-card muted">Date and time unavailable</div>
-          </ng-template>
-
-          <div class="meta-list">
-            <div class="meta-row" *ngIf="location; else noWhere">
-              <span class="meta-label">Location</span>
-              <span class="meta-value">{{ location }}</span>
-            </div>
-
-            <ng-template #noWhere>
-              <div class="meta-row muted">
-                <span class="meta-label">Location</span>
-                <span class="meta-value">Unavailable</span>
-              </div>
-            </ng-template>
-
-            <div class="meta-row" *ngIf="displayRoom">
-              <span class="meta-label">Room</span>
-              <span class="meta-value">{{ displayRoom }}</span>
-            </div>
-
-            <div class="meta-row" *ngIf="recommendedAgeGroupsLabel">
-              <span class="meta-label">Recommended age groups</span>
-              <span class="meta-value">{{ recommendedAgeGroupsLabel }}</span>
+              @if (!event.allDay) {
+              <div class="when-time">{{ startsAtDate | date : "h:mm a" }}</div>
+              } @if (event.allDay) {
+              <div class="when-time">All day</div>
+              }
             </div>
           </div>
-        </div>
-
-        <div class="desc" *ngIf="descriptionHtml; else noDesc">
-          <div [innerHTML]="descriptionHtml" (click)="handleBodyLinkClick($event)"></div>
-        </div>
-
-        <ng-template #noDesc>
-          <p class="muted">No description provided.</p>
-        </ng-template>
-
-        <div class="registration-callout" *ngIf="registrationRequired">
-          <div class="registration-note" *ngIf="registrationNote">
-            {{ registrationNote }}
-          </div>
-
-          <div class="registration-window" *ngIf="registrationWindowLabel">
-            {{ registrationWindowLabel }}
-          </div>
-
           <ion-button
-            *ngIf="registrationButtonVisible"
-            class="registration-button"
-            expand="block"
-            (click)="openExternalUrl()"
+            fill="outline"
+            size="small"
+            class="calendar-button"
+            (click)="addToCalendar()"
           >
-            Register now
+            Add to calendar
           </ion-button>
         </div>
-
-        <div class="tags" *ngIf="event?.tags?.length">
-          <ion-chip *ngFor="let t of event?.tags" outline="true">
-            <ion-label>{{ t }}</ion-label>
-          </ion-chip>
+        } @else {
+        <div class="when-card muted">Date and time unavailable</div>
+        }
+        <div class="meta-list">
+          @if (location) {
+          <div class="meta-row">
+            <span class="meta-label">Location</span>
+            <span class="meta-value">{{ location }}</span>
+          </div>
+          } @else {
+          <div class="meta-row muted">
+            <span class="meta-label">Location</span>
+            <span class="meta-value">Unavailable</span>
+          </div>
+          } @if (displayRoom) {
+          <div class="meta-row">
+            <span class="meta-label">Room</span>
+            <span class="meta-value">{{ displayRoom }}</span>
+          </div>
+          } @if (recommendedAgeGroupsLabel) {
+          <div class="meta-row">
+            <span class="meta-label">Recommended age groups</span>
+            <span class="meta-value">{{ recommendedAgeGroupsLabel }}</span>
+          </div>
+          }
         </div>
-      </ion-card-content>
-    </ion-card>
-
-    <ion-button
-      *ngIf="externalUrl && !registrationRequired"
-      class="open-button"
-      expand="block"
-      (click)="openExternalUrl()"
-    >
-      View full details
-    </ion-button>
-  </ng-container>
+      </div>
+      @if (descriptionHtml) {
+      <div class="desc">
+        <div
+          [innerHTML]="descriptionHtml"
+          (click)="handleBodyLinkClick($event)"
+        ></div>
+      </div>
+      } @else {
+      <p class="muted">No description provided.</p>
+      } @if (registrationRequired) {
+      <div class="registration-callout">
+        @if (registrationNote) {
+        <div class="registration-note">
+          {{ registrationNote }}
+        </div>
+        } @if (registrationWindowLabel) {
+        <div class="registration-window">
+          {{ registrationWindowLabel }}
+        </div>
+        } @if (registrationButtonVisible) {
+        <ion-button
+          class="registration-button"
+          expand="block"
+          (click)="openExternalUrl()"
+        >
+          Register now
+        </ion-button>
+        }
+      </div>
+      } @if (event.tags?.length) {
+      <div class="tags">
+        @for (t of event.tags; track t) {
+        <ion-chip outline="true">
+          <ion-label>{{ t }}</ion-label>
+        </ion-chip>
+        }
+      </div>
+      }
+    </ion-card-content>
+  </ion-card>
+  @if (externalUrl && !registrationRequired) {
+  <ion-button class="open-button" expand="block" (click)="openExternalUrl()">
+    View full details
+  </ion-button>
+  } }
 </ion-content>

@@ -1,6 +1,10 @@
-import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { IonicModule, ActionSheetController, AlertController } from '@ionic/angular';
+import { Component, inject } from '@angular/core';
+
+import {
+  IonicModule,
+  ActionSheetController,
+  AlertController,
+} from '@ionic/angular/lazy';
 import { Router } from '@angular/router';
 import { finalize } from 'rxjs';
 
@@ -14,22 +18,20 @@ import { ListLookupService } from '../../services/list-lookup.service';
   selector: 'app-my-lists',
   templateUrl: './my-lists.page.html',
   styleUrls: ['./my-lists.page.scss'],
-  imports: [CommonModule, IonicModule],
+  imports: [IonicModule],
 })
 export class MyListsPage {
+  globals = inject(Globals);
+  private listsService = inject(ListsService);
+  private toast = inject(ToastService);
+  private router = inject(Router);
+  private actionSheetCtrl = inject(ActionSheetController);
+  private alertCtrl = inject(AlertController);
+  private listLookup = inject(ListLookupService);
+
   loading = false;
   mutating = false;
   lists: AspenUserList[] = [];
-
-  constructor(
-    public globals: Globals,
-    private listsService: ListsService,
-    private toast: ToastService,
-    private router: Router,
-    private actionSheetCtrl: ActionSheetController,
-    private alertCtrl: AlertController,
-    private listLookup: ListLookupService,
-  ) {}
 
   async ionViewWillEnter() {
     this.refresh();
@@ -48,13 +50,15 @@ export class MyListsPage {
         finalize(() => {
           this.loading = false;
           ev?.target?.complete?.();
-        }),
+        })
       )
       .subscribe({
         next: (lists) => {
           this.lists = (lists ?? []).slice().sort((a, b) => {
-            const ta = new Date((a?.dateUpdated ?? '').toString()).getTime() || 0;
-            const tb = new Date((b?.dateUpdated ?? '').toString()).getTime() || 0;
+            const ta =
+              new Date((a?.dateUpdated ?? '').toString()).getTime() || 0;
+            const tb =
+              new Date((b?.dateUpdated ?? '').toString()).getTime() || 0;
             return tb - ta;
           });
           this.listLookup.replaceLists(this.lists);
@@ -100,8 +104,13 @@ export class MyListsPage {
     if (isPublic === null) return;
 
     this.mutating = true;
-    this.listsService.createList(basics.title, basics.description, isPublic)
-      .pipe(finalize(() => { this.mutating = false; }))
+    this.listsService
+      .createList(basics.title, basics.description, isPublic)
+      .pipe(
+        finalize(() => {
+          this.mutating = false;
+        })
+      )
       .subscribe({
         next: (res) => {
           if (!res?.success) {
@@ -136,7 +145,8 @@ export class MyListsPage {
           handler: () => this.confirmDeleteList(list),
         },
         {
-          text: 'Close', role: 'cancel',
+          text: 'Close',
+          role: 'cancel',
         },
       ],
     });
@@ -150,7 +160,7 @@ export class MyListsPage {
     const basics = await this.promptListBasics(
       'Edit List',
       this.listTitle(list),
-      this.listDescription(list),
+      this.listDescription(list)
     );
     if (!basics) return;
 
@@ -164,12 +174,17 @@ export class MyListsPage {
     }
 
     this.mutating = true;
-    this.listsService.editList(listId, {
-      title: basics.title,
-      description: basics.description,
-      isPublic,
-    })
-      .pipe(finalize(() => { this.mutating = false; }))
+    this.listsService
+      .editList(listId, {
+        title: basics.title,
+        description: basics.description,
+        isPublic,
+      })
+      .pipe(
+        finalize(() => {
+          this.mutating = false;
+        })
+      )
       .subscribe({
         next: (res) => {
           if (!res?.success) {
@@ -190,9 +205,10 @@ export class MyListsPage {
     const count = this.listCount(list);
     const title = this.listTitle(list);
     const itemText = `${count} item${count === 1 ? '' : 's'}`;
-    const warning = count > 0
-      ? `THIS LIST HAS ${itemText.toUpperCase()} IN IT. ARE YOU SURE?`
-      : 'Are you sure you want to delete this list?';
+    const warning =
+      count > 0
+        ? `THIS LIST HAS ${itemText.toUpperCase()} IN IT. ARE YOU SURE?`
+        : 'Are you sure you want to delete this list?';
 
     const alert = await this.alertCtrl.create({
       header: 'Delete list?',
@@ -220,15 +236,22 @@ export class MyListsPage {
     if (this.mutating) return;
 
     this.mutating = true;
-    this.listsService.deleteList(listId)
-      .pipe(finalize(() => { this.mutating = false; }))
+    this.listsService
+      .deleteList(listId)
+      .pipe(
+        finalize(() => {
+          this.mutating = false;
+        })
+      )
       .subscribe({
         next: (res) => {
           if (!res?.success) {
             this.toast.presentToast(res?.message || 'Could not delete list.');
             return;
           }
-          this.lists = this.lists.filter(x => (x?.id ?? '').toString().trim() !== listId);
+          this.lists = this.lists.filter(
+            (x) => (x?.id ?? '').toString().trim() !== listId
+          );
           this.listLookup.removeList(listId);
           this.toast.presentToast(res?.message || 'List deleted.');
         },
@@ -239,7 +262,7 @@ export class MyListsPage {
   private async promptListBasics(
     header: string,
     initialTitle = '',
-    initialDescription = '',
+    initialDescription = ''
   ): Promise<{ title: string; description: string } | null> {
     return new Promise(async (resolve) => {
       const alert = await this.alertCtrl.create({
@@ -282,7 +305,9 @@ export class MyListsPage {
     });
   }
 
-  private async promptVisibility(initialPublic: boolean): Promise<boolean | null> {
+  private async promptVisibility(
+    initialPublic: boolean
+  ): Promise<boolean | null> {
     return new Promise(async (resolve) => {
       const alert = await this.alertCtrl.create({
         header: 'List Visibility',

@@ -1,6 +1,13 @@
-import { Component, Input, OnChanges, OnInit, SimpleChanges } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { IonicModule, ModalController } from '@ionic/angular';
+import {
+  Component,
+  Input,
+  OnChanges,
+  OnInit,
+  SimpleChanges,
+  inject,
+} from '@angular/core';
+
+import { IonicModule, ModalController } from '@ionic/angular/lazy';
 
 interface CopyDetailRow {
   location: string;
@@ -21,17 +28,17 @@ interface GroupedCopyDetailRow {
   selector: 'app-copy-details-popover',
   templateUrl: './copy-details-popover.component.html',
   styleUrls: ['./copy-details-popover.component.scss'],
-  imports: [CommonModule, IonicModule],
+  imports: [IonicModule],
 })
 export class CopyDetailsPopoverComponent implements OnChanges, OnInit {
+  private modalController = inject(ModalController);
+
   @Input() formatLabel = 'Copy details';
   @Input() title = 'Untitled';
   @Input() author = '';
   @Input() coverUrl = '';
   @Input() details: CopyDetailRow[] = [];
   groupedRows: GroupedCopyDetailRow[] = [];
-
-  constructor(private modalController: ModalController) {}
 
   ngOnInit(): void {
     this.groupedRows = this.groupDetails(this.details ?? []);
@@ -46,7 +53,16 @@ export class CopyDetailsPopoverComponent implements OnChanges, OnInit {
   }
 
   private groupDetails(details: CopyDetailRow[]): GroupedCopyDetailRow[] {
-    const groups = new Map<string, { location: string; callNumber: string; statuses: string[]; count: number; availableCount: number }>();
+    const groups = new Map<
+      string,
+      {
+        location: string;
+        callNumber: string;
+        statuses: string[];
+        count: number;
+        availableCount: number;
+      }
+    >();
 
     for (const d of details) {
       const location = (d?.location ?? '').toString().trim();

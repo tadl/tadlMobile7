@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Observable, from, map, shareReplay, switchMap } from 'rxjs';
 
@@ -29,15 +29,13 @@ export interface AspenPatronFinesResponse {
 
 @Injectable({ providedIn: 'root' })
 export class FinesService {
-  private activeFetch$: Observable<AspenPatronFinesResponse> | null = null;
+  private http = inject(HttpClient);
+  private globals = inject(Globals);
+  private auth = inject(AuthService);
+  private accounts = inject(AccountStoreService);
+  private userApiQueue = inject(UserApiQueueService);
 
-  constructor(
-    private http: HttpClient,
-    private globals: Globals,
-    private auth: AuthService,
-    private accounts: AccountStoreService,
-    private userApiQueue: UserApiQueueService,
-  ) {}
+  private activeFetch$: Observable<AspenPatronFinesResponse> | null = null;
 
   fetchPatronFines(): Observable<AspenPatronFinesResponse> {
     const snap = this.auth.snapshot();
@@ -56,7 +54,7 @@ export class FinesService {
     if (existing) return existing;
 
     const request$ = from(this.accounts.getPassword(snap.activeAccountId)).pipe(
-      switchMap(password => {
+      switchMap((password) => {
         if (!password) {
           return from([
             {
@@ -82,10 +80,14 @@ export class FinesService {
 
         return this.userApiQueue
           .run(snap.activeAccountId, () =>
-            this.http.post<any>(`${this.globals.aspen_api_base}/UserAPI`, body.toString(), { params, headers }),
+            this.http.post<any>(
+              `${this.globals.aspen_api_base}/UserAPI`,
+              body.toString(),
+              { params, headers }
+            )
           )
           .pipe(
-            map(raw => {
+            map((raw) => {
               const result = raw?.result ?? raw ?? {};
               const fines = this.normalizeFineCollection(result?.fines);
               const totalOwed = this.computeTotalOwed(fines, result?.totalOwed);
@@ -94,17 +96,23 @@ export class FinesService {
                 success: !!result?.success,
                 fines,
                 totalOwed,
-                message: typeof result?.message === 'string' ? result.message : undefined,
+                message:
+                  typeof result?.message === 'string'
+                    ? result.message
+                    : undefined,
               } satisfies AspenPatronFinesResponse;
-            }),
+            })
           );
       }),
       map((result) => result),
-      shareReplay({ bufferSize: 1, refCount: true }),
+      shareReplay({ bufferSize: 1, refCount: true })
     );
 
     this.activeFetch$ = request$;
-    request$.subscribe({ complete: () => (this.activeFetch$ = null), error: () => (this.activeFetch$ = null) });
+    request$.subscribe({
+      complete: () => (this.activeFetch$ = null),
+      error: () => (this.activeFetch$ = null),
+    });
     return request$;
   }
 

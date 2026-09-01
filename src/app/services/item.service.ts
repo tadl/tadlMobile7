@@ -1,5 +1,5 @@
 // src/app/services/item.service.ts
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, map, concat, from, filter, tap } from 'rxjs';
 import { Globals } from '../globals';
@@ -96,12 +96,10 @@ export interface AspenFormatVariationsResult {
 
 @Injectable({ providedIn: 'root' })
 export class ItemService {
-  constructor(
-    private http: HttpClient,
-    private globals: Globals,
-    private cache: AppCacheService,
-    private discoveryUrls: DiscoveryUrlService,
-  ) {}
+  private http = inject(HttpClient);
+  private globals = inject(Globals);
+  private cache = inject(AppCacheService);
+  private discoveryUrls = inject(DiscoveryUrlService);
 
   /**
    * Work-level details (grouped work):
@@ -115,16 +113,16 @@ export class ItemService {
 
     const cacheKey = `item:groupedWork:${key}`;
     const cached$ = from(this.cache.read<AspenGroupedWork>(cacheKey)).pipe(
-      filter((v): v is AspenGroupedWork => !!v && typeof v === 'object'),
+      filter((v): v is AspenGroupedWork => !!v && typeof v === 'object')
     );
 
     const network$ = this.http
       .get<any>(`${this.globals.aspen_api_base}/WorkAPI`, { params })
       .pipe(
-        map(raw => this.normalizeGroupedWork(raw?.result ?? raw)),
+        map((raw) => this.normalizeGroupedWork(raw?.result ?? raw)),
         tap((work) => {
           this.cache.write(cacheKey, work).catch(() => {});
-        }),
+        })
       );
 
     return concat(cached$, network$);
@@ -146,17 +144,21 @@ export class ItemService {
       .set('id', numeric);
 
     const cacheKey = `item:availability:${numeric}`;
-    const cached$ = from(this.cache.read<AspenItemAvailabilityResult>(cacheKey)).pipe(
-      filter((v): v is AspenItemAvailabilityResult => !!v && typeof v === 'object'),
+    const cached$ = from(
+      this.cache.read<AspenItemAvailabilityResult>(cacheKey)
+    ).pipe(
+      filter(
+        (v): v is AspenItemAvailabilityResult => !!v && typeof v === 'object'
+      )
     );
 
     const network$ = this.http
       .get<any>(`${this.globals.aspen_api_base}/ItemAPI`, { params })
       .pipe(
-        map(raw => (raw?.result ?? raw) as AspenItemAvailabilityResult),
+        map((raw) => (raw?.result ?? raw) as AspenItemAvailabilityResult),
         tap((availability) => {
           this.cache.write(cacheKey, availability).catch(() => {});
-        }),
+        })
       );
 
     return concat(cached$, network$);
@@ -166,7 +168,10 @@ export class ItemService {
    * Format-level variation/status info (includes eContent provider details like OverDrive/Hoopla).
    * GET /API/ItemAPI?method=getVariations&id=<groupedWorkKey>&format=<formatLabel>
    */
-  getFormatVariations(groupedWorkKey: string, formatLabel: string): Observable<AspenFormatVariationsResult> {
+  getFormatVariations(
+    groupedWorkKey: string,
+    formatLabel: string
+  ): Observable<AspenFormatVariationsResult> {
     const key = (groupedWorkKey || '').trim();
     const format = (formatLabel || '').trim();
 
@@ -176,17 +181,24 @@ export class ItemService {
       .set('format', format);
 
     const cacheKey = `item:variations:${key}:${format.toLowerCase()}`;
-    const cached$ = from(this.cache.read<AspenFormatVariationsResult>(cacheKey)).pipe(
-      filter((v): v is AspenFormatVariationsResult => !!v && typeof v === 'object' && !!v.variations),
+    const cached$ = from(
+      this.cache.read<AspenFormatVariationsResult>(cacheKey)
+    ).pipe(
+      filter(
+        (v): v is AspenFormatVariationsResult =>
+          !!v && typeof v === 'object' && !!v.variations
+      )
     );
 
     const network$ = this.http
       .get<any>(`${this.globals.aspen_api_base}/ItemAPI`, { params })
       .pipe(
-        map(raw => this.normalizeVariationsResult(raw?.result ?? raw, key, format)),
+        map((raw) =>
+          this.normalizeVariationsResult(raw?.result ?? raw, key, format)
+        ),
         tap((result) => {
           this.cache.write(cacheKey, result).catch(() => {});
-        }),
+        })
       );
 
     return concat(cached$, network$);
@@ -208,7 +220,7 @@ export class ItemService {
     if (!onclick) return null;
 
     const m = onclick.match(
-      /showPlaceHold(?:Editions)?\s*\([^)]*['"]ils['"]\s*,\s*['"]([^'"]+)['"]/i,
+      /showPlaceHold(?:Editions)?\s*\([^)]*['"]ils['"]\s*,\s*['"]([^'"]+)['"]/i
     );
     const id = (m?.[1] ?? '').toString().trim();
     if (id) return id;
@@ -234,7 +246,11 @@ export class ItemService {
     return Array.from(ids);
   }
 
-  private normalizeVariationsResult(input: any, groupedWorkKey: string, formatLabel: string): AspenFormatVariationsResult {
+  private normalizeVariationsResult(
+    input: any,
+    groupedWorkKey: string,
+    formatLabel: string
+  ): AspenFormatVariationsResult {
     const sourceVariations = input?.variations;
     const entries =
       sourceVariations && typeof sourceVariations === 'object'
@@ -245,24 +261,38 @@ export class ItemService {
     for (const [label, rawVariation] of entries as Array<[string, any]>) {
       variations[label] = {
         id: typeof rawVariation?.id === 'string' ? rawVariation.id : undefined,
-        source: typeof rawVariation?.source === 'string' ? rawVariation.source : undefined,
-        actions: Array.isArray(rawVariation?.actions) ? rawVariation.actions : [],
-        statusIndicator: rawVariation?.statusIndicator && typeof rawVariation.statusIndicator === 'object'
-          ? {
-              isAvailable: !!rawVariation.statusIndicator?.isAvailable,
-              isEContent: !!rawVariation.statusIndicator?.isEContent,
-              isAvailableOnline: !!rawVariation.statusIndicator?.isAvailableOnline,
-              groupedStatus: typeof rawVariation.statusIndicator?.groupedStatus === 'string'
-                ? rawVariation.statusIndicator.groupedStatus
-                : undefined,
-              numCopiesMessage: typeof rawVariation.statusIndicator?.numCopiesMessage === 'string'
-                ? rawVariation.statusIndicator.numCopiesMessage
-                : undefined,
-              numHolds: Number.isFinite(Number(rawVariation.statusIndicator?.numHolds))
-                ? Number(rawVariation.statusIndicator.numHolds)
-                : undefined,
-            }
-          : undefined,
+        source:
+          typeof rawVariation?.source === 'string'
+            ? rawVariation.source
+            : undefined,
+        actions: Array.isArray(rawVariation?.actions)
+          ? rawVariation.actions
+          : [],
+        statusIndicator:
+          rawVariation?.statusIndicator &&
+          typeof rawVariation.statusIndicator === 'object'
+            ? {
+                isAvailable: !!rawVariation.statusIndicator?.isAvailable,
+                isEContent: !!rawVariation.statusIndicator?.isEContent,
+                isAvailableOnline:
+                  !!rawVariation.statusIndicator?.isAvailableOnline,
+                groupedStatus:
+                  typeof rawVariation.statusIndicator?.groupedStatus ===
+                  'string'
+                    ? rawVariation.statusIndicator.groupedStatus
+                    : undefined,
+                numCopiesMessage:
+                  typeof rawVariation.statusIndicator?.numCopiesMessage ===
+                  'string'
+                    ? rawVariation.statusIndicator.numCopiesMessage
+                    : undefined,
+                numHolds: Number.isFinite(
+                  Number(rawVariation.statusIndicator?.numHolds)
+                )
+                  ? Number(rawVariation.statusIndicator.numHolds)
+                  : undefined,
+              }
+            : undefined,
       };
     }
 

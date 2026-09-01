@@ -1,4 +1,5 @@
-// src/app/services/aspen-api.config.ts
+import { APP_PROFILE } from '../app-profile';
+
 export const ASPEN_API_QUERY_PARAMS: Record<string, string> = {
-  api: 'tadl-prod',
+  api: APP_PROFILE.aspenApiParam,
 };

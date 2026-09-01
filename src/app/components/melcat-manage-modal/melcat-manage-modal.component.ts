@@ -1,6 +1,6 @@
-import { Component, Input, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { IonicModule, ModalController } from '@ionic/angular';
+import { Component, Input, OnInit, inject } from '@angular/core';
+
+import { IonicModule, ModalController } from '@ionic/angular/lazy';
 
 import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
@@ -11,21 +11,19 @@ import { AuthService } from '../../services/auth.service';
   selector: 'app-melcat-manage-modal',
   templateUrl: './melcat-manage-modal.component.html',
   styleUrls: ['./melcat-manage-modal.component.scss'],
-  imports: [CommonModule, IonicModule],
+  imports: [IonicModule],
 })
 export class MelcatManageModalComponent implements OnInit {
+  globals = inject(Globals);
+  private modalCtrl = inject(ModalController);
+  private toast = inject(ToastService);
+  private auth = inject(AuthService);
+
   @Input() type: 'hold' | 'checkout' = 'hold';
   @Input() title = '';
   @Input() author = '';
   @Input() format = '';
   melcatId = '';
-
-  constructor(
-    public globals: Globals,
-    private modalCtrl: ModalController,
-    private toast: ToastService,
-    private auth: AuthService,
-  ) {}
 
   ngOnInit() {
     const snap = this.auth.snapshot();
@@ -34,7 +32,9 @@ export class MelcatManageModalComponent implements OnInit {
       snap?.profile?.username ??
       snap?.profile?.unique_ils_id ??
       ''
-    ).toString().trim();
+    )
+      .toString()
+      .trim();
   }
 
   async close() {

@@ -9,31 +9,37 @@
 
 <ion-content>
   <ion-card class="news-card">
-    <img
-      *ngIf="shouldShowHero()"
-      [src]="heroImage()!"
-      [alt]="titleFor()"
-      class="hero"
-    />
+    @if (shouldShowHero()) {
+    <img [src]="heroImage()!" [alt]="titleFor()" class="hero" />
+    }
 
     <ion-card-header>
       <ion-card-title class="title">{{ titleFor() }}</ion-card-title>
-      <ion-card-subtitle class="meta" *ngIf="dateFor()">{{ dateFor() }}</ion-card-subtitle>
+      @if (dateFor()) {
+      <ion-card-subtitle class="meta">{{ dateFor() }}</ion-card-subtitle>
+      }
     </ion-card-header>
 
     <ion-card-content>
+      @if (htmlContent()) {
       <div
         class="news-body prose"
-        *ngIf="htmlContent()"
         [innerHTML]="htmlContent()"
         (click)="handleBodyLinkClick($event)"
       ></div>
+      }
     </ion-card-content>
   </ion-card>
 
-  <div class="browser-link-wrap" *ngIf="postUrl()">
-    <ion-button class="browser-link-button" expand="block" (click)="openLink(postUrl()!)">
+  @if (postUrl()) {
+  <div class="browser-link-wrap">
+    <ion-button
+      class="browser-link-button"
+      expand="block"
+      (click)="openLink(postUrl()!)"
+    >
       View in browser
     </ion-button>
   </div>
+  }
 </ion-content>

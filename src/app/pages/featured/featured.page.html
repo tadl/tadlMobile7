@@ -32,72 +32,91 @@
       </ion-segment>
     </div>
 
-    <div class="refreshing-note" *ngIf="isTabLoading(selectedTab) && tilesByTab[selectedTab].length > 0">
-      Refreshing featured items...
-    </div>
+    @if (isTabLoading(selectedTab) && tilesByTab[selectedTab].length > 0) {
+    <div class="refreshing-note">Refreshing featured items...</div>
+    }
   </div>
 
   <div class="featured-shell">
-    <div class="category-grid skeleton-list" *ngIf="isTabLoading(selectedTab) && tilesByTab[selectedTab].length === 0">
-      <ion-card class="category-card" *ngFor="let _card of [1, 2, 3, 4]">
+    @if (isTabLoading(selectedTab) && tilesByTab[selectedTab].length === 0) {
+    <div class="category-grid skeleton-list">
+      @for (_card of [1, 2, 3, 4]; track _card) {
+      <ion-card class="category-card">
         <ion-card-header>
           <ion-card-title>
-            <ion-skeleton-text animated style="width: 55%;"></ion-skeleton-text>
+            <ion-skeleton-text animated style="width: 55%"></ion-skeleton-text>
           </ion-card-title>
         </ion-card-header>
         <ion-card-content>
           <div class="cover-grid">
+            @for (_cover of [1, 2, 3, 4, 5, 6]; track _cover) {
             <ion-skeleton-text
-              *ngFor="let _cover of [1, 2, 3, 4, 5, 6]"
               animated
               class="cover-skeleton"
               [class.square-cover]="selectedTab === 'music'"
             ></ion-skeleton-text>
+            }
           </div>
         </ion-card-content>
       </ion-card>
+      }
     </div>
+    }
   </div>
 
   <div class="featured-shell">
-    <ion-list class="category-list" lines="none" *ngIf="tilesByTab[selectedTab].length > 0">
+    @if (tilesByTab[selectedTab].length > 0) {
+    <ion-list class="category-list" lines="none">
       <div class="category-grid">
-        <ion-item-group *ngFor="let tile of tilesByTab[selectedTab]; trackBy: trackByTile">
+        @for (tile of tilesByTab[selectedTab]; track trackByTile($index, tile))
+        {
+        <ion-item-group>
           <ion-card class="category-card" button (click)="openCategory(tile)">
             <ion-card-header>
               <ion-card-title>{{ tile.label }}</ion-card-title>
             </ion-card-header>
             <ion-card-content>
-              <div class="cover-grid" *ngIf="tile.covers.length > 0">
+              @if (tile.covers.length > 0) {
+              <div class="cover-grid">
+                @for (cover of tile.covers; track cover) {
                 <img
-                  *ngFor="let cover of tile.covers"
                   [src]="cover"
                   [class.square-cover]="selectedTab === 'music'"
                   alt=""
                   (error)="$event.target.style.visibility='hidden'"
                 />
+                }
               </div>
+              }
             </ion-card-content>
           </ion-card>
         </ion-item-group>
+        }
       </div>
     </ion-list>
+    }
   </div>
 
   <div class="featured-shell">
-    <ion-item *ngIf="!isTabLoading(selectedTab) && tabErrorByTab[selectedTab] && tilesByTab[selectedTab].length === 0">
+    @if (!isTabLoading(selectedTab) && tabErrorByTab[selectedTab] &&
+    tilesByTab[selectedTab].length === 0) {
+    <ion-item>
       <ion-label class="ion-text-wrap">
         {{ tabErrorByTab[selectedTab] }}
         <div class="error-actions">
-          <ion-button size="small" fill="outline" (click)="retrySelectedTab()">Retry</ion-button>
+          <ion-button size="small" fill="outline" (click)="retrySelectedTab()"
+            >Retry</ion-button
+          >
         </div>
       </ion-label>
     </ion-item>
-
-    <ion-item *ngIf="!isTabLoading(selectedTab) && !tabErrorByTab[selectedTab] && tilesByTab[selectedTab].length === 0">
+    } @if (!isTabLoading(selectedTab) && !tabErrorByTab[selectedTab] &&
+    tilesByTab[selectedTab].length === 0) {
+    <ion-item>
       <ion-label class="ion-text-wrap">
         No featured categories are available in this section.
       </ion-label>
     </ion-item>
+    }
   </div>
 </ion-content>

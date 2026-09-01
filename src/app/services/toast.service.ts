@@ -1,18 +1,16 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { ToastButton, ToastController } from '@ionic/angular';
 import { ServiceAlertService } from './service-alert.service';
 
 @Injectable({ providedIn: 'root' })
 export class ToastService {
-  constructor(
-    private toastController: ToastController,
-    private serviceAlerts: ServiceAlertService,
-  ) {}
+  private toastController = inject(ToastController);
+  private serviceAlerts = inject(ServiceAlertService);
 
   async presentToast(
     message: string,
     duration: number = 3500,
-    buttons?: ToastButton[],
+    buttons?: ToastButton[]
   ) {
     const normalizedMessage = this.normalizeMessage(message);
     const finalMessage = this.withServiceAlertIfNeeded(normalizedMessage);
@@ -28,7 +26,7 @@ export class ToastService {
 
   async presentHoldPlacedToast(
     message: string = 'Hold placed.',
-    onManage?: () => void | Promise<void>,
+    onManage?: () => void | Promise<void>
   ) {
     const buttons: ToastButton[] = onManage
       ? [

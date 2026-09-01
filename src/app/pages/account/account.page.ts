@@ -1,13 +1,20 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { IonicModule, ActionSheetController, ModalController } from '@ionic/angular';
+import {
+  IonicModule,
+  ActionSheetController,
+  ModalController,
+} from '@ionic/angular/lazy';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 
 import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
 import { AuthService } from '../../services/auth.service';
-import { AccountStoreService, StoredAccountMeta } from '../../services/account-store.service';
+import {
+  AccountStoreService,
+  StoredAccountMeta,
+} from '../../services/account-store.service';
 import { PatronService } from '../../services/patron.service';
 import { ShowCardModalComponent } from '../../components/show-card-modal/show-card-modal.component';
 import { SwitchUserModalComponent } from '../../components/switch-user-modal/switch-user-modal.component';
@@ -22,6 +29,16 @@ import { ListLookupService } from '../../services/list-lookup.service';
   imports: [CommonModule, IonicModule, FormsModule],
 })
 export class AccountPage implements OnInit {
+  globals = inject(Globals);
+  auth = inject(AuthService);
+  patron = inject(PatronService);
+  private router = inject(Router);
+  private accounts = inject(AccountStoreService);
+  private toast = inject(ToastService);
+  private actionSheet = inject(ActionSheetController);
+  private modal = inject(ModalController);
+  private listLookup = inject(ListLookupService);
+
   username = '';
   password = '';
   showPassword = false;
@@ -29,18 +46,6 @@ export class AccountPage implements OnInit {
 
   storedAccounts: StoredAccountMeta[] = [];
   loadingAccounts = false;
-
-  constructor(
-    public globals: Globals,
-    public auth: AuthService,
-    public patron: PatronService,
-    private router: Router,
-    private accounts: AccountStoreService,
-    private toast: ToastService,
-    private actionSheet: ActionSheetController,
-    private modal: ModalController,
-    private listLookup: ListLookupService,
-  ) {}
 
   ngOnInit() {
     this.refreshStoredAccounts();
@@ -58,7 +63,7 @@ export class AccountPage implements OnInit {
     this.loadingAccounts = true;
     this.accounts
       .listAccounts()
-      .then(list => {
+      .then((list) => {
         this.storedAccounts = list ?? [];
       })
       .catch(() => {
@@ -123,7 +128,10 @@ export class AccountPage implements OnInit {
       error: (e) => {
         this.password = '';
         const msg = e?.message ?? '';
-        if (msg === 'invalid_login') this.toast.presentToast('Login failed. Check your username/password and try again.');
+        if (msg === 'invalid_login')
+          this.toast.presentToast(
+            'Login failed. Check your username/password and try again.'
+          );
         else this.toast.presentToast('Login failed. Please try again.');
       },
     });
@@ -148,7 +156,9 @@ export class AccountPage implements OnInit {
       error: (e) => {
         const msg = e?.message ?? '';
         if (msg === 'missing_password') {
-          this.toast.presentToast('No password stored for that account. Please log in manually.');
+          this.toast.presentToast(
+            'No password stored for that account. Please log in manually.'
+          );
         } else {
           this.toast.presentToast('Could not switch user.');
         }
@@ -187,7 +197,9 @@ export class AccountPage implements OnInit {
                 } catch {
                   // ignore, but we can warn later if you want
                 }
-                this.toast.presentToast('Logged out and removed saved account.');
+                this.toast.presentToast(
+                  'Logged out and removed saved account.'
+                );
                 this.refreshStoredAccounts();
               },
               error: () => this.toast.presentToast('Logout failed.'),
@@ -195,7 +207,8 @@ export class AccountPage implements OnInit {
           },
         },
         {
-          text: 'Close', role: 'cancel',
+          text: 'Close',
+          role: 'cancel',
         },
       ],
     });
@@ -206,7 +219,13 @@ export class AccountPage implements OnInit {
   async showCard() {
     const snap = this.auth.snapshot();
     const barcode = (snap?.profile?.ils_barcode ?? '').toString().trim();
-    const melcatId = (snap?.profile?.username ?? snap?.profile?.unique_ils_id ?? '').toString().trim();
+    const melcatId = (
+      snap?.profile?.username ??
+      snap?.profile?.unique_ils_id ??
+      ''
+    )
+      .toString()
+      .trim();
     if (!barcode) {
       this.toast.presentToast('No barcode found on this account.');
       return;
@@ -240,11 +259,15 @@ export class AccountPage implements OnInit {
     this.goAccountPage('/my-lists');
   }
 
-  goFines() { this.goAccountPage('/fines'); }
+  goFines() {
+    this.goAccountPage('/fines');
+  }
   goHistory() {
     this.goAccountPage('/checkout-history');
   }
-  goPrefs() { this.goAccountPage('/account-preferences'); }
+  goPrefs() {
+    this.goAccountPage('/account-preferences');
+  }
 
   private async refreshMyListsCount(profile?: any) {
     const snap = this.auth.snapshot();

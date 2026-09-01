@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, catchError, from, map, of, switchMap, tap } from 'rxjs';
 
@@ -40,11 +40,9 @@ export interface PreferencesUpdateResult {
 
 @Injectable({ providedIn: 'root' })
 export class AccountPreferencesService {
-  constructor(
-    private http: HttpClient,
-    private globals: Globals,
-    private cache: AppCacheService,
-  ) {}
+  private http = inject(HttpClient);
+  private globals = inject(Globals);
+  private cache = inject(AppCacheService);
 
   getCachedPreferences(accountId: string): Promise<AccountPreferences | null> {
     const id = (accountId ?? '').trim();
@@ -58,34 +56,39 @@ export class AccountPreferencesService {
     return this.cache.read<string>(this.tokenCacheKey(id));
   }
 
-  fetchByCredentials(username: string, password: string): Observable<PreferencesPayload> {
+  fetchByCredentials(
+    username: string,
+    password: string
+  ): Observable<PreferencesPayload> {
     const params = new HttpParams()
       .set('username', (username ?? '').trim())
       .set('password', (password ?? '').trim());
 
-    return this.http
-      .get<any>(this.preferencesFetchUrl(), { params })
-      .pipe(
-        map((raw) => {
-          const root = raw?.result ?? raw ?? {};
-          const user = root?.user ?? {};
-          const preferences = this.normalizePreferences(root?.preferences ?? {});
+    return this.http.get<any>(this.preferencesFetchUrl(), { params }).pipe(
+      map((raw) => {
+        const root = raw?.result ?? raw ?? {};
+        const user = root?.user ?? {};
+        const preferences = this.normalizePreferences(root?.preferences ?? {});
 
-          return {
-            token: (user?.token ?? '').toString().trim(),
-            preferences,
-            raw,
-          } satisfies PreferencesPayload;
-        }),
-      );
+        return {
+          token: (user?.token ?? '').toString().trim(),
+          preferences,
+          raw,
+        } satisfies PreferencesPayload;
+      })
+    );
   }
 
-  fetchForAccount(accountId: string, username: string, password: string): Observable<PreferencesPayload> {
+  fetchForAccount(
+    accountId: string,
+    username: string,
+    password: string
+  ): Observable<PreferencesPayload> {
     const id = (accountId ?? '').trim();
     if (!id) return this.fetchByCredentials(username, password);
 
     return this.fetchByCredentials(username, password).pipe(
-      tap((res) => this.persistAccountCache(id, res)),
+      tap((res) => this.persistAccountCache(id, res))
     );
   }
 
@@ -93,7 +96,7 @@ export class AccountPreferencesService {
     token: string,
     values: Record<string, string | number | boolean>,
     username?: string,
-    password?: string,
+    password?: string
   ): Observable<PreferencesUpdateResult> {
     let params = new HttpParams().set('token', (token ?? '').trim());
     const user = (username ?? '').trim();
@@ -109,25 +112,25 @@ export class AccountPreferencesService {
       params = params.set('v', '5');
     }
 
-    return this.http
-      .get<any>(this.preferencesUpdateUrl(), { params })
-      .pipe(
-        map((raw) => {
-          const root = raw?.result ?? raw ?? {};
-          const user = root?.user ?? {};
-          const prefs = root?.preferences ? this.normalizePreferences(root.preferences) : undefined;
-          const message = this.extractMessage(root);
-          const success = this.inferSuccess(root);
+    return this.http.get<any>(this.preferencesUpdateUrl(), { params }).pipe(
+      map((raw) => {
+        const root = raw?.result ?? raw ?? {};
+        const user = root?.user ?? {};
+        const prefs = root?.preferences
+          ? this.normalizePreferences(root.preferences)
+          : undefined;
+        const message = this.extractMessage(root);
+        const success = this.inferSuccess(root);
 
-          return {
-            success,
-            message,
-            token: (user?.token ?? '').toString().trim(),
-            preferences: prefs,
-            raw,
-          } satisfies PreferencesUpdateResult;
-        }),
-      );
+        return {
+          success,
+          message,
+          token: (user?.token ?? '').toString().trim(),
+          preferences: prefs,
+          raw,
+        } satisfies PreferencesUpdateResult;
+      })
+    );
   }
 
   updateForAccount(
@@ -135,7 +138,7 @@ export class AccountPreferencesService {
     username: string,
     password: string,
     currentToken: string,
-    values: Record<string, string | number | boolean>,
+    values: Record<string, string | number | boolean>
   ): Observable<PreferencesUpdateResult> {
     const id = (accountId ?? '').trim();
     const user = (username ?? '').trim();
@@ -145,7 +148,7 @@ export class AccountPreferencesService {
     const getToken$ = inMemoryToken
       ? of(inMemoryToken)
       : from(this.cache.read<string>(this.tokenCacheKey(id))).pipe(
-          map((t) => (t ?? '').toString().trim()),
+          map((t) => (t ?? '').toString().trim())
         );
 
     return getToken$.pipe(
@@ -153,7 +156,9 @@ export class AccountPreferencesService {
         if (!token) {
           return this.fetchByCredentials(user, pass).pipe(
             tap((res) => this.persistAccountCache(id, res)),
-            switchMap((res) => this.updateByToken(res.token, values, user, pass)),
+            switchMap((res) =>
+              this.updateByToken(res.token, values, user, pass)
+            )
           );
         }
 
@@ -164,28 +169,38 @@ export class AccountPreferencesService {
             }
             return this.fetchByCredentials(user, pass).pipe(
               tap((fresh) => this.persistAccountCache(id, fresh)),
-              switchMap((fresh) => this.updateByToken(fresh.token, values, user, pass)),
+              switchMap((fresh) =>
+                this.updateByToken(fresh.token, values, user, pass)
+              )
             );
           }),
           catchError(() =>
             this.fetchByCredentials(user, pass).pipe(
               tap((fresh) => this.persistAccountCache(id, fresh)),
-              switchMap((fresh) => this.updateByToken(fresh.token, values, user, pass)),
-            ),
-          ),
+              switchMap((fresh) =>
+                this.updateByToken(fresh.token, values, user, pass)
+              )
+            )
+          )
         );
-      }),
+      })
     );
   }
 
-  async persistTokenForAccount(accountId: string, token: string): Promise<void> {
+  async persistTokenForAccount(
+    accountId: string,
+    token: string
+  ): Promise<void> {
     const id = (accountId ?? '').trim();
     const t = (token ?? '').trim();
     if (!id || !t) return;
     await this.cache.write(this.tokenCacheKey(id), t);
   }
 
-  async persistPreferencesForAccount(accountId: string, preferences: AccountPreferences): Promise<void> {
+  async persistPreferencesForAccount(
+    accountId: string,
+    preferences: AccountPreferences
+  ): Promise<void> {
     const id = (accountId ?? '').trim();
     if (!id || !preferences) return;
     await this.cache.write(this.preferencesCacheKey(id), preferences);
@@ -221,10 +236,14 @@ export class AccountPreferencesService {
   private extractMessage(root: any): string {
     const messages = Array.isArray(root?.messages) ? root.messages : [];
     const first = messages[0] ?? {};
-    if (typeof first?.error === 'string' && first.error.trim()) return first.error.trim();
-    if (typeof first?.success === 'string' && first.success.trim()) return first.success.trim();
-    if (typeof root?.message === 'string' && root.message.trim()) return root.message.trim();
-    if (typeof root?.error === 'string' && root.error.trim()) return root.error.trim();
+    if (typeof first?.error === 'string' && first.error.trim())
+      return first.error.trim();
+    if (typeof first?.success === 'string' && first.success.trim())
+      return first.success.trim();
+    if (typeof root?.message === 'string' && root.message.trim())
+      return root.message.trim();
+    if (typeof root?.error === 'string' && root.error.trim())
+      return root.error.trim();
     return '';
   }
 
@@ -239,7 +258,10 @@ export class AccountPreferencesService {
     return root?.success === true;
   }
 
-  private async persistAccountCache(accountId: string, payload: PreferencesPayload): Promise<void> {
+  private async persistAccountCache(
+    accountId: string,
+    payload: PreferencesPayload
+  ): Promise<void> {
     const id = (accountId ?? '').trim();
     if (!id) return;
 
@@ -252,7 +274,9 @@ export class AccountPreferencesService {
     }
   }
 
-  private looksLikeValidPreferences(prefs: AccountPreferences | null | undefined): boolean {
+  private looksLikeValidPreferences(
+    prefs: AccountPreferences | null | undefined
+  ): boolean {
     if (!prefs) return false;
     return !!prefs.username || !!prefs.email || !!prefs.pickup_library;
   }
@@ -277,6 +301,11 @@ export class AccountPreferencesService {
     if (!res || res.success) return false;
     const msg = (res.message ?? '').toLowerCase();
     if (!msg) return true;
-    return msg.includes('token') || msg.includes('login') || msg.includes('not logged in') || msg.includes('invalid');
+    return (
+      msg.includes('token') ||
+      msg.includes('login') ||
+      msg.includes('not logged in') ||
+      msg.includes('invalid')
+    );
   }
 }

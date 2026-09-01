@@ -1,11 +1,11 @@
-import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, inject } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import {
   IonicModule,
   ActionSheetController,
   AlertController,
-} from '@ionic/angular';
+} from '@ionic/angular/lazy';
 import { finalize } from 'rxjs';
 
 import { Globals } from '../../globals';
@@ -27,9 +27,17 @@ interface SelectOption {
   selector: 'app-account-preferences',
   templateUrl: './account-preferences.page.html',
   styleUrls: ['./account-preferences.page.scss'],
-  imports: [CommonModule, FormsModule, IonicModule],
+  imports: [FormsModule, IonicModule],
 })
 export class AccountPreferencesPage {
+  globals = inject(Globals);
+  private auth = inject(AuthService);
+  private accounts = inject(AccountStoreService);
+  private prefsService = inject(AccountPreferencesService);
+  private actionSheetController = inject(ActionSheetController);
+  private alertController = inject(AlertController);
+  private toast = inject(ToastService);
+
   loading = false;
   saving = false;
 
@@ -54,16 +62,6 @@ export class AccountPreferencesPage {
     { name: 'All locations', code: '22' },
     ...this.pickupOptions,
   ];
-
-  constructor(
-    public globals: Globals,
-    private auth: AuthService,
-    private accounts: AccountStoreService,
-    private prefsService: AccountPreferencesService,
-    private actionSheetController: ActionSheetController,
-    private alertController: AlertController,
-    private toast: ToastService,
-  ) {}
 
   ionViewWillEnter() {
     this.loadPreferences();
@@ -102,7 +100,7 @@ export class AccountPreferencesPage {
         keep_hold_history: this.preferences.keep_hold_history,
       },
       undefined,
-      false,
+      false
     );
   }
 
@@ -119,7 +117,7 @@ export class AccountPreferencesPage {
         keep_hold_history: this.preferences.keep_hold_history,
       },
       undefined,
-      false,
+      false
     );
   }
 
@@ -134,7 +132,8 @@ export class AccountPreferencesPage {
 
     if (!checked) {
       const sheet = await this.actionSheetController.create({
-        header: 'Warning: turning off checkout history will permanently delete your existing history.',
+        header:
+          'Warning: turning off checkout history will permanently delete your existing history.',
         buttons: [
           {
             text: 'Delete Checkout History',
@@ -142,7 +141,8 @@ export class AccountPreferencesPage {
             handler: () => this.updateCircHistory(false),
           },
           {
-            text: 'Close', role: 'cancel',
+            text: 'Close',
+            role: 'cancel',
             handler: () => {
               this.ignoreCircHistoryChange = true;
               if (this.preferences) this.preferences.keep_circ_history = true;
@@ -169,7 +169,7 @@ export class AccountPreferencesPage {
         keep_hold_history: this.preferences.keep_hold_history,
       },
       undefined,
-      false,
+      false
     );
   }
 
@@ -198,7 +198,8 @@ export class AccountPreferencesPage {
             const username = (values?.username ?? '').toString().trim();
             const currentPassword = (values?.current_password ?? '').toString();
             if (!this.preferences) return false;
-            if (!username || username === this.preferences.username) return false;
+            if (!username || username === this.preferences.username)
+              return false;
             if (!currentPassword) {
               this.toast.presentToast('Current password is required.');
               return false;
@@ -213,7 +214,7 @@ export class AccountPreferencesPage {
               },
               undefined,
               true,
-              () => this.persistUsername(username),
+              () => this.persistUsername(username)
             );
 
             return true;
@@ -249,7 +250,8 @@ export class AccountPreferencesPage {
             const alias = (values?.hold_shelf_alias ?? '').toString().trim();
             const currentPassword = (values?.current_password ?? '').toString();
             if (!this.preferences) return false;
-            if (!alias || alias === this.preferences.hold_shelf_alias) return false;
+            if (!alias || alias === this.preferences.hold_shelf_alias)
+              return false;
             if (!currentPassword) {
               this.toast.presentToast('Current password is required.');
               return false;
@@ -263,7 +265,7 @@ export class AccountPreferencesPage {
                 current_password: currentPassword,
               },
               undefined,
-              true,
+              true
             );
 
             return true;
@@ -313,7 +315,7 @@ export class AccountPreferencesPage {
                 current_password: currentPassword,
               },
               undefined,
-              true,
+              true
             );
 
             return true;
@@ -325,7 +327,8 @@ export class AccountPreferencesPage {
   }
 
   async updatePassword() {
-    const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d!@#$%^&*()\-_=+\[\]{};:'",.<>/?\\|]{7,}$/;
+    const passwordRegex =
+      /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d!@#$%^&*()\-_=+\[\]{};:'",.<>/?\\|]{7,}$/;
 
     const alert = await this.alertController.create({
       header: 'Change Password',
@@ -365,7 +368,10 @@ export class AccountPreferencesPage {
               return false;
             }
             if (!passwordRegex.test(newPw1)) {
-              this.toast.presentToast('Password must be at least 7 characters and include one letter and one number.', 8000);
+              this.toast.presentToast(
+                'Password must be at least 7 characters and include one letter and one number.',
+                8000
+              );
               return false;
             }
 
@@ -378,7 +384,7 @@ export class AccountPreferencesPage {
               },
               undefined,
               true,
-              () => this.persistPassword(newPw1),
+              () => this.persistPassword(newPw1)
             );
 
             return true;
@@ -407,7 +413,9 @@ export class AccountPreferencesPage {
         {
           text: 'Save',
           handler: (values) => {
-            const formatted = this.formatTenDigitPhone(values?.phone_notify_number);
+            const formatted = this.formatTenDigitPhone(
+              values?.phone_notify_number
+            );
             if (!formatted) {
               this.toast.presentToast('Please enter a 10-digit phone number.');
               return false;
@@ -428,7 +436,7 @@ export class AccountPreferencesPage {
                 text_notify: this.preferences.text_notify,
               },
               undefined,
-              false,
+              false
             );
             return true;
           },
@@ -456,7 +464,9 @@ export class AccountPreferencesPage {
         {
           text: 'Save',
           handler: (values) => {
-            const formatted = this.formatTenDigitPhone(values?.text_notify_number);
+            const formatted = this.formatTenDigitPhone(
+              values?.text_notify_number
+            );
             if (!formatted) {
               this.toast.presentToast('Please enter a 10-digit phone number.');
               return false;
@@ -477,7 +487,7 @@ export class AccountPreferencesPage {
                 text_notify: this.preferences.text_notify,
               },
               undefined,
-              false,
+              false
             );
             return true;
           },
@@ -488,7 +498,10 @@ export class AccountPreferencesPage {
     await alert.present();
   }
 
-  onToggleNotify(method: 'email_notify' | 'phone_notify' | 'text_notify', checked: boolean) {
+  onToggleNotify(
+    method: 'email_notify' | 'phone_notify' | 'text_notify',
+    checked: boolean
+  ) {
     if (!this.preferences || this.saving) return;
 
     this.submitUpdate(
@@ -496,12 +509,15 @@ export class AccountPreferencesPage {
         notify_prefs_changed: true,
         phone_notify_number: this.preferences.phone_notify_number,
         text_notify_number: this.preferences.text_notify_number,
-        email_notify: method === 'email_notify' ? checked : this.preferences.email_notify,
-        phone_notify: method === 'phone_notify' ? checked : this.preferences.phone_notify,
-        text_notify: method === 'text_notify' ? checked : this.preferences.text_notify,
+        email_notify:
+          method === 'email_notify' ? checked : this.preferences.email_notify,
+        phone_notify:
+          method === 'phone_notify' ? checked : this.preferences.phone_notify,
+        text_notify:
+          method === 'text_notify' ? checked : this.preferences.text_notify,
       },
       undefined,
-      false,
+      false
     );
   }
 
@@ -524,7 +540,9 @@ export class AccountPreferencesPage {
 
       const pw = await this.accounts.getPassword(active.id);
       if (!pw) {
-        this.toast.presentToast('Could not read saved password for this account.');
+        this.toast.presentToast(
+          'Could not read saved password for this account.'
+        );
         this.loading = false;
         ev?.target?.complete?.();
         return;
@@ -534,19 +552,25 @@ export class AccountPreferencesPage {
       this.activeAccountId = active.id;
       this.activePassword = pw;
 
-      const cached = await this.prefsService.getCachedPreferences(this.activeAccountId);
+      const cached = await this.prefsService.getCachedPreferences(
+        this.activeAccountId
+      );
       if (cached) {
         this.preferences = cached;
       }
       const hadCachedPreferences = !!cached;
 
       this.prefsService
-        .fetchForAccount(this.activeAccountId, this.activeUsername, this.activePassword)
+        .fetchForAccount(
+          this.activeAccountId,
+          this.activeUsername,
+          this.activePassword
+        )
         .pipe(
           finalize(() => {
             this.loading = false;
             ev?.target?.complete?.();
-          }),
+          })
         )
         .subscribe({
           next: (res) => {
@@ -560,7 +584,10 @@ export class AccountPreferencesPage {
             this.preferences = res.preferences;
             void this.syncUsernameFromPreferences(res.preferences);
             if (this.activeAccountId && this.token) {
-              void this.prefsService.persistTokenForAccount(this.activeAccountId, this.token);
+              void this.prefsService.persistTokenForAccount(
+                this.activeAccountId,
+                this.token
+              );
             }
           },
           error: () => {
@@ -580,10 +607,12 @@ export class AccountPreferencesPage {
     values: Record<string, string | number | boolean>,
     successToast?: string,
     showDefaultSuccessToast: boolean = true,
-    onSuccess?: () => void,
+    onSuccess?: () => void
   ) {
     if (!this.activeAccountId || !this.activeUsername || !this.activePassword) {
-      this.toast.presentToast('Missing account credentials. Pull to refresh and try again.');
+      this.toast.presentToast(
+        'Missing account credentials. Pull to refresh and try again.'
+      );
       return;
     }
     if (this.saving) return;
@@ -596,13 +625,15 @@ export class AccountPreferencesPage {
         this.activeUsername,
         this.activePassword,
         this.token,
-        values,
+        values
       )
       .pipe(finalize(() => (this.saving = false)))
       .subscribe({
         next: (res) => {
           if (!res.success) {
-            this.toast.presentToast(res.message || 'Could not update preferences.');
+            this.toast.presentToast(
+              res.message || 'Could not update preferences.'
+            );
             return;
           }
 
@@ -615,11 +646,17 @@ export class AccountPreferencesPage {
             this.preferences = res.preferences;
             void this.syncUsernameFromPreferences(res.preferences);
             if (this.activeAccountId) {
-              void this.prefsService.persistPreferencesForAccount(this.activeAccountId, res.preferences);
+              void this.prefsService.persistPreferencesForAccount(
+                this.activeAccountId,
+                res.preferences
+              );
             }
           }
           if (this.activeAccountId && this.token) {
-            void this.prefsService.persistTokenForAccount(this.activeAccountId, this.token);
+            void this.prefsService.persistTokenForAccount(
+              this.activeAccountId,
+              this.token
+            );
           }
 
           if (onSuccess) onSuccess();
@@ -647,7 +684,9 @@ export class AccountPreferencesPage {
     this.activeUsername = newUsername;
   }
 
-  private async syncUsernameFromPreferences(preferences: AccountPreferences | null) {
+  private async syncUsernameFromPreferences(
+    preferences: AccountPreferences | null
+  ) {
     const nextUsername = (preferences?.username ?? '').toString().trim();
     if (!nextUsername || nextUsername === this.activeUsername) return;
     await this.auth.updateActiveAccountUsername(nextUsername);
@@ -675,10 +714,15 @@ export class AccountPreferencesPage {
   }
 
   private async refreshPreferencesFromServer() {
-    if (!this.activeAccountId || !this.activeUsername || !this.activePassword) return;
+    if (!this.activeAccountId || !this.activeUsername || !this.activePassword)
+      return;
 
     this.prefsService
-      .fetchForAccount(this.activeAccountId, this.activeUsername, this.activePassword)
+      .fetchForAccount(
+        this.activeAccountId,
+        this.activeUsername,
+        this.activePassword
+      )
       .subscribe({
         next: (res) => {
           if (!res?.preferences) return;
@@ -686,10 +730,16 @@ export class AccountPreferencesPage {
           this.preferences = res.preferences;
           void this.syncUsernameFromPreferences(res.preferences);
           if (this.activeAccountId && this.token) {
-            void this.prefsService.persistTokenForAccount(this.activeAccountId, this.token);
+            void this.prefsService.persistTokenForAccount(
+              this.activeAccountId,
+              this.token
+            );
           }
           if (this.activeAccountId) {
-            void this.prefsService.persistPreferencesForAccount(this.activeAccountId, res.preferences);
+            void this.prefsService.persistPreferencesForAccount(
+              this.activeAccountId,
+              res.preferences
+            );
           }
         },
       });

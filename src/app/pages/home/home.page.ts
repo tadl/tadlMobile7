@@ -1,6 +1,6 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { IonicModule, ModalController } from '@ionic/angular';
+import { IonicModule, ModalController } from '@ionic/angular/lazy';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -11,7 +11,11 @@ import { AuthState, AuthService } from '../../services/auth.service';
 import { PatronService } from '../../services/patron.service';
 import { ToastService } from '../../services/toast.service';
 import { ShowCardModalComponent } from '../../components/show-card-modal/show-card-modal.component';
-import { LocationsService, type AppLocation, type AppLocationException } from '../../services/locations.service';
+import {
+  LocationsService,
+  type AppLocation,
+  type AppLocationException,
+} from '../../services/locations.service';
 import { ServiceAlertService } from '../../services/service-alert.service';
 
 type HomeClosureNotice = {
@@ -27,19 +31,17 @@ type HomeClosureNotice = {
   imports: [CommonModule, IonicModule, RouterModule, FormsModule],
 })
 export class HomePage {
+  globals = inject(Globals);
+  auth = inject(AuthService);
+  patron = inject(PatronService);
+  private router = inject(Router);
+  private modal = inject(ModalController);
+  private toast = inject(ToastService);
+  private locationsService = inject(LocationsService);
+  serviceAlerts = inject(ServiceAlertService);
+
   homeQuery = '';
   closureNotice: HomeClosureNotice | null = null;
-
-  constructor(
-    public globals: Globals,
-    public auth: AuthService,
-    public patron: PatronService,
-    private router: Router,
-    private modal: ModalController,
-    private toast: ToastService,
-    private locationsService: LocationsService,
-    public serviceAlerts: ServiceAlertService,
-  ) {}
 
   ionViewDidEnter() {
     this.loadClosureNotice();
@@ -62,7 +64,9 @@ export class HomePage {
     const parts: string[] = [];
 
     if (b.checkouts > 0) {
-      parts.push(`${b.checkouts} item${b.checkouts === 1 ? '' : 's'} checked out`);
+      parts.push(
+        `${b.checkouts} item${b.checkouts === 1 ? '' : 's'} checked out`
+      );
     }
 
     if (b.holds > 0) {
@@ -85,7 +89,13 @@ export class HomePage {
   async showCard() {
     const snap = this.auth.snapshot();
     const barcode = (snap?.profile?.ils_barcode ?? '').toString().trim();
-    const melcatId = (snap?.profile?.username ?? snap?.profile?.unique_ils_id ?? '').toString().trim();
+    const melcatId = (
+      snap?.profile?.username ??
+      snap?.profile?.unique_ils_id ??
+      ''
+    )
+      .toString()
+      .trim();
     if (!barcode) {
       this.toast.presentToast('No barcode found on this account.');
       return;
@@ -116,7 +126,9 @@ export class HomePage {
       this.router.navigate(['/search'], { queryParams: { advanced: 1 } });
       return;
     }
-    this.router.navigate(['/search'], { queryParams: { advanced: 1, lookfor: q } });
+    this.router.navigate(['/search'], {
+      queryParams: { advanced: 1, lookfor: q },
+    });
   }
 
   async goToRoute(url: string) {
@@ -148,7 +160,9 @@ export class HomePage {
   private loadClosureNotice() {
     this.locationsService.getLocations().subscribe({
       next: (locations) => {
-        this.closureNotice = this.buildClosureNotice(Array.isArray(locations) ? locations : []);
+        this.closureNotice = this.buildClosureNotice(
+          Array.isArray(locations) ? locations : []
+        );
       },
       error: () => {
         this.closureNotice = null;
@@ -156,7 +170,9 @@ export class HomePage {
     });
   }
 
-  private buildClosureNotice(locations: AppLocation[]): HomeClosureNotice | null {
+  private buildClosureNotice(
+    locations: AppLocation[]
+  ): HomeClosureNotice | null {
     const todayKey = this.globals.easternDateString();
     const tomorrowKey = this.globals.easternDateStringPlusDays(1);
     const targetKeys = [todayKey, tomorrowKey];
@@ -173,29 +189,38 @@ export class HomePage {
     const allDates = Array.from(
       new Set(
         affected.reduce<string[]>((acc, entry) => {
-          acc.push(...entry.exceptions.map((ex) => (ex.date ?? '').toString().trim()));
+          acc.push(
+            ...entry.exceptions.map((ex) => (ex.date ?? '').toString().trim())
+          );
           return acc;
-        }, []),
-      ),
+        }, [])
+      )
     ).sort();
     const dateLabel = this.formatDateList(allDates);
     const allClosed = affected.every((entry) =>
-      entry.exceptions.every((ex) => this.isClosedException(ex)),
+      entry.exceptions.every((ex) => this.isClosedException(ex))
     );
     const tense = this.noticeTenseForDates(allDates);
     const sharedReasonSuffix = this.reasonSuffixForExceptions(
       affected.reduce<AppLocationException[]>((acc, entry) => {
         acc.push(...entry.exceptions);
         return acc;
-      }, []),
+      }, [])
     );
 
     if (affected.length === 1) {
       const locationName = affected[0].location.fullname;
-      const reasonSuffix = this.reasonSuffixForExceptions(affected[0].exceptions);
+      const reasonSuffix = this.reasonSuffixForExceptions(
+        affected[0].exceptions
+      );
       return {
         message: allClosed
-          ? `${this.closedMessageForSingle(locationName, allDates, tense, dateLabel)}${reasonSuffix}`
+          ? `${this.closedMessageForSingle(
+              locationName,
+              allDates,
+              tense,
+              dateLabel
+            )}${reasonSuffix}`
           : `${locationName} has modified hours on ${dateLabel}.${reasonSuffix}`,
         actionLabel: 'View locations',
       };
@@ -203,31 +228,44 @@ export class HomePage {
 
     return {
       message: allClosed
-        ? `${this.closedMessageForMultiple(allDates, tense, dateLabel)}${sharedReasonSuffix}`
+        ? `${this.closedMessageForMultiple(
+            allDates,
+            tense,
+            dateLabel
+          )}${sharedReasonSuffix}`
         : `Some locations have modified hours on ${dateLabel}.${sharedReasonSuffix}`,
       actionLabel: 'View locations',
     };
   }
 
-  private matchingExceptions(loc: AppLocation, targetKeys: string[]): AppLocationException[] {
+  private matchingExceptions(
+    loc: AppLocation,
+    targetKeys: string[]
+  ): AppLocationException[] {
     const exceptions = Array.isArray(loc.exceptions) ? loc.exceptions : [];
     return exceptions
       .filter((ex) => this.isClosureLikeException(ex))
       .filter((ex) => targetKeys.includes((ex?.date ?? '').toString().trim()));
   }
 
-  private isClosureLikeException(ex: AppLocationException | null | undefined): boolean {
+  private isClosureLikeException(
+    ex: AppLocationException | null | undefined
+  ): boolean {
     const hours = (ex?.hours ?? '').toString().trim();
     const reason = (ex?.reason ?? '').toString().trim();
     return !!hours || !!reason;
   }
 
-  private isClosedException(ex: AppLocationException | null | undefined): boolean {
+  private isClosedException(
+    ex: AppLocationException | null | undefined
+  ): boolean {
     const hours = (ex?.hours ?? '').toString().trim().toLowerCase();
     return hours.includes('closed');
   }
 
-  private noticeTenseForDates(dateKeys: string[]): 'present' | 'future' | 'mixed' {
+  private noticeTenseForDates(
+    dateKeys: string[]
+  ): 'present' | 'future' | 'mixed' {
     const today = this.globals.easternDateString();
     const tomorrow = this.globals.easternDateStringPlusDays(1);
     const hasToday = dateKeys.includes(today);
@@ -241,10 +279,12 @@ export class HomePage {
     locationName: string,
     dateKeys: string[],
     tense: 'present' | 'future' | 'mixed',
-    dateLabel: string,
+    dateLabel: string
   ): string {
-    if (dateKeys.length === 1 && tense === 'present') return `${locationName} is closed today.`;
-    if (dateKeys.length === 1 && tense === 'future') return `${locationName} will be closed tomorrow.`;
+    if (dateKeys.length === 1 && tense === 'present')
+      return `${locationName} is closed today.`;
+    if (dateKeys.length === 1 && tense === 'future')
+      return `${locationName} will be closed tomorrow.`;
     return tense === 'future'
       ? `${locationName} will be closed on ${dateLabel}.`
       : `${locationName} is closed on ${dateLabel}.`;
@@ -253,10 +293,12 @@ export class HomePage {
   private closedMessageForMultiple(
     dateKeys: string[],
     tense: 'present' | 'future' | 'mixed',
-    dateLabel: string,
+    dateLabel: string
   ): string {
-    if (dateKeys.length === 1 && tense === 'present') return 'Some locations are closed today.';
-    if (dateKeys.length === 1 && tense === 'future') return 'Some locations will be closed tomorrow.';
+    if (dateKeys.length === 1 && tense === 'present')
+      return 'Some locations are closed today.';
+    if (dateKeys.length === 1 && tense === 'future')
+      return 'Some locations will be closed tomorrow.';
     return tense === 'future'
       ? `Some locations will be closed on ${dateLabel}.`
       : `Some locations are closed on ${dateLabel}.`;
@@ -270,16 +312,20 @@ export class HomePage {
     if (!labels.length) return 'the next two days';
     if (labels.length === 1) return labels[0];
     if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
-    return `${labels.slice(0, -1).join(', ')}, and ${labels[labels.length - 1]}`;
+    return `${labels.slice(0, -1).join(', ')}, and ${
+      labels[labels.length - 1]
+    }`;
   }
 
-  private reasonSuffixForExceptions(exceptions: AppLocationException[]): string {
+  private reasonSuffixForExceptions(
+    exceptions: AppLocationException[]
+  ): string {
     const reasons = Array.from(
       new Set(
         exceptions
           .map((ex) => (ex?.reason ?? '').toString().trim())
-          .filter(Boolean),
-      ),
+          .filter(Boolean)
+      )
     );
 
     if (!reasons.length || reasons.length > 1) return '';
@@ -287,10 +333,14 @@ export class HomePage {
   }
 
   private formatDateKey(dateKey: string): string {
-    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec((dateKey ?? '').toString().trim());
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(
+      (dateKey ?? '').toString().trim()
+    );
     if (!match) return dateKey;
 
-    const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12));
+    const date = new Date(
+      Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12)
+    );
     return new Intl.DateTimeFormat(undefined, {
       timeZone: this.globals.app_time_zone,
       weekday: 'short',

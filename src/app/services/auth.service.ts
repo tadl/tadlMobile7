@@ -1,8 +1,21 @@
 // src/app/services/auth.service.ts
-import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, from, switchMap, map, tap, throwError, catchError, of } from 'rxjs';
+import { Injectable, inject } from '@angular/core';
+import {
+  BehaviorSubject,
+  Observable,
+  from,
+  switchMap,
+  map,
+  tap,
+  throwError,
+  catchError,
+  of,
+} from 'rxjs';
 
-import { AccountStoreService, StoredAccountMeta } from './account-store.service';
+import {
+  AccountStoreService,
+  StoredAccountMeta,
+} from './account-store.service';
 import { PatronService } from './patron.service';
 
 export interface AuthState {
@@ -14,6 +27,9 @@ export interface AuthState {
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
+  private accounts = inject(AccountStoreService);
+  private patron = inject(PatronService);
+
   private readonly profileRefreshThrottleMs = 5 * 60 * 1000;
   private lastProfileRefreshAt = 0;
   private lastProfileRefreshAccountId: string | null = null;
@@ -24,11 +40,6 @@ export class AuthService {
     activeAccountMeta: null,
     profile: null,
   });
-
-  constructor(
-    private accounts: AccountStoreService,
-    private patron: PatronService,
-  ) {}
 
   authState(): Observable<AuthState> {
     return this.state$.asObservable();
@@ -55,7 +66,13 @@ export class AuthService {
     checkouts?: number;
   }): void {
     const snap = this.state$.value;
-    if (!snap.activeAccountId || !snap.activeAccountMeta || !snap.profile || !delta) return;
+    if (
+      !snap.activeAccountId ||
+      !snap.activeAccountMeta ||
+      !snap.profile ||
+      !delta
+    )
+      return;
 
     const nextProfile: any = { ...snap.profile };
 
@@ -72,9 +89,18 @@ export class AuthService {
     };
 
     applyDelta(['numHolds', 'numHoldsIls', 'holds'], delta.holds);
-    applyDelta(['numHoldsAvailable', 'numHoldsAvailableIls', 'holds_ready'], delta.holdsReady);
-    applyDelta(['numHoldsRequested', 'numHoldsRequestedIls'], delta.holdsRequested);
-    applyDelta(['numCheckedOut', 'numCheckedOutIls', 'checkouts'], delta.checkouts);
+    applyDelta(
+      ['numHoldsAvailable', 'numHoldsAvailableIls', 'holds_ready'],
+      delta.holdsReady
+    );
+    applyDelta(
+      ['numHoldsRequested', 'numHoldsRequestedIls'],
+      delta.holdsRequested
+    );
+    applyDelta(
+      ['numCheckedOut', 'numCheckedOutIls', 'checkouts'],
+      delta.checkouts
+    );
 
     this.state$.next({
       ...snap,
@@ -82,7 +108,9 @@ export class AuthService {
       profile: nextProfile,
     });
 
-    this.accounts.cacheProfile(snap.activeAccountId, nextProfile).catch(() => {});
+    this.accounts
+      .cacheProfile(snap.activeAccountId, nextProfile)
+      .catch(() => {});
   }
 
   /**
@@ -92,17 +120,24 @@ export class AuthService {
    */
   restore(): Observable<AuthState> {
     return from(this.accounts.getActiveAccountId()).pipe(
-      switchMap(activeId => {
+      switchMap((activeId) => {
         if (!activeId) {
-          const next: AuthState = { isLoggedIn: false, activeAccountId: null, activeAccountMeta: null, profile: null };
+          const next: AuthState = {
+            isLoggedIn: false,
+            activeAccountId: null,
+            activeAccountMeta: null,
+            profile: null,
+          };
           this.state$.next(next);
           return from([next]);
         }
 
-        return from(Promise.all([
-          this.accounts.getActiveAccountMeta(),
-          this.accounts.getCachedProfile(activeId),
-        ])).pipe(
+        return from(
+          Promise.all([
+            this.accounts.getActiveAccountMeta(),
+            this.accounts.getCachedProfile(activeId),
+          ])
+        ).pipe(
           map(([meta, cachedProfile]) => {
             const next: AuthState = {
               isLoggedIn: !!meta && !!cachedProfile,
@@ -112,9 +147,9 @@ export class AuthService {
             };
             this.state$.next(next);
             return next;
-          }),
+          })
         );
-      }),
+      })
     );
   }
 
@@ -133,18 +168,22 @@ export class AuthService {
     }
 
     return this.patron.getPatronProfile(u, p).pipe(
-      switchMap(res => {
+      switchMap((res) => {
         if (!res.success || !res.profile) {
           return throwError(() => new Error('invalid_login'));
         }
 
         const label = this.patron.displayNameFromProfile(res.profile);
 
-        return from(this.accounts.upsertAccountMeta({ username: u, label })).pipe(
-          switchMap(meta =>
+        return from(
+          this.accounts.upsertAccountMeta({ username: u, label })
+        ).pipe(
+          switchMap((meta) =>
             from(this.accounts.setPassword(meta.id, p)).pipe(
               switchMap(() => from(this.accounts.setActiveAccountId(meta.id))),
-              switchMap(() => from(this.accounts.cacheProfile(meta.id, res.profile))),
+              switchMap(() =>
+                from(this.accounts.cacheProfile(meta.id, res.profile))
+              ),
               map(() => {
                 const next: AuthState = {
                   isLoggedIn: true,
@@ -154,11 +193,11 @@ export class AuthService {
                 };
                 this.state$.next(next);
                 return next;
-              }),
-            ),
-          ),
+              })
+            )
+          )
         );
-      }),
+      })
     );
   }
 
@@ -170,42 +209,61 @@ export class AuthService {
    */
   switchAccount(accountId: string): Observable<AuthState> {
     return from(this.accounts.listAccounts()).pipe(
-      map(list => list.find(a => a.id === accountId) ?? null),
-      switchMap(meta => {
+      map((list) => list.find((a) => a.id === accountId) ?? null),
+      switchMap((meta) => {
         if (!meta) return throwError(() => new Error('account_not_found'));
 
         return from(this.accounts.getPassword(meta.id)).pipe(
-          switchMap(password => {
-            if (!password) return throwError(() => new Error('missing_password'));
-            return this.patron.getPatronProfile(meta.username, password, meta.id).pipe(
-              switchMap(res => {
-                if (!res.success || !res.profile) return throwError(() => new Error('invalid_login'));
+          switchMap((password) => {
+            if (!password)
+              return throwError(() => new Error('missing_password'));
+            return this.patron
+              .getPatronProfile(meta.username, password, meta.id)
+              .pipe(
+                switchMap((res) => {
+                  if (!res.success || !res.profile)
+                    return throwError(() => new Error('invalid_login'));
 
-                // label might change; keep it updated
-                const label = this.patron.displayNameFromProfile(res.profile);
+                  // label might change; keep it updated
+                  const label = this.patron.displayNameFromProfile(res.profile);
 
-                return from(this.accounts.upsertAccountMeta({ id: meta.id, username: meta.username, label })).pipe(
-                  switchMap(updatedMeta =>
-                    from(this.accounts.setActiveAccountId(updatedMeta.id)).pipe(
-                      switchMap(() => from(this.accounts.cacheProfile(updatedMeta.id, res.profile))),
-                      map(() => {
-                        const next: AuthState = {
-                          isLoggedIn: true,
-                          activeAccountId: updatedMeta.id,
-                          activeAccountMeta: updatedMeta,
-                          profile: res.profile,
-                        };
-                        this.state$.next(next);
-                        return next;
-                      }),
-                    ),
-                  ),
-                );
-              }),
-            );
-          }),
+                  return from(
+                    this.accounts.upsertAccountMeta({
+                      id: meta.id,
+                      username: meta.username,
+                      label,
+                    })
+                  ).pipe(
+                    switchMap((updatedMeta) =>
+                      from(
+                        this.accounts.setActiveAccountId(updatedMeta.id)
+                      ).pipe(
+                        switchMap(() =>
+                          from(
+                            this.accounts.cacheProfile(
+                              updatedMeta.id,
+                              res.profile
+                            )
+                          )
+                        ),
+                        map(() => {
+                          const next: AuthState = {
+                            isLoggedIn: true,
+                            activeAccountId: updatedMeta.id,
+                            activeAccountMeta: updatedMeta,
+                            profile: res.profile,
+                          };
+                          this.state$.next(next);
+                          return next;
+                        })
+                      )
+                    )
+                  );
+                })
+              );
+          })
         );
-      }),
+      })
     );
   }
 
@@ -217,20 +275,25 @@ export class AuthService {
   logout(): Observable<AuthState> {
     return from(this.accounts.getActiveAccountId()).pipe(
       tap(() => {}),
-      switchMap(activeId => {
+      switchMap((activeId) => {
         if (activeId) {
           // keep password; clear cached profile
           return from(this.accounts.clearCachedProfile(activeId)).pipe(
-            switchMap(() => from(this.accounts.setActiveAccountId(null))),
+            switchMap(() => from(this.accounts.setActiveAccountId(null)))
           );
         }
         return from(this.accounts.setActiveAccountId(null));
       }),
       map(() => {
-        const next: AuthState = { isLoggedIn: false, activeAccountId: null, activeAccountMeta: null, profile: null };
+        const next: AuthState = {
+          isLoggedIn: false,
+          activeAccountId: null,
+          activeAccountMeta: null,
+          profile: null,
+        };
         this.state$.next(next);
         return next;
-      }),
+      })
     );
   }
 
@@ -257,36 +320,44 @@ export class AuthService {
     this.lastProfileRefreshAccountId = snap.activeAccountId;
 
     return from(this.accounts.getPassword(snap.activeAccountId)).pipe(
-      switchMap(password => {
+      switchMap((password) => {
         if (!password) {
           return from(this.invalidateActiveSession(false)).pipe(
-            map(() => this.snapshot()),
+            map(() => this.snapshot())
           );
         }
 
-        return this.patron.getPatronProfile(snap.activeAccountMeta!.username, password, snap.activeAccountId).pipe(
-          switchMap(res => {
-            if (!res.success || !res.profile) {
-              return from(this.invalidateActiveSession(true)).pipe(
-                map(() => this.snapshot()),
-              );
-            }
+        return this.patron
+          .getPatronProfile(
+            snap.activeAccountMeta!.username,
+            password,
+            snap.activeAccountId
+          )
+          .pipe(
+            switchMap((res) => {
+              if (!res.success || !res.profile) {
+                return from(this.invalidateActiveSession(true)).pipe(
+                  map(() => this.snapshot())
+                );
+              }
 
-            return from(this.accounts.cacheProfile(snap.activeAccountId!, res.profile)).pipe(
-              map(() => {
-                const next: AuthState = {
-                  ...snap,
-                  isLoggedIn: true,
-                  profile: res.profile,
-                };
-                this.state$.next(next);
-                return next;
-              }),
-            );
-          }),
-          catchError(() => of(snap)),
-        );
-      }),
+              return from(
+                this.accounts.cacheProfile(snap.activeAccountId!, res.profile)
+              ).pipe(
+                map(() => {
+                  const next: AuthState = {
+                    ...snap,
+                    isLoggedIn: true,
+                    profile: res.profile,
+                  };
+                  this.state$.next(next);
+                  return next;
+                })
+              );
+            }),
+            catchError(() => of(snap))
+          );
+      })
     );
   }
 
@@ -305,12 +376,16 @@ export class AuthService {
     const next: AuthState = {
       ...snap,
       activeAccountMeta: updatedMeta,
-      profile: snap.profile ? { ...snap.profile, username: nextUsername } : snap.profile,
+      profile: snap.profile
+        ? { ...snap.profile, username: nextUsername }
+        : snap.profile,
     };
     this.state$.next(next);
   }
 
-  private async invalidateActiveSession(removeStoredAccount: boolean): Promise<void> {
+  private async invalidateActiveSession(
+    removeStoredAccount: boolean
+  ): Promise<void> {
     const snap = this.snapshot();
     if (snap.activeAccountId) {
       if (removeStoredAccount) {

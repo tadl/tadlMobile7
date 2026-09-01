@@ -23,26 +23,37 @@
         <ion-card-title>Live from TADL</ion-card-title>
       </ion-card-header>
       <ion-card-content>
-        Enjoy a selection of live camera feeds from TADL. Select a camera to open it in YouTube or your browser.
+        Enjoy a selection of live camera feeds from TADL. Select a camera to
+        open it in YouTube or your browser.
       </ion-card-content>
     </ion-card>
 
-    <ion-card *ngIf="loading && !webcams.length" class="webcams-state-card">
+    @if (loading && !webcams.length) {
+    <ion-card class="webcams-state-card">
       <ion-card-content>Loading webcams...</ion-card-content>
     </ion-card>
-
-    <ion-list *ngIf="webcams.length" class="webcams-list">
-      <ion-item button detail="true" *ngFor="let cam of webcams" (click)="openWebcam(cam)">
-        <ion-icon slot="start" name="videocam-outline" class="webcam-list-icon"></ion-icon>
+    } @if (webcams.length) {
+    <ion-list class="webcams-list">
+      @for (cam of webcams; track cam) {
+      <ion-item button detail="true" (click)="openWebcam(cam)">
+        <ion-icon
+          slot="start"
+          name="videocam-outline"
+          class="webcam-list-icon"
+        ></ion-icon>
         <ion-label>
           <h2>{{ cam.title }}</h2>
-          <p *ngIf="cam.subtitle">{{ cam.subtitle }}</p>
+          @if (cam.subtitle) {
+          <p>{{ cam.subtitle }}</p>
+          }
         </ion-label>
       </ion-item>
+      }
     </ion-list>
-
-    <ion-card *ngIf="!loading && !webcams.length" class="webcams-state-card">
+    } @if (!loading && !webcams.length) {
+    <ion-card class="webcams-state-card">
       <ion-card-content>No webcams are available right now.</ion-card-content>
     </ion-card>
+    }
   </div>
 </ion-content>

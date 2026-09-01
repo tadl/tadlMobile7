@@ -1,30 +1,56 @@
-import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, inject } from '@angular/core';
+
 import { Router } from '@angular/router';
 import { ActivatedRoute } from '@angular/router';
-import { IonicModule, ModalController, ActionSheetController, AlertController, type ActionSheetButton } from '@ionic/angular';
+import {
+  IonicModule,
+  ModalController,
+  ActionSheetController,
+  AlertController,
+  type ActionSheetButton,
+} from '@ionic/angular/lazy';
 import { finalize } from 'rxjs';
 import { lastValueFrom } from 'rxjs';
 
 import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
-import { ListsService, type AspenListTitle } from '../../services/lists.service';
+import {
+  ListsService,
+  type AspenListTitle,
+} from '../../services/lists.service';
 import { ItemDetailComponent } from '../../components/item-detail/item-detail.component';
 import { AspenSearchHit } from '../../services/search.service';
 import { AuthService } from '../../services/auth.service';
 import { HoldsService } from '../../services/holds.service';
 import { FormatFamilyService } from '../../services/format-family.service';
 import { ListLookupService } from '../../services/list-lookup.service';
-import { HoldSupportService, HoldTargetOption } from '../../services/hold-support.service';
+import {
+  HoldSupportService,
+  HoldTargetOption,
+} from '../../services/hold-support.service';
 
 @Component({
   standalone: true,
   selector: 'app-my-list-detail',
   templateUrl: './my-list-detail.page.html',
   styleUrls: ['./my-list-detail.page.scss'],
-  imports: [CommonModule, IonicModule],
+  imports: [IonicModule],
 })
 export class MyListDetailPage {
+  globals = inject(Globals);
+  private route = inject(ActivatedRoute);
+  private listsService = inject(ListsService);
+  private toast = inject(ToastService);
+  private modalController = inject(ModalController);
+  private actionSheetCtrl = inject(ActionSheetController);
+  private alertCtrl = inject(AlertController);
+  private router = inject(Router);
+  private listLookup = inject(ListLookupService);
+  private auth = inject(AuthService);
+  private holds = inject(HoldsService);
+  private formatFamily = inject(FormatFamilyService);
+  private holdSupport = inject(HoldSupportService);
+
   loading = false;
   loadingMore = false;
   listId = '';
@@ -39,22 +65,6 @@ export class MyListDetailPage {
   actionRecordId = '';
   canEditList = false;
   mutatingList = false;
-
-  constructor(
-    public globals: Globals,
-    private route: ActivatedRoute,
-    private listsService: ListsService,
-    private toast: ToastService,
-    private modalController: ModalController,
-    private actionSheetCtrl: ActionSheetController,
-    private alertCtrl: AlertController,
-    private router: Router,
-    private listLookup: ListLookupService,
-    private auth: AuthService,
-    private holds: HoldsService,
-    private formatFamily: FormatFamilyService,
-    private holdSupport: HoldSupportService,
-  ) {}
 
   ionViewWillEnter() {
     this.listId = (this.route.snapshot.paramMap.get('id') ?? '').trim();
@@ -79,33 +89,43 @@ export class MyListDetailPage {
     this.totalPages = 1;
     this.infiniteDisabled = true;
     this.loading = true;
-    this.listsService.fetchListTitles(this.listId, this.page, this.pageSize).pipe(
-      finalize(() => {
-        this.loading = false;
-        ev?.target?.complete?.();
-      }),
-    ).subscribe({
-      next: (res) => {
-        if (!res?.success) {
-          this.titles = [];
-          this.toast.presentToast(res?.message || 'Could not load this list.');
-          return;
-        }
+    this.listsService
+      .fetchListTitles(this.listId, this.page, this.pageSize)
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+          ev?.target?.complete?.();
+        })
+      )
+      .subscribe({
+        next: (res) => {
+          if (!res?.success) {
+            this.titles = [];
+            this.toast.presentToast(
+              res?.message || 'Could not load this list.'
+            );
+            return;
+          }
 
-        this.listTitle = (res?.listTitle ?? '').toString().trim() || this.listTitle;
-        this.listDescription = (res?.listDescription ?? '').toString().trim();
-        this.titles = Array.isArray(res?.titles) ? res.titles : [];
-        this.listLookup.observeListPage(this.listId, this.listTitle, this.titles);
-        this.page = Number(res?.page_current ?? 1) || 1;
-        this.totalPages = Number(res?.page_total ?? 1) || 1;
-        this.infiniteDisabled = !(this.page < this.totalPages);
-      },
-      error: () => {
-        this.titles = [];
-        this.infiniteDisabled = true;
-        this.toast.presentToast('Could not load this list.');
-      },
-    });
+          this.listTitle =
+            (res?.listTitle ?? '').toString().trim() || this.listTitle;
+          this.listDescription = (res?.listDescription ?? '').toString().trim();
+          this.titles = Array.isArray(res?.titles) ? res.titles : [];
+          this.listLookup.observeListPage(
+            this.listId,
+            this.listTitle,
+            this.titles
+          );
+          this.page = Number(res?.page_current ?? 1) || 1;
+          this.totalPages = Number(res?.page_total ?? 1) || 1;
+          this.infiniteDisabled = !(this.page < this.totalPages);
+        },
+        error: () => {
+          this.titles = [];
+          this.infiniteDisabled = true;
+          this.toast.presentToast('Could not load this list.');
+        },
+      });
   }
 
   loadMore(ev: any) {
@@ -126,37 +146,50 @@ export class MyListDetailPage {
 
     const nextPage = this.page + 1;
     this.loadingMore = true;
-    this.listsService.fetchListTitles(this.listId, nextPage, this.pageSize).pipe(
-      finalize(() => {
-        this.loadingMore = false;
-        ev?.target?.complete?.();
-      }),
-    ).subscribe({
-      next: (res) => {
-        if (!res?.success) {
-          this.toast.presentToast(res?.message || 'Could not load more list titles.');
-          return;
-        }
+    this.listsService
+      .fetchListTitles(this.listId, nextPage, this.pageSize)
+      .pipe(
+        finalize(() => {
+          this.loadingMore = false;
+          ev?.target?.complete?.();
+        })
+      )
+      .subscribe({
+        next: (res) => {
+          if (!res?.success) {
+            this.toast.presentToast(
+              res?.message || 'Could not load more list titles.'
+            );
+            return;
+          }
 
-        const nextTitles = Array.isArray(res?.titles) ? res.titles : [];
-        if (nextTitles.length) {
-          const seen = new Set(this.titles.map((x) => this.recordIdForEntry(x)));
-          const deduped = nextTitles.filter((x) => {
-            const id = this.recordIdForEntry(x);
-            if (!id || seen.has(id)) return false;
-            seen.add(id);
-            return true;
-          });
-          this.titles = [...this.titles, ...deduped];
-          this.listLookup.observeListPage(this.listId, this.listTitle, deduped);
-        }
+          const nextTitles = Array.isArray(res?.titles) ? res.titles : [];
+          if (nextTitles.length) {
+            const seen = new Set(
+              this.titles.map((x) => this.recordIdForEntry(x))
+            );
+            const deduped = nextTitles.filter((x) => {
+              const id = this.recordIdForEntry(x);
+              if (!id || seen.has(id)) return false;
+              seen.add(id);
+              return true;
+            });
+            this.titles = [...this.titles, ...deduped];
+            this.listLookup.observeListPage(
+              this.listId,
+              this.listTitle,
+              deduped
+            );
+          }
 
-        this.page = Number(res?.page_current ?? nextPage) || nextPage;
-        this.totalPages = Number(res?.page_total ?? this.totalPages) || this.totalPages;
-        this.infiniteDisabled = !(this.page < this.totalPages);
-      },
-      error: () => this.toast.presentToast('Could not load more list titles.'),
-    });
+          this.page = Number(res?.page_current ?? nextPage) || nextPage;
+          this.totalPages =
+            Number(res?.page_total ?? this.totalPages) || this.totalPages;
+          this.infiniteDisabled = !(this.page < this.totalPages);
+        },
+        error: () =>
+          this.toast.presentToast('Could not load more list titles.'),
+      });
   }
 
   titleText(t: AspenListTitle): string {
@@ -172,7 +205,8 @@ export class MyListDetailPage {
     if (!raw) return '';
     if (/^https?:\/\//i.test(raw)) return raw;
     if (raw.startsWith('//')) return `https:${raw}`;
-    if (raw.startsWith('/')) return `${this.globals.aspen_discovery_base}${raw}`;
+    if (raw.startsWith('/'))
+      return `${this.globals.aspen_discovery_base}${raw}`;
     return `${this.globals.aspen_discovery_base}/${raw}`;
   }
 
@@ -199,7 +233,9 @@ export class MyListDetailPage {
       language: (t?.language ?? '').toString().trim() || undefined,
       format: t?.format,
       itemList: Array.isArray((t as any)?.itemList) ? (t as any).itemList : [],
-      catalogUrl: `${this.globals.aspen_discovery_base}/GroupedWork/${encodeURIComponent(key)}`,
+      catalogUrl: `${
+        this.globals.aspen_discovery_base
+      }/GroupedWork/${encodeURIComponent(key)}`,
       raw: t,
     };
 
@@ -264,7 +300,10 @@ export class MyListDetailPage {
   }
 
   removeBusyFor(t: AspenListTitle): boolean {
-    return this.removingRecordId !== '' && this.removingRecordId === this.recordIdForEntry(t);
+    return (
+      this.removingRecordId !== '' &&
+      this.removingRecordId === this.recordIdForEntry(t)
+    );
   }
 
   rowActionBusyFor(t: AspenListTitle): boolean {
@@ -292,10 +331,15 @@ export class MyListDetailPage {
     });
   }
 
-  private async placeHoldFromTitle(t: AspenListTitle, precomputedTargets?: HoldTargetOption[]): Promise<void> {
+  private async placeHoldFromTitle(
+    t: AspenListTitle,
+    precomputedTargets?: HoldTargetOption[]
+  ): Promise<void> {
     const groupedKey = this.recordIdForEntry(t);
     if (!groupedKey) {
-      this.toast.presentToast('Could not determine holdable record id. Open details to place hold.');
+      this.toast.presentToast(
+        'Could not determine holdable record id. Open details to place hold.'
+      );
       return;
     }
     if (!this.auth.snapshot()?.isLoggedIn) {
@@ -304,7 +348,8 @@ export class MyListDetailPage {
     }
     if (this.rowActionBusyFor(t)) return;
 
-    const holdTargets = precomputedTargets ?? await this.holdTargetsWithStatusForTitle(t);
+    const holdTargets =
+      precomputedTargets ?? (await this.holdTargetsWithStatusForTitle(t));
     const availableTargets = holdTargets.filter((x) => !x.isOnHold);
 
     if (!availableTargets.length) {
@@ -321,14 +366,27 @@ export class MyListDetailPage {
 
     const defaultPickup = await this.holdSupport.defaultPickupBranchCode();
     if (defaultPickup) {
-      this.placeHoldNowForTitle(t, selectedTarget.recordId, defaultPickup, selectedTarget.formatLabel || selectedTarget.label);
+      this.placeHoldNowForTitle(
+        t,
+        selectedTarget.recordId,
+        defaultPickup,
+        selectedTarget.formatLabel || selectedTarget.label
+      );
       return;
     }
 
-    const buttons: ActionSheetButton[] = this.globals.pickupLocations.map((loc) => ({
-      text: loc.name,
-      handler: () => this.placeHoldNowForTitle(t, selectedTarget.recordId, loc.code, selectedTarget.formatLabel || selectedTarget.label),
-    }));
+    const buttons: ActionSheetButton[] = this.globals.pickupLocations.map(
+      (loc) => ({
+        text: loc.name,
+        handler: () =>
+          this.placeHoldNowForTitle(
+            t,
+            selectedTarget.recordId,
+            loc.code,
+            selectedTarget.formatLabel || selectedTarget.label
+          ),
+      })
+    );
     buttons.push({ text: 'Close', role: 'cancel' });
 
     const sheet = await this.actionSheetCtrl.create({
@@ -342,14 +400,19 @@ export class MyListDetailPage {
     t: AspenListTitle,
     recordId: string,
     pickupBranch: string,
-    selectedFormatLabel?: string,
+    selectedFormatLabel?: string
   ): void {
     const groupedKey = this.recordIdForEntry(t);
     if (!groupedKey || this.rowActionBusyFor(t)) return;
 
     this.actionRecordId = groupedKey;
-    this.holds.placeHold(recordId, pickupBranch, null)
-      .pipe(finalize(() => { this.actionRecordId = ''; }))
+    this.holds
+      .placeHold(recordId, pickupBranch, null)
+      .pipe(
+        finalize(() => {
+          this.actionRecordId = '';
+        })
+      )
       .subscribe({
         next: (res) => {
           if (!res?.success) {
@@ -357,30 +420,44 @@ export class MyListDetailPage {
             return;
           }
           this.auth.adjustActiveProfileCounts({ holds: 1, holdsRequested: 1 });
-          void this.holdSupport.cacheOptimisticPlacedHold({
-            groupedKey,
-            itemList: Array.isArray((t as any)?.itemList) ? (t as any).itemList : [],
-            rawItemList: (t as any)?.itemList,
-            title: this.titleText(t),
-            author: this.authorText(t) || undefined,
-            coverUrl: this.coverUrl(t) || undefined,
-          }, recordId, selectedFormatLabel);
+          void this.holdSupport.cacheOptimisticPlacedHold(
+            {
+              groupedKey,
+              itemList: Array.isArray((t as any)?.itemList)
+                ? (t as any).itemList
+                : [],
+              rawItemList: (t as any)?.itemList,
+              title: this.titleText(t),
+              author: this.authorText(t) || undefined,
+              coverUrl: this.coverUrl(t) || undefined,
+            },
+            recordId,
+            selectedFormatLabel
+          );
           const title = this.titleText(t) || 'this title';
           if (selectedFormatLabel) {
-            void this.toast.presentHoldPlacedToast(`Hold placed: ${title} (${selectedFormatLabel})`, () => {
-              void this.router.navigate(['/holds']);
-            });
+            void this.toast.presentHoldPlacedToast(
+              `Hold placed: ${title} (${selectedFormatLabel})`,
+              () => {
+                void this.router.navigate(['/holds']);
+              }
+            );
             return;
           }
-          void this.toast.presentHoldPlacedToast(`Hold placed: ${title}`, () => {
-            void this.router.navigate(['/holds']);
-          });
+          void this.toast.presentHoldPlacedToast(
+            `Hold placed: ${title}`,
+            () => {
+              void this.router.navigate(['/holds']);
+            }
+          );
         },
         error: () => this.toast.presentToast('Could not place hold.'),
       });
   }
 
-  private async holdTargetsWithStatusForTitle(t: AspenListTitle): Promise<HoldTargetOption[]> {
+  private async holdTargetsWithStatusForTitle(
+    t: AspenListTitle
+  ): Promise<HoldTargetOption[]> {
     if (!this.canPlaceHoldFromTitle(t)) return [];
 
     const groupedKey = this.recordIdForEntry(t);
@@ -395,13 +472,17 @@ export class MyListDetailPage {
     });
   }
 
-  private async pickHoldTarget(options: HoldTargetOption[]): Promise<HoldTargetOption | null> {
+  private async pickHoldTarget(
+    options: HoldTargetOption[]
+  ): Promise<HoldTargetOption | null> {
     return new Promise(async (resolve) => {
       const sorted = [...options].sort((a, b) => {
         const aHeld = !!a.isOnHold;
         const bHeld = !!b.isOnHold;
         if (aHeld !== bHeld) return aHeld ? -1 : 1;
-        return (a.label || '').localeCompare((b.label || ''), undefined, { sensitivity: 'base' });
+        return (a.label || '').localeCompare(b.label || '', undefined, {
+          sensitivity: 'base',
+        });
       });
       const sheet = await this.actionSheetCtrl.create({
         header: 'Place hold on which format?',
@@ -433,7 +514,9 @@ export class MyListDetailPage {
     });
   }
 
-  private async hasCachedHoldForGroupedKey(groupedKey: string): Promise<boolean> {
+  private async hasCachedHoldForGroupedKey(
+    groupedKey: string
+  ): Promise<boolean> {
     return this.holdSupport.hasCachedHoldForGroupedKey(groupedKey);
   }
 
@@ -454,7 +537,8 @@ export class MyListDetailPage {
           handler: () => this.removeFromListNow(t),
         },
         {
-          text: 'Close', role: 'cancel',
+          text: 'Close',
+          role: 'cancel',
         },
       ],
     });
@@ -473,7 +557,9 @@ export class MyListDetailPage {
     }
     const recordId = this.recordIdForEntry(t);
     if (!recordId) {
-      this.toast.presentToast('This title cannot be removed (missing record id).');
+      this.toast.presentToast(
+        'This title cannot be removed (missing record id).'
+      );
       return;
     }
     if (!this.listId) {
@@ -482,20 +568,30 @@ export class MyListDetailPage {
     }
 
     this.removingRecordId = recordId;
-    this.listsService.removeTitlesFromList(this.listId, [recordId])
-      .pipe(finalize(() => { this.removingRecordId = ''; }))
+    this.listsService
+      .removeTitlesFromList(this.listId, [recordId])
+      .pipe(
+        finalize(() => {
+          this.removingRecordId = '';
+        })
+      )
       .subscribe({
         next: (res) => {
           if (!res?.success) {
-            this.toast.presentToast(res?.message || 'Could not remove title from list.');
+            this.toast.presentToast(
+              res?.message || 'Could not remove title from list.'
+            );
             return;
           }
 
-          this.titles = this.titles.filter(x => this.recordIdForEntry(x) !== recordId);
+          this.titles = this.titles.filter(
+            (x) => this.recordIdForEntry(x) !== recordId
+          );
           this.listLookup.removeMembership(recordId, this.listId);
           this.toast.presentToast(res?.message || 'Removed from list.');
         },
-        error: () => this.toast.presentToast('Could not remove title from list.'),
+        error: () =>
+          this.toast.presentToast('Could not remove title from list.'),
       });
   }
 
@@ -565,9 +661,10 @@ export class MyListDetailPage {
     const alert = await this.alertCtrl.create({
       header: 'Delete list?',
       subHeader: this.listTitle || 'List',
-      message: count > 0
-        ? `THIS LIST HAS ${itemText.toUpperCase()} IN IT. ARE YOU SURE?\n\nThis cannot be undone.`
-        : 'This cannot be undone.',
+      message:
+        count > 0
+          ? `THIS LIST HAS ${itemText.toUpperCase()} IN IT. ARE YOU SURE?\n\nThis cannot be undone.`
+          : 'This cannot be undone.',
       buttons: [
         { text: 'Close', role: 'cancel' },
         {
@@ -585,8 +682,13 @@ export class MyListDetailPage {
     if (!this.listId || this.mutatingList) return;
 
     this.mutatingList = true;
-    this.listsService.editList(this.listId, { title, description })
-      .pipe(finalize(() => { this.mutatingList = false; }))
+    this.listsService
+      .editList(this.listId, { title, description })
+      .pipe(
+        finalize(() => {
+          this.mutatingList = false;
+        })
+      )
       .subscribe({
         next: (res) => {
           if (!res?.success) {
@@ -608,8 +710,13 @@ export class MyListDetailPage {
 
     const listId = this.listId;
     this.mutatingList = true;
-    this.listsService.deleteList(listId)
-      .pipe(finalize(() => { this.mutatingList = false; }))
+    this.listsService
+      .deleteList(listId)
+      .pipe(
+        finalize(() => {
+          this.mutatingList = false;
+        })
+      )
       .subscribe({
         next: (res) => {
           if (!res?.success) {
@@ -636,7 +743,7 @@ export class MyListDetailPage {
       const ownedIds = new Set(
         (userLists ?? [])
           .map((x) => (x?.id ?? '').toString().trim())
-          .filter((x) => !!x),
+          .filter((x) => !!x)
       );
       this.canEditList = ownedIds.has(this.listId);
     } catch {

@@ -27,25 +27,25 @@
     </ion-button>
   </div>
 
-  <ion-list *ngIf="lists.length > 0" lines="full" class="full-list">
-    <ion-item
-      button
-      detail="false"
-      class="list-row"
-      *ngFor="let list of lists; trackBy: trackByList"
-      (click)="openList(list)"
-    >
-      <ion-thumbnail slot="start" *ngIf="list.cover">
+  @if (lists.length > 0) {
+  <ion-list lines="full" class="full-list">
+    @for (list of lists; track trackByList($index, list)) {
+    <ion-item button detail="false" class="list-row" (click)="openList(list)">
+      @if (list.cover) {
+      <ion-thumbnail slot="start">
         <img [src]="list.cover" alt="" />
       </ion-thumbnail>
-
+      }
       <ion-label class="ion-text-wrap">
         <div class="title">{{ listTitle(list) }}</div>
-        <div class="sub" *ngIf="listDescription(list)">{{ listDescription(list) }}</div>
+        @if (listDescription(list)) {
+        <div class="sub">{{ listDescription(list) }}</div>
+        }
         <ion-note>{{ list.public ? 'Public list' : 'Private list' }}</ion-note>
       </ion-label>
-
-      <ion-badge slot="end" class="count-badge">{{ listCount(list) }}</ion-badge>
+      <ion-badge slot="end" class="count-badge"
+        >{{ listCount(list) }}</ion-badge
+      >
       <ion-button
         slot="end"
         fill="clear"
@@ -58,11 +58,13 @@
         <ion-icon name="ellipsis-vertical" slot="icon-only"></ion-icon>
       </ion-button>
     </ion-item>
+    }
   </ion-list>
-
-  <ion-item *ngIf="!loading && lists.length === 0">
+  } @if (!loading && lists.length === 0) {
+  <ion-item>
     <ion-label class="ion-text-wrap">
       You do not have any lists yet.
     </ion-label>
   </ion-item>
+  }
 </ion-content>

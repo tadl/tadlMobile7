@@ -1,6 +1,13 @@
-import { AfterViewInit, Component, Input, OnChanges, SimpleChanges } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { IonicModule, ModalController } from '@ionic/angular';
+import {
+  AfterViewInit,
+  Component,
+  Input,
+  OnChanges,
+  SimpleChanges,
+  inject,
+} from '@angular/core';
+
+import { IonicModule, ModalController } from '@ionic/angular/lazy';
 
 import { Globals } from '../../globals';
 
@@ -12,18 +19,16 @@ import JsBarcode from 'jsbarcode';
   selector: 'app-show-card-modal',
   templateUrl: './show-card-modal.component.html',
   styleUrls: ['./show-card-modal.component.scss'],
-  imports: [CommonModule, IonicModule],
+  imports: [IonicModule],
 })
 export class ShowCardModalComponent implements AfterViewInit, OnChanges {
+  globals = inject(Globals);
+  private modalController = inject(ModalController);
+
   @Input() barcode!: string;
 
   // optional: show the MeLCat username/id under the barcode
   @Input() melcatId?: string;
-
-  constructor(
-    public globals: Globals,
-    private modalController: ModalController,
-  ) {}
 
   close() {
     this.modalController.dismiss();

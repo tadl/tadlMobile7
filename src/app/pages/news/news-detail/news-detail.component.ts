@@ -1,7 +1,7 @@
-import { Component, Input } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, Input, inject } from '@angular/core';
+
 import { SecurityContext } from '@angular/core';
-import { IonicModule, ModalController } from '@ionic/angular';
+import { IonicModule, ModalController } from '@ionic/angular/lazy';
 import { DomSanitizer } from '@angular/platform-browser';
 import { Globals } from '../../../globals';
 import { NewsletterItem } from '../../../services/news.service';
@@ -12,21 +12,19 @@ import { DiscoveryLinkRouterService } from '../../../services/discovery-link-rou
   selector: 'app-news-detail',
   templateUrl: './news-detail.component.html',
   styleUrls: ['./news-detail.component.scss'],
-  imports: [CommonModule, IonicModule],
+  imports: [IonicModule],
 })
 export class NewsDetailComponent {
+  globals = inject(Globals);
+  private modalController = inject(ModalController);
+  private discoveryLinks = inject(DiscoveryLinkRouterService);
+  private sanitizer = inject(DomSanitizer);
+
   @Input() news?: NewsletterItem;
 
   readonly placeholderImage = 'assets/location-placeholder.png';
   private htmlContentCacheRaw: string | null = null;
   private htmlContentCacheValue = '';
-
-  constructor(
-    public globals: Globals,
-    private modalController: ModalController,
-    private discoveryLinks: DiscoveryLinkRouterService,
-    private sanitizer: DomSanitizer,
-  ) {}
 
   close() {
     this.modalController.dismiss();

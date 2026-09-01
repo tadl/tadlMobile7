@@ -1,6 +1,11 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { IonicModule, ModalController, ActionSheetController, type ActionSheetButton } from '@ionic/angular';
+import {
+  IonicModule,
+  ModalController,
+  ActionSheetController,
+  type ActionSheetButton,
+} from '@ionic/angular/lazy';
 import { finalize } from 'rxjs';
 
 import { Globals } from '../../globals';
@@ -20,6 +25,14 @@ import { FormatFamilyService } from '../../services/format-family.service';
   imports: [CommonModule, IonicModule],
 })
 export class HoldsPage {
+  globals = inject(Globals);
+  private toast = inject(ToastService);
+  private auth = inject(AuthService);
+  private holds = inject(HoldsService);
+  private modal = inject(ModalController);
+  private actionSheet = inject(ActionSheetController);
+  private formatFamily = inject(FormatFamilyService);
+
   loading = false;
   hydratedFromCache = false;
   private holdActionBusyKeys = new Set<string>();
@@ -29,16 +42,6 @@ export class HoldsPage {
   // We’re only showing ILS holds here (per your direction)
   ilsReady: AspenHold[] = [];
   ilsNotReady: AspenHold[] = [];
-
-  constructor(
-    public globals: Globals,
-    private toast: ToastService,
-    private auth: AuthService,
-    private holds: HoldsService,
-    private modal: ModalController,
-    private actionSheet: ActionSheetController,
-    private formatFamily: FormatFamilyService,
-  ) {}
 
   async ionViewWillEnter() {
     await this.loadCacheThenRefresh();
@@ -82,18 +85,22 @@ export class HoldsPage {
 
     this.loading = true;
 
-    const holds$ = ev ? this.holds.fetchFreshActiveHolds(true) : this.holds.fetchActiveHolds();
+    const holds$ = ev
+      ? this.holds.fetchFreshActiveHolds(true)
+      : this.holds.fetchActiveHolds();
 
     holds$
       .pipe(
         finalize(() => {
           this.loading = false;
           ev?.target?.complete?.();
-        }),
+        })
       )
       .subscribe({
         next: async (allHolds) => {
-          const ilsOnly = (allHolds ?? []).filter(h => (h?.type === 'ils' || h?.source === 'ils'));
+          const ilsOnly = (allHolds ?? []).filter(
+            (h) => h?.type === 'ils' || h?.source === 'ils'
+          );
           this.partitionIlsHolds(ilsOnly);
           this.syncProfileHoldCountsFromList(ilsOnly);
 
@@ -121,9 +128,12 @@ export class HoldsPage {
     }
 
     ready.sort((a, b) => {
-      const byAvailable = this.holdAvailableSortValue(b) - this.holdAvailableSortValue(a);
+      const byAvailable =
+        this.holdAvailableSortValue(b) - this.holdAvailableSortValue(a);
       if (byAvailable !== 0) return byAvailable;
-      return this.holdTitle(a).localeCompare(this.holdTitle(b), undefined, { sensitivity: 'base' });
+      return this.holdTitle(a).localeCompare(this.holdTitle(b), undefined, {
+        sensitivity: 'base',
+      });
     });
 
     notReady.sort((a, b) => {
@@ -131,14 +141,17 @@ export class HoldsPage {
       const bFrozen = this.holdDisplayState(b) === 'frozen';
       if (aFrozen !== bFrozen) return aFrozen ? 1 : -1;
 
-      const byPlaced = this.holdPlacedSortValue(b) - this.holdPlacedSortValue(a);
+      const byPlaced =
+        this.holdPlacedSortValue(b) - this.holdPlacedSortValue(a);
       if (byPlaced !== 0) return byPlaced;
 
       const aPos = Number(a?.position ?? Number.MAX_SAFE_INTEGER);
       const bPos = Number(b?.position ?? Number.MAX_SAFE_INTEGER);
       if (aPos !== bPos) return aPos - bPos;
 
-      return this.holdTitle(a).localeCompare(this.holdTitle(b), undefined, { sensitivity: 'base' });
+      return this.holdTitle(a).localeCompare(this.holdTitle(b), undefined, {
+        sensitivity: 'base',
+      });
     });
 
     this.ilsReady = ready;
@@ -158,7 +171,9 @@ export class HoldsPage {
   }
 
   get hasAnyVisibleData(): boolean {
-    return this.filteredIlsReady.length > 0 || this.filteredIlsNotReady.length > 0;
+    return (
+      this.filteredIlsReady.length > 0 || this.filteredIlsNotReady.length > 0
+    );
   }
 
   get hasActiveQuery(): boolean {
@@ -174,7 +189,9 @@ export class HoldsPage {
     if (!query) return holds;
 
     return (holds ?? []).filter((hold) => {
-      const haystack = `${this.holdTitle(hold)} ${this.holdAuthor(hold)}`.toLocaleLowerCase();
+      const haystack = `${this.holdTitle(hold)} ${this.holdAuthor(
+        hold
+      )}`.toLocaleLowerCase();
       return haystack.includes(query);
     });
   }
@@ -184,7 +201,13 @@ export class HoldsPage {
   }
 
   private holdAvailableSortValue(h: AspenHold): number {
-    return Number((h as any)?.availableDate ?? (h as any)?.availableTime ?? (h as any)?.expirationDate ?? (h as any)?.expire ?? 0);
+    return Number(
+      (h as any)?.availableDate ??
+        (h as any)?.availableTime ??
+        (h as any)?.expirationDate ??
+        (h as any)?.expire ??
+        0
+    );
   }
 
   holdTitle(h: AspenHold): string {
@@ -204,7 +227,10 @@ export class HoldsPage {
   }
 
   mediaIconNameForHold(h: AspenHold): string {
-    return this.formatFamily.iconNameForItem({ format: h?.['format'], itemList: h?.['itemList'] });
+    return this.formatFamily.iconNameForItem({
+      format: h?.['format'],
+      itemList: h?.['itemList'],
+    });
   }
 
   holdStatus(h: AspenHold): string {
@@ -277,7 +303,9 @@ export class HoldsPage {
       language: undefined,
       format: h?.['format'], // TS4111-safe
       itemList: [],
-      catalogUrl: `${this.globals.aspen_discovery_base}/GroupedWork/${encodeURIComponent(key)}`,
+      catalogUrl: `${
+        this.globals.aspen_discovery_base
+      }/GroupedWork/${encodeURIComponent(key)}`,
       raw: h,
     };
 
@@ -291,18 +319,20 @@ export class HoldsPage {
     // IMPORTANT: react to changes from the modal
     m.onDidDismiss().then((res) => {
       const data = res?.data;
-        if (data?.refreshHolds) {
-          const groupedWorkId = (data?.groupedWorkId ?? '').toString().trim();
-          const updatedHoldsForItem = Array.isArray(data?.holdsForItem) ? (data.holdsForItem as AspenHold[]) : null;
+      if (data?.refreshHolds) {
+        const groupedWorkId = (data?.groupedWorkId ?? '').toString().trim();
+        const updatedHoldsForItem = Array.isArray(data?.holdsForItem)
+          ? (data.holdsForItem as AspenHold[])
+          : null;
 
         if (groupedWorkId && updatedHoldsForItem) {
           this.applyItemHoldMutation(groupedWorkId, updatedHoldsForItem);
-          } else {
-            this.partitionIlsHolds([...this.ilsReady, ...this.ilsNotReady]);
-          }
-          void this.persistLocalHolds();
+        } else {
+          this.partitionIlsHolds([...this.ilsReady, ...this.ilsNotReady]);
         }
-      });
+        void this.persistLocalHolds();
+      }
+    });
 
     await m.present();
   }
@@ -317,7 +347,10 @@ export class HoldsPage {
       const sheet = await this.actionSheet.create({
         header: this.holdTitle(h),
         buttons: [
-          { text: 'Manage hold', handler: () => this.openMelcatManager('hold', h) },
+          {
+            text: 'Manage hold',
+            handler: () => this.openMelcatManager('hold', h),
+          },
           { text: 'Close', role: 'cancel' },
         ],
       });
@@ -358,7 +391,7 @@ export class HoldsPage {
       {
         text: 'Close',
         role: 'cancel',
-      },
+      }
     );
 
     const sheet = await this.actionSheet.create({
@@ -381,39 +414,53 @@ export class HoldsPage {
     const wasFrozen = this.holdIsFrozen(h);
     const targetFrozen = !wasFrozen;
     const op$ = wasFrozen ? this.holds.thawHold(h) : this.holds.freezeHold(h);
-    op$
-      .subscribe({
-        next: (res) => {
-          if (!res?.success) {
-            this.holdActionBusyKeys.delete(key);
-            this.toast.presentToast(wasFrozen ? 'Could not thaw hold.' : 'Could not freeze hold.');
-            return;
-          }
-
+    op$.subscribe({
+      next: (res) => {
+        if (!res?.success) {
           this.holdActionBusyKeys.delete(key);
-          this.applyHoldFrozenState(h, targetFrozen);
+          this.toast.presentToast(
+            wasFrozen ? 'Could not thaw hold.' : 'Could not freeze hold.'
+          );
+          return;
+        }
 
-          const title = this.holdTitle(h);
-          this.toast.presentToast(targetFrozen ? `Hold frozen: ${title}` : `Hold thawed: ${title}`);
-        },
-        error: () => this.reconcileHoldToggleAfterUnknownError(h, targetFrozen, key),
-      });
+        this.holdActionBusyKeys.delete(key);
+        this.applyHoldFrozenState(h, targetFrozen);
+
+        const title = this.holdTitle(h);
+        this.toast.presentToast(
+          targetFrozen ? `Hold frozen: ${title}` : `Hold thawed: ${title}`
+        );
+      },
+      error: () =>
+        this.reconcileHoldToggleAfterUnknownError(h, targetFrozen, key),
+    });
   }
 
-  private reconcileHoldToggleAfterUnknownError(h: AspenHold, targetFrozen: boolean, key: string) {
+  private reconcileHoldToggleAfterUnknownError(
+    h: AspenHold,
+    targetFrozen: boolean,
+    key: string
+  ) {
     this.holds.verifyHoldFrozenStateAfterDelay(h, targetFrozen).subscribe({
       next: (verified) => {
         if (verified) {
           this.applyHoldFrozenState(verified, targetFrozen);
           const title = this.holdTitle(verified);
-          this.toast.presentToast(targetFrozen ? `Hold frozen: ${title}` : `Hold thawed: ${title}`);
+          this.toast.presentToast(
+            targetFrozen ? `Hold frozen: ${title}` : `Hold thawed: ${title}`
+          );
           return;
         }
 
-        this.toast.presentToast(targetFrozen ? 'Could not freeze hold.' : 'Could not thaw hold.');
+        this.toast.presentToast(
+          targetFrozen ? 'Could not freeze hold.' : 'Could not thaw hold.'
+        );
       },
       error: () => {
-        this.toast.presentToast(targetFrozen ? 'Could not freeze hold.' : 'Could not thaw hold.');
+        this.toast.presentToast(
+          targetFrozen ? 'Could not freeze hold.' : 'Could not thaw hold.'
+        );
       },
       complete: () => this.holdActionBusyKeys.delete(key),
     });
@@ -430,11 +477,24 @@ export class HoldsPage {
     }
 
     const currentCode = ((h as any)?.currentPickupId ?? '').toString().trim();
-    const currentName = ((h as any)?.pickupLocationName ?? (h as any)?.currentPickupName ?? '').toString().trim();
-    const buttons: ActionSheetButton[] = this.globals.pickupLocations.map((loc) => ({
-      text: loc.code === currentCode ? `${loc.name} (Current)` : loc.name,
-      handler: () => this.changePickupLocationNow(h, holdId, this.globals.pickupAspenNewLocation(loc)),
-    }));
+    const currentName = (
+      (h as any)?.pickupLocationName ??
+      (h as any)?.currentPickupName ??
+      ''
+    )
+      .toString()
+      .trim();
+    const buttons: ActionSheetButton[] = this.globals.pickupLocations.map(
+      (loc) => ({
+        text: loc.code === currentCode ? `${loc.name} (Current)` : loc.name,
+        handler: () =>
+          this.changePickupLocationNow(
+            h,
+            holdId,
+            this.globals.pickupAspenNewLocation(loc)
+          ),
+      })
+    );
     buttons.push({ text: 'Close', role: 'cancel' });
 
     const sheet = await this.actionSheet.create({
@@ -446,7 +506,11 @@ export class HoldsPage {
     await sheet.present();
   }
 
-  private changePickupLocationNow(h: AspenHold, holdId: number, newLocation: string) {
+  private changePickupLocationNow(
+    h: AspenHold,
+    holdId: number,
+    newLocation: string
+  ) {
     if (this.isHoldActionBusy(h)) return;
 
     const key = this.holdActionKey(h);
@@ -460,23 +524,36 @@ export class HoldsPage {
       .subscribe({
         next: (res) => {
           if (!res?.success) {
-            this.toast.presentToast(res?.message || 'Could not change pickup location.');
+            this.toast.presentToast(
+              res?.message || 'Could not change pickup location.'
+            );
             return;
           }
 
           if (parsed) {
             (h as any).currentPickupId = parsed.code;
-            (h as any).currentPickupName = this.globals.pickupNameForCode(parsed.code) ?? (h as any).currentPickupName;
+            (h as any).currentPickupName =
+              this.globals.pickupNameForCode(parsed.code) ??
+              (h as any).currentPickupName;
             (h as any).pickupLocationId = parsed.id;
-            (h as any).pickupLocationName = this.globals.pickupNameForCode(parsed.code) ?? (h as any).pickupLocationName;
+            (h as any).pickupLocationName =
+              this.globals.pickupNameForCode(parsed.code) ??
+              (h as any).pickupLocationName;
           }
 
           const title = this.holdTitle(h);
-          const pickupName = parsed ? this.globals.pickupNameForCode(parsed.code) : '';
-          this.toast.presentToast(pickupName ? `Pickup location updated for ${title}: ${pickupName}` : `Pickup location updated: ${title}`);
+          const pickupName = parsed
+            ? this.globals.pickupNameForCode(parsed.code)
+            : '';
+          this.toast.presentToast(
+            pickupName
+              ? `Pickup location updated for ${title}: ${pickupName}`
+              : `Pickup location updated: ${title}`
+          );
           void this.persistLocalHolds();
         },
-        error: () => this.toast.presentToast('Could not change pickup location.'),
+        error: () =>
+          this.toast.presentToast('Could not change pickup location.'),
       });
   }
 
@@ -540,15 +617,27 @@ export class HoldsPage {
   }
 
   trackByHold(_idx: number, h: AspenHold) {
-    return (h as any)?.id ?? (h as any)?.recordId ?? (h as any)?.groupedWorkId ?? _idx;
+    return (
+      (h as any)?.id ??
+      (h as any)?.recordId ??
+      (h as any)?.groupedWorkId ??
+      _idx
+    );
   }
 
   get hasAnyData(): boolean {
-    return (this.ilsReady?.length ?? 0) > 0 || (this.ilsNotReady?.length ?? 0) > 0;
+    return (
+      (this.ilsReady?.length ?? 0) > 0 || (this.ilsNotReady?.length ?? 0) > 0
+    );
   }
 
   private holdActionKey(h: AspenHold): string {
-    const raw = (h as any)?.id ?? (h as any)?.cancelId ?? (h as any)?.recordId ?? (h as any)?.groupedWorkId ?? '';
+    const raw =
+      (h as any)?.id ??
+      (h as any)?.cancelId ??
+      (h as any)?.recordId ??
+      (h as any)?.groupedWorkId ??
+      '';
     return String(raw).trim();
   }
 
@@ -576,11 +665,17 @@ export class HoldsPage {
 
   private holdFormatSummary(hold?: AspenHold): string {
     const raw = (hold as any)?.format;
-    if (Array.isArray(raw)) return raw.map((x) => String(x).trim()).filter(Boolean).join(', ');
+    if (Array.isArray(raw))
+      return raw
+        .map((x) => String(x).trim())
+        .filter(Boolean)
+        .join(', ');
     return (raw ?? '').toString().trim();
   }
 
-  private parseAspenNewLocation(s: string): { id: string; code: string } | null {
+  private parseAspenNewLocation(
+    s: string
+  ): { id: string; code: string } | null {
     const raw = (s ?? '').trim();
     if (!raw) return null;
     const parts = raw.split('_');
@@ -607,7 +702,9 @@ export class HoldsPage {
   private removeHoldFromLists(hold: AspenHold) {
     const key = this.holdActionKey(hold);
     this.ilsReady = this.ilsReady.filter((h) => this.holdActionKey(h) !== key);
-    this.ilsNotReady = this.ilsNotReady.filter((h) => this.holdActionKey(h) !== key);
+    this.ilsNotReady = this.ilsNotReady.filter(
+      (h) => this.holdActionKey(h) !== key
+    );
   }
 
   private findHoldByKey(key: string): AspenHold | null {
@@ -622,7 +719,10 @@ export class HoldsPage {
   private async persistLocalHolds() {
     const snap = this.auth.snapshot();
     if (!snap.activeAccountId) return;
-    await this.holds.setCachedHolds(snap.activeAccountId, [...this.ilsReady, ...this.ilsNotReady]);
+    await this.holds.setCachedHolds(snap.activeAccountId, [
+      ...this.ilsReady,
+      ...this.ilsNotReady,
+    ]);
   }
 
   private holdDisplayState(h: AspenHold): 'ready' | 'active' | 'frozen' {
@@ -635,12 +735,19 @@ export class HoldsPage {
       .join(' ')
       .trim();
 
-    if (statusBits.includes('ready to pickup') || statusBits.includes('ready for pickup')) {
+    if (
+      statusBits.includes('ready to pickup') ||
+      statusBits.includes('ready for pickup')
+    ) {
       return 'ready';
     }
 
     if ((h as any)?.frozen === true) return 'frozen';
-    if (statusBits.includes('frozen') || statusBits.includes('suspend') || statusBits.includes('suspended')) {
+    if (
+      statusBits.includes('frozen') ||
+      statusBits.includes('suspend') ||
+      statusBits.includes('suspended')
+    ) {
       return 'frozen';
     }
 
@@ -651,16 +758,22 @@ export class HoldsPage {
     return this.holdDisplayState(h) === 'ready';
   }
 
-  private applyItemHoldMutation(groupedWorkId: string, nextForItem: AspenHold[]) {
+  private applyItemHoldMutation(
+    groupedWorkId: string,
+    nextForItem: AspenHold[]
+  ) {
     const key = (groupedWorkId ?? '').toString().trim();
     if (!key) return;
 
     const existing = [...this.ilsReady, ...this.ilsNotReady].filter(
-      (h) => String((h as any)?.groupedWorkId ?? '').toString().trim() !== key,
+      (h) =>
+        String((h as any)?.groupedWorkId ?? '')
+          .toString()
+          .trim() !== key
     );
 
     const incomingIls = (nextForItem ?? []).filter(
-      (h) => h?.type === 'ils' || h?.source === 'ils',
+      (h) => h?.type === 'ils' || h?.source === 'ils'
     );
 
     this.partitionIlsHolds([...existing, ...incomingIls]);
@@ -668,14 +781,24 @@ export class HoldsPage {
 
   private syncProfileHoldCountsFromList(holds: AspenHold[]) {
     const total = (holds ?? []).length;
-    const ready = (holds ?? []).filter((h) => this.holdDisplayState(h) === 'ready').length;
+    const ready = (holds ?? []).filter(
+      (h) => this.holdDisplayState(h) === 'ready'
+    ).length;
     const requested = Math.max(0, total - ready);
 
     const snap = this.auth.snapshot();
     const profile: any = snap?.profile ?? {};
-    const currentTotal = this.toCount(profile?.numHolds ?? profile?.numHoldsIls ?? profile?.holds);
-    const currentReady = this.toCount(profile?.numHoldsAvailable ?? profile?.numHoldsAvailableIls ?? profile?.holds_ready);
-    const currentRequested = this.toCount(profile?.numHoldsRequested ?? profile?.numHoldsRequestedIls);
+    const currentTotal = this.toCount(
+      profile?.numHolds ?? profile?.numHoldsIls ?? profile?.holds
+    );
+    const currentReady = this.toCount(
+      profile?.numHoldsAvailable ??
+        profile?.numHoldsAvailableIls ??
+        profile?.holds_ready
+    );
+    const currentRequested = this.toCount(
+      profile?.numHoldsRequested ?? profile?.numHoldsRequestedIls
+    );
 
     this.auth.adjustActiveProfileCounts({
       holds: total - currentTotal,
@@ -690,7 +813,9 @@ export class HoldsPage {
   }
 
   private formatDeadlineDate(date: Date): string {
-    const month = new Intl.DateTimeFormat(undefined, { month: 'long' }).format(date);
+    const month = new Intl.DateTimeFormat(undefined, { month: 'long' }).format(
+      date
+    );
     const day = date.getDate();
     return `${month} ${day}${this.ordinalSuffix(day)}`;
   }

@@ -17,11 +17,11 @@
     <ion-refresher-content></ion-refresher-content>
   </ion-refresher>
 
-  <ion-list *ngIf="preferences">
+  @if (preferences) {
+  <ion-list>
     <ion-item-divider>
       <ion-label>App Preferences</ion-label>
     </ion-item-divider>
-
     <ion-item class="pref-item pref-item--setting">
       <ion-label>
         <div class="pref-label">Links</div>
@@ -38,11 +38,11 @@
           </ion-segment-button>
         </ion-segment>
         <div class="pref-help">
-          Open discover.tadl.org links on your device in-app, or use your browser.
+          Open {{ globals.aspen_discovery_base }} links on your device in-app,
+          or use your browser.
         </div>
       </ion-label>
     </ion-item>
-
     <ion-item class="pref-item pref-item--setting">
       <ion-label>
         <div class="pref-label">Theme</div>
@@ -62,45 +62,47 @@
           </ion-segment-button>
         </ion-segment>
         <div class="pref-help">
-          By default, the app will mirror your system theme. Use Light or Dark to override your system preference.
+          By default, the app will mirror your system theme. Use Light or Dark
+          to override your system preference.
         </div>
       </ion-label>
     </ion-item>
   </ion-list>
-
-  <ion-list *ngIf="preferences">
+  } @if (preferences) {
+  <ion-list>
     <ion-item-divider>
       <ion-label>Circulation Preferences</ion-label>
     </ion-item-divider>
-
     <ion-item>
       <ion-label>Pickup Library</ion-label>
-        <ion-select
-          slot="end"
-          interface="popover"
-          aria-label="Pickup library"
-          [value]="preferences.pickup_library"
-          [disabled]="saving"
-          (ionChange)="onPickupLibraryChanged($event)"
+      <ion-select
+        slot="end"
+        interface="popover"
+        aria-label="Pickup library"
+        [value]="preferences.pickup_library"
+        [disabled]="saving"
+        (ionChange)="onPickupLibraryChanged($event)"
       >
-        <ion-select-option *ngFor="let opt of pickupOptions" [value]="opt.code">{{ opt.name }}</ion-select-option>
+        @for (opt of pickupOptions; track opt) {
+        <ion-select-option [value]="opt.code">{{ opt.name }}</ion-select-option>
+        }
       </ion-select>
     </ion-item>
-
     <ion-item>
       <ion-label>Default Search Location</ion-label>
-        <ion-select
-          slot="end"
-          interface="popover"
-          aria-label="Default search location"
-          [value]="preferences.default_search"
-          [disabled]="saving"
-          (ionChange)="onDefaultSearchChanged($event)"
+      <ion-select
+        slot="end"
+        interface="popover"
+        aria-label="Default search location"
+        [value]="preferences.default_search"
+        [disabled]="saving"
+        (ionChange)="onDefaultSearchChanged($event)"
       >
-        <ion-select-option *ngFor="let opt of searchOptions" [value]="opt.code">{{ opt.name }}</ion-select-option>
+        @for (opt of searchOptions; track opt) {
+        <ion-select-option [value]="opt.code">{{ opt.name }}</ion-select-option>
+        }
       </ion-select>
     </ion-item>
-
     <ion-item>
       <ion-label>Keep Circulation History</ion-label>
       <ion-toggle
@@ -112,49 +114,62 @@
       ></ion-toggle>
     </ion-item>
   </ion-list>
-
-  <ion-list *ngIf="preferences">
+  } @if (preferences) {
+  <ion-list>
     <ion-item-divider>
       <ion-label>User Preferences</ion-label>
       <ion-note slot="end">Tap to change</ion-note>
     </ion-item-divider>
-
-    <ion-item button detail="true" [disabled]="saving" (click)="updateUsername()">
+    <ion-item
+      button
+      detail="true"
+      [disabled]="saving"
+      (click)="updateUsername()"
+    >
       <ion-label>Username</ion-label>
       <ion-note slot="end">{{ preferences.username }}</ion-note>
     </ion-item>
-
     <ion-item button detail="true" [disabled]="saving" (click)="updateAlias()">
       <ion-label>Holdshelf Alias</ion-label>
       <ion-note slot="end">{{ preferences.hold_shelf_alias }}</ion-note>
     </ion-item>
-
     <ion-item button detail="true" [disabled]="saving" (click)="updateEmail()">
       <ion-label>Email Address</ion-label>
       <ion-note slot="end">{{ preferences.email }}</ion-note>
     </ion-item>
-
-    <ion-item button detail="true" [disabled]="saving" (click)="updatePassword()">
+    <ion-item
+      button
+      detail="true"
+      [disabled]="saving"
+      (click)="updatePassword()"
+    >
       <ion-label>Password</ion-label>
       <ion-note slot="end">(not displayed)</ion-note>
     </ion-item>
   </ion-list>
-
-  <ion-list *ngIf="preferences">
+  } @if (preferences) {
+  <ion-list>
     <ion-item-divider>
       <ion-label>Notification Preferences</ion-label>
     </ion-item-divider>
-
-    <ion-item button detail="true" [disabled]="saving" (click)="updatePhoneNotifyNumber()">
+    <ion-item
+      button
+      detail="true"
+      [disabled]="saving"
+      (click)="updatePhoneNotifyNumber()"
+    >
       <ion-label>Phone Notify Number</ion-label>
       <ion-note slot="end">{{ preferences.phone_notify_number }}</ion-note>
     </ion-item>
-
-    <ion-item button detail="true" [disabled]="saving" (click)="updateTextNotifyNumber()">
+    <ion-item
+      button
+      detail="true"
+      [disabled]="saving"
+      (click)="updateTextNotifyNumber()"
+    >
       <ion-label>Text Notify Number</ion-label>
       <ion-note slot="end">{{ preferences.text_notify_number }}</ion-note>
     </ion-item>
-
     <ion-item>
       <ion-label>Email Notify</ion-label>
       <ion-toggle
@@ -165,7 +180,6 @@
         (ionChange)="onToggleNotify('email_notify', $event.detail.checked)"
       ></ion-toggle>
     </ion-item>
-
     <ion-item>
       <ion-label>Phone Notify</ion-label>
       <ion-toggle
@@ -176,7 +190,6 @@
         (ionChange)="onToggleNotify('phone_notify', $event.detail.checked)"
       ></ion-toggle>
     </ion-item>
-
     <ion-item>
       <ion-label>Text Notify</ion-label>
       <ion-toggle
@@ -188,12 +201,13 @@
       ></ion-toggle>
     </ion-item>
   </ion-list>
-
-  <ion-item *ngIf="loading && !preferences">
+  } @if (loading && !preferences) {
+  <ion-item>
     <ion-label>Loading account preferences...</ion-label>
   </ion-item>
-
-  <ion-item *ngIf="!loading && !preferences">
+  } @if (!loading && !preferences) {
+  <ion-item>
     <ion-label>No preference data available.</ion-label>
   </ion-item>
+  }
 </ion-content>

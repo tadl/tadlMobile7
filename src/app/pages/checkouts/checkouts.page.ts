@@ -1,12 +1,29 @@
-import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { IonicModule, ModalController, ActionSheetController } from '@ionic/angular';
-import { catchError, concatMap, finalize, from, map, of, switchMap, timer, toArray } from 'rxjs';
+import { Component, inject } from '@angular/core';
+
+import {
+  IonicModule,
+  ModalController,
+  ActionSheetController,
+} from '@ionic/angular/lazy';
+import {
+  catchError,
+  concatMap,
+  finalize,
+  from,
+  map,
+  of,
+  switchMap,
+  timer,
+  toArray,
+} from 'rxjs';
 
 import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
 import { AuthService } from '../../services/auth.service';
-import { CheckoutsService, type AspenCheckout } from '../../services/checkouts.service';
+import {
+  CheckoutsService,
+  type AspenCheckout,
+} from '../../services/checkouts.service';
 import { ItemDetailComponent } from '../../components/item-detail/item-detail.component';
 import { AspenSearchHit } from '../../services/search.service';
 import { MelcatManageModalComponent } from '../../components/melcat-manage-modal/melcat-manage-modal.component';
@@ -17,9 +34,17 @@ import { FormatFamilyService } from '../../services/format-family.service';
   selector: 'app-checkouts',
   templateUrl: './checkouts.page.html',
   styleUrls: ['./checkouts.page.scss'],
-  imports: [CommonModule, IonicModule],
+  imports: [IonicModule],
 })
 export class CheckoutsPage {
+  globals = inject(Globals);
+  private toast = inject(ToastService);
+  private auth = inject(AuthService);
+  private checkouts = inject(CheckoutsService);
+  private modalCtrl = inject(ModalController);
+  private actionSheetCtrl = inject(ActionSheetController);
+  private formatFamily = inject(FormatFamilyService);
+
   private static readonly BULK_ACTION_DELAY_MS = 450;
   loading = false;
   renewAllBusy = false;
@@ -28,16 +53,6 @@ export class CheckoutsPage {
   query = '';
 
   ilsCheckouts: AspenCheckout[] = [];
-
-  constructor(
-    public globals: Globals,
-    private toast: ToastService,
-    private auth: AuthService,
-    private checkouts: CheckoutsService,
-    private modalCtrl: ModalController,
-    private actionSheetCtrl: ActionSheetController,
-    private formatFamily: FormatFamilyService,
-  ) {}
 
   ionViewWillEnter() {
     this.refresh();
@@ -58,14 +73,16 @@ export class CheckoutsPage {
 
     this.loading = true;
 
-    const checkouts$ = ev ? this.checkouts.fetchFreshActiveCheckouts(true) : this.checkouts.fetchActiveCheckouts();
+    const checkouts$ = ev
+      ? this.checkouts.fetchFreshActiveCheckouts(true)
+      : this.checkouts.fetchActiveCheckouts();
 
     checkouts$
       .pipe(
         finalize(() => {
           this.loading = false;
           ev?.target?.complete?.();
-        }),
+        })
       )
       .subscribe({
         next: (list) => {
@@ -84,7 +101,9 @@ export class CheckoutsPage {
     // "Main title : subtitle / statement of responsibility".
     // For list display, keep the concise main title only.
     const withoutResponsibility = raw.split(/\s+\/\s+/)[0]?.trim() ?? raw;
-    const withoutSubtitle = withoutResponsibility.split(/\s+:\s+/)[0]?.trim() ?? withoutResponsibility;
+    const withoutSubtitle =
+      withoutResponsibility.split(/\s+:\s+/)[0]?.trim() ??
+      withoutResponsibility;
     const cleaned = withoutSubtitle.replace(/[\s:\/]+$/, '').trim();
 
     return cleaned || raw || 'Untitled';
@@ -95,7 +114,10 @@ export class CheckoutsPage {
   }
 
   mediaIconNameForCheckout(c: AspenCheckout): string {
-    return this.formatFamily.iconNameForItem({ format: c?.format, itemList: c?.['itemList'] });
+    return this.formatFamily.iconNameForItem({
+      format: c?.format,
+      itemList: c?.['itemList'],
+    });
   }
 
   dueText(c: AspenCheckout): string {
@@ -103,7 +125,12 @@ export class CheckoutsPage {
     if (!Number.isFinite(due) || due <= 0) return '';
     // dueDate is epoch seconds
     const dt = new Date(due * 1000);
-    return dt.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    return dt.toLocaleDateString(undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
   }
 
   checkoutRenewInfoText(c: AspenCheckout): string {
@@ -111,7 +138,8 @@ export class CheckoutsPage {
     const max = Number(c?.maxRenewals);
 
     if (!Number.isFinite(max) || max < 0) return '';
-    const left = Number.isFinite(used) && used >= 0 ? Math.max(0, max - used) : max;
+    const left =
+      Number.isFinite(used) && used >= 0 ? Math.max(0, max - used) : max;
     return `Renewals available: ${left}`;
   }
 
@@ -128,7 +156,9 @@ export class CheckoutsPage {
     if (!query) return this.ilsCheckouts;
 
     return (this.ilsCheckouts ?? []).filter((checkout) => {
-      const haystack = `${this.checkoutTitle(checkout)} ${this.checkoutAuthor(checkout)}`.toLocaleLowerCase();
+      const haystack = `${this.checkoutTitle(checkout)} ${this.checkoutAuthor(
+        checkout
+      )}`.toLocaleLowerCase();
       return haystack.includes(query);
     });
   }
@@ -154,7 +184,9 @@ export class CheckoutsPage {
   }
 
   get renewableCount(): number {
-    return (this.filteredIlsCheckouts ?? []).filter((c) => this.checkoutCanRenew(c)).length;
+    return (this.filteredIlsCheckouts ?? []).filter((c) =>
+      this.checkoutCanRenew(c)
+    ).length;
   }
 
   get hasRenewableCheckouts(): boolean {
@@ -179,12 +211,15 @@ export class CheckoutsPage {
       handler: () => this.refresh(),
     });
     buttons.push({
-      text: 'Close', role: 'cancel',
+      text: 'Close',
+      role: 'cancel',
     });
 
     const sheet = await this.actionSheetCtrl.create({
       header: 'Bulk actions',
-      subHeader: `${this.ilsCheckouts.length} item${this.ilsCheckouts.length === 1 ? '' : 's'} checked out`,
+      subHeader: `${this.ilsCheckouts.length} item${
+        this.ilsCheckouts.length === 1 ? '' : 's'
+      } checked out`,
       buttons,
     });
 
@@ -199,7 +234,10 @@ export class CheckoutsPage {
       const sheet = await this.actionSheetCtrl.create({
         header: this.checkoutTitle(c),
         buttons: [
-          { text: 'Manage checkout', handler: () => this.openMelcatManager('checkout', c) },
+          {
+            text: 'Manage checkout',
+            handler: () => this.openMelcatManager('checkout', c),
+          },
           { text: 'Close', role: 'cancel' },
         ],
       });
@@ -213,17 +251,20 @@ export class CheckoutsPage {
       subHeader: canRenew ? undefined : 'This item cannot be renewed.',
       buttons: [
         ...(canRenew
-          ? [{
-              text: 'Renew',
-              handler: () => this.renewSingle(c),
-            }]
+          ? [
+              {
+                text: 'Renew',
+                handler: () => this.renewSingle(c),
+              },
+            ]
           : []),
         {
           text: 'View details',
           handler: () => this.openCheckout(c),
         },
         {
-          text: 'Close', role: 'cancel',
+          text: 'Close',
+          role: 'cancel',
         },
       ],
     });
@@ -241,7 +282,9 @@ export class CheckoutsPage {
 
     const sheet = await this.actionSheetCtrl.create({
       header: 'Renew all checkouts?',
-      subHeader: `Try to renew ${count} item${count === 1 ? '' : 's'}. Items that cannot be renewed will be skipped.`,
+      subHeader: `Try to renew ${count} item${
+        count === 1 ? '' : 's'
+      }. Items that cannot be renewed will be skipped.`,
       buttons: [
         {
           text: 'Renew all',
@@ -259,7 +302,8 @@ export class CheckoutsPage {
     if (!key || this.renewingKeys.has(key)) return;
 
     this.renewingKeys.add(key);
-    this.checkouts.renewCheckout(c)
+    this.checkouts
+      .renewCheckout(c)
       .pipe(finalize(() => this.renewingKeys.delete(key)))
       .subscribe({
         next: (res) => {
@@ -274,7 +318,9 @@ export class CheckoutsPage {
   }
 
   private renewAll() {
-    const renewable = (this.ilsCheckouts ?? []).filter((c) => this.checkoutCanRenew(c));
+    const renewable = (this.ilsCheckouts ?? []).filter((c) =>
+      this.checkoutCanRenew(c)
+    );
     if (!renewable.length) return;
 
     this.renewAllBusy = true;
@@ -292,14 +338,22 @@ export class CheckoutsPage {
               raw: res?.raw,
               rateLimited: false,
             })),
-            catchError((err) => of({ checkout, success: false, message: '', raw: null, rateLimited: err?.status === 429 })),
-          ),
+            catchError((err) =>
+              of({
+                checkout,
+                success: false,
+                message: '',
+                raw: null,
+                rateLimited: err?.status === 429,
+              })
+            )
+          )
         ),
         toArray(),
         finalize(() => {
           this.renewAllBusy = false;
           this.renewingKeys.clear();
-        }),
+        })
       )
       .subscribe({
         next: (results) => {
@@ -307,13 +361,20 @@ export class CheckoutsPage {
           const failed = results.length - ok;
           const rateLimited = results.some((r) => r.rateLimited);
           if (rateLimited) {
-            this.toast.presentToast('Aspen rate-limited the bulk renew request. Some items may not have updated yet.', 6000);
+            this.toast.presentToast(
+              'Aspen rate-limited the bulk renew request. Some items may not have updated yet.',
+              6000
+            );
           } else if (failed === 0) {
-            this.refreshAfterRenewal(`Renewed ${ok} item${ok === 1 ? '' : 's'}.`);
+            this.refreshAfterRenewal(
+              `Renewed ${ok} item${ok === 1 ? '' : 's'}.`
+            );
           } else if (ok === 0) {
             this.toast.presentToast('Could not renew any items.');
           } else {
-            this.refreshAfterRenewal(`Renewed ${ok} item${ok === 1 ? '' : 's'}; ${failed} failed.`);
+            this.refreshAfterRenewal(
+              `Renewed ${ok} item${ok === 1 ? '' : 's'}; ${failed} failed.`
+            );
           }
         },
         error: () => {
@@ -340,7 +401,11 @@ export class CheckoutsPage {
       language: undefined,
       format: c?.format,
       itemList: [],
-      catalogUrl: key ? `${this.globals.aspen_discovery_base}/GroupedWork/${encodeURIComponent(key)}` : undefined,
+      catalogUrl: key
+        ? `${
+            this.globals.aspen_discovery_base
+          }/GroupedWork/${encodeURIComponent(key)}`
+        : undefined,
       raw: c,
     };
 
@@ -354,11 +419,16 @@ export class CheckoutsPage {
     m.onDidDismiss().then((res) => {
       const data = res?.data;
       if (data?.refreshCheckouts) {
-        const updatedCheckout = data?.checkout as AspenCheckout | null | undefined;
+        const updatedCheckout = data?.checkout as
+          | AspenCheckout
+          | null
+          | undefined;
         if (updatedCheckout) {
           this.applyCheckoutMutation(updatedCheckout);
         } else {
-          this.ilsCheckouts = this.sortCheckouts([...(this.ilsCheckouts ?? [])]);
+          this.ilsCheckouts = this.sortCheckouts([
+            ...(this.ilsCheckouts ?? []),
+          ]);
         }
       }
     });
@@ -375,7 +445,12 @@ export class CheckoutsPage {
   }
 
   private checkoutKey(c: AspenCheckout): string {
-    const raw = (c as any)?.id ?? (c as any)?.itemId ?? (c as any)?.barcode ?? (c as any)?.recordId ?? '';
+    const raw =
+      (c as any)?.id ??
+      (c as any)?.itemId ??
+      (c as any)?.barcode ??
+      (c as any)?.recordId ??
+      '';
     return String(raw).trim();
   }
 
@@ -388,7 +463,10 @@ export class CheckoutsPage {
     return !grouped && !cover;
   }
 
-  private async openMelcatManager(type: 'hold' | 'checkout', checkout?: AspenCheckout) {
+  private async openMelcatManager(
+    type: 'hold' | 'checkout',
+    checkout?: AspenCheckout
+  ) {
     const title = checkout ? this.checkoutTitle(checkout) : '';
     const author = checkout ? this.checkoutAuthor(checkout) : '';
     const format = this.checkoutFormatSummary(checkout);
@@ -403,7 +481,11 @@ export class CheckoutsPage {
 
   private checkoutFormatSummary(checkout?: AspenCheckout): string {
     const raw = (checkout as any)?.format;
-    if (Array.isArray(raw)) return raw.map((x) => String(x).trim()).filter(Boolean).join(', ');
+    if (Array.isArray(raw))
+      return raw
+        .map((x) => String(x).trim())
+        .filter(Boolean)
+        .join(', ');
     return (raw ?? '').toString().trim();
   }
 
@@ -433,12 +515,18 @@ export class CheckoutsPage {
       (this.ilsCheckouts ?? []).map((checkout) => {
         if (this.checkoutKey(checkout) !== updatedKey) return checkout;
         matched = true;
-        return { ...(checkout as any), ...(updatedCheckout as any) } as AspenCheckout;
-      }),
+        return {
+          ...(checkout as any),
+          ...(updatedCheckout as any),
+        } as AspenCheckout;
+      })
     );
 
     if (!matched) {
-      this.ilsCheckouts = this.sortCheckouts([updatedCheckout, ...(this.ilsCheckouts ?? [])]);
+      this.ilsCheckouts = this.sortCheckouts([
+        updatedCheckout,
+        ...(this.ilsCheckouts ?? []),
+      ]);
     }
   }
 
@@ -465,7 +553,9 @@ export class CheckoutsPage {
     const target = Math.max(0, Number(totalCheckouts ?? 0) || 0);
     const snap = this.auth.snapshot();
     const profile: any = snap?.profile ?? {};
-    const current = this.toCount(profile?.numCheckedOut ?? profile?.numCheckedOutIls ?? profile?.checkouts);
+    const current = this.toCount(
+      profile?.numCheckedOut ?? profile?.numCheckedOutIls ?? profile?.checkouts
+    );
     this.auth.adjustActiveProfileCounts({ checkouts: target - current });
   }
 

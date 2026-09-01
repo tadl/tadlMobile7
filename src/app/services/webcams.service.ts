@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, concat, filter, from, map, tap } from 'rxjs';
 
@@ -15,25 +15,25 @@ export interface WebcamFeedItem {
 
 @Injectable({ providedIn: 'root' })
 export class WebcamsService {
-  private readonly baseUrl = 'https://feeds.tools.tadl.org/webcams.json';
+  private http = inject(HttpClient);
+  private cache = inject(AppCacheService);
 
-  constructor(
-    private http: HttpClient,
-    private cache: AppCacheService,
-  ) {}
+  private readonly baseUrl = 'https://feeds.tools.tadl.org/webcams.json';
 
   getWebcams(): Observable<WebcamFeedItem[]> {
     const cacheKey = 'webcams:items';
     const cached$ = from(this.cache.read<WebcamFeedItem[]>(cacheKey)).pipe(
       filter((items): items is WebcamFeedItem[] => Array.isArray(items)),
-      map((items) => this.normalize(items)),
+      map((items) => this.normalize(items))
     );
 
     const network$ = this.http.get<WebcamFeedItem[]>(this.baseUrl).pipe(
       map((items) => this.normalize(items)),
       tap((items) => {
-        this.cache.write(cacheKey, Array.isArray(items) ? items : []).catch(() => {});
-      }),
+        this.cache
+          .write(cacheKey, Array.isArray(items) ? items : [])
+          .catch(() => {});
+      })
     );
 
     return concat(cached$, network$);
@@ -41,8 +41,14 @@ export class WebcamsService {
 
   private normalize(items: WebcamFeedItem[]): WebcamFeedItem[] {
     return (Array.isArray(items) ? items : [])
-      .filter((item) => !!item?.title && !!item?.youtube_url && !!item?.embed_url)
+      .filter(
+        (item) => !!item?.title && !!item?.youtube_url && !!item?.embed_url
+      )
       .filter((item) => item.active !== false)
-      .sort((a, b) => (a?.sort_order ?? Number.MAX_SAFE_INTEGER) - (b?.sort_order ?? Number.MAX_SAFE_INTEGER));
+      .sort(
+        (a, b) =>
+          (a?.sort_order ?? Number.MAX_SAFE_INTEGER) -
+          (b?.sort_order ?? Number.MAX_SAFE_INTEGER)
+      );
   }
 }

@@ -1,10 +1,14 @@
-import { Component, Input } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { IonicModule, ActionSheetController, type ActionSheetButton } from '@ionic/angular';
+import { Component, Input, inject } from '@angular/core';
+
+import {
+  IonicModule,
+  ActionSheetController,
+  type ActionSheetButton,
+} from '@ionic/angular/lazy';
 import { Capacitor } from '@capacitor/core';
 import { AppLauncher } from '@capacitor/app-launcher';
 import { Globals } from '../../../globals';
-import { ModalController } from '@ionic/angular/standalone';
+import { ModalController } from '@ionic/angular';
 import {
   LocationsService,
   type AppLocation,
@@ -40,20 +44,18 @@ type UpcomingScheduleRow = {
   selector: 'app-location-detail',
   templateUrl: './location-detail.component.html',
   styleUrls: ['./location-detail.component.scss'],
-  imports: [CommonModule, IonicModule],
+  imports: [IonicModule],
 })
 export class LocationDetailComponent {
+  globals = inject(Globals);
+  private modalController = inject(ModalController);
+  private locationsService = inject(LocationsService);
+  private actionSheet = inject(ActionSheetController);
+
   @Input() shortname?: string;
   @Input() location?: Location;
 
   loading = false;
-
-  constructor(
-    public globals: Globals,
-    private modalController: ModalController,
-    private locationsService: LocationsService,
-    private actionSheet: ActionSheetController,
-  ) {}
 
   ionViewDidEnter() {
     // Fetch “real” detail via shortname (even if we already have a list object)
@@ -66,16 +68,18 @@ export class LocationDetailComponent {
     this.loading = true;
     const skipCache = !!this.location;
 
-    this.locationsService.getLocationByShortname(shortname, { skipCache }).subscribe({
-      next: (detail) => {
-        this.location = detail ?? this.location;
-        this.loading = false;
-      },
-      error: () => {
-        this.loading = false;
-        console.warn('[LocationDetail] Failed to load detail for', shortname);
-      },
-    });
+    this.locationsService
+      .getLocationByShortname(shortname, { skipCache })
+      .subscribe({
+        next: (detail) => {
+          this.location = detail ?? this.location;
+          this.loading = false;
+        },
+        error: () => {
+          this.loading = false;
+          console.warn('[LocationDetail] Failed to load detail for', shortname);
+        },
+      });
   }
 
   close() {
@@ -128,14 +132,18 @@ export class LocationDetailComponent {
   }
 
   locationStatus(loc: Location): LocationStatusDisplay | null {
-    const todayException = this.exceptionForDate(loc, this.globals.easternDateString());
+    const todayException = this.exceptionForDate(
+      loc,
+      this.globals.easternDateString()
+    );
     if (todayException) {
       const todayDisplay = this.formatStatusDisplay(
         todayException.hours,
         'today',
-        todayException.reason,
+        todayException.reason
       );
-      if (!this.isPastExceptionClosingHours(todayException.hours)) return todayDisplay;
+      if (!this.isPastExceptionClosingHours(todayException.hours))
+        return todayDisplay;
       return this.tomorrowStatus(loc) || todayDisplay;
     }
 
@@ -186,7 +194,10 @@ export class LocationDetailComponent {
 
   private todayKey(): LocationWeekdayKey {
     // globals.day_today() appears to return "Monday" etc in your app
-    const d = (this.globals.day_today?.() || '').toString().trim().toLowerCase();
+    const d = (this.globals.day_today?.() || '')
+      .toString()
+      .trim()
+      .toLowerCase();
     // ensure it matches the JSON keys
     switch (d) {
       case 'sunday':
@@ -204,24 +215,30 @@ export class LocationDetailComponent {
   }
 
   private tomorrowStatus(loc: Location): LocationStatusDisplay | null {
-    const tomorrowException = this.exceptionForDate(loc, this.globals.easternDateStringPlusDays(1));
+    const tomorrowException = this.exceptionForDate(
+      loc,
+      this.globals.easternDateStringPlusDays(1)
+    );
     if (tomorrowException) {
       return this.formatStatusDisplay(
         tomorrowException.hours,
         'tomorrow',
-        tomorrowException.reason,
+        tomorrowException.reason
       );
     }
 
     const tomorrowKey = this.weekdayKeyPlusDays(1);
     if (!tomorrowKey) return null;
 
-    return this.formatStatusDisplay(formatLocationDayHours(loc, tomorrowKey), 'tomorrow');
+    return this.formatStatusDisplay(
+      formatLocationDayHours(loc, tomorrowKey),
+      'tomorrow'
+    );
   }
 
   private weekdayKeyPlusDays(days: number): LocationWeekdayKey | null {
     const weekday = this.globals.easternWeekdayKey(
-      new Date(Date.now() + days * 24 * 60 * 60 * 1000),
+      new Date(Date.now() + days * 24 * 60 * 60 * 1000)
     );
     const map: Record<string, LocationWeekdayKey> = {
       sunday: 'sunday',
@@ -238,12 +255,13 @@ export class LocationDetailComponent {
   private formatStatusDisplay(
     rawHours: unknown,
     dayLabel: 'today' | 'tomorrow',
-    reason?: unknown,
+    reason?: unknown
   ): LocationStatusDisplay {
     const hours = (rawHours ?? '').toString().trim();
     const reasonText = (reason ?? '').toString().trim();
     if (!hours) {
-      const label = dayLabel === 'today' ? 'Hours Updated Today' : 'Hours Updated Tomorrow';
+      const label =
+        dayLabel === 'today' ? 'Hours Updated Today' : 'Hours Updated Tomorrow';
       return {
         label,
         detail: reasonText,
@@ -258,8 +276,8 @@ export class LocationDetailComponent {
         ? 'Closed Today'
         : 'Closed Tomorrow'
       : dayLabel === 'today'
-        ? 'Open Today'
-        : 'Open Tomorrow';
+      ? 'Open Today'
+      : 'Open Tomorrow';
 
     const detail = [isClosed ? '' : hours, reasonText ? `(${reasonText})` : '']
       .filter(Boolean)
@@ -273,7 +291,10 @@ export class LocationDetailComponent {
     };
   }
 
-  private isPastClosingHours(loc: Location, weekday: LocationWeekdayKey): boolean {
+  private isPastClosingHours(
+    loc: Location,
+    weekday: LocationWeekdayKey
+  ): boolean {
     if (isLocationClosed(loc, weekday)) return false;
 
     const closeTime = getLocationClosingMinutes(loc, weekday);
@@ -297,7 +318,9 @@ export class LocationDetailComponent {
     const lower = trimmed.toLowerCase();
     if (lower.includes('midnight')) return 24 * 60;
 
-    const match = trimmed.match(/(?:to|-|–|—)\s*([0-9]{1,2})(?::([0-9]{2}))?\s*([AaPp][Mm])/);
+    const match = trimmed.match(
+      /(?:to|-|–|—)\s*([0-9]{1,2})(?::([0-9]{2}))?\s*([AaPp][Mm])/
+    );
     if (!match) return null;
 
     const hour12 = Number(match[1]);
@@ -318,8 +341,12 @@ export class LocationDetailComponent {
       hour12: false,
     }).formatToParts(new Date());
 
-    const hour = Number(parts.find((part) => part.type === 'hour')?.value ?? '0');
-    const minute = Number(parts.find((part) => part.type === 'minute')?.value ?? '0');
+    const hour = Number(
+      parts.find((part) => part.type === 'hour')?.value ?? '0'
+    );
+    const minute = Number(
+      parts.find((part) => part.type === 'minute')?.value ?? '0'
+    );
     if (!Number.isFinite(hour) || !Number.isFinite(minute)) return 0;
     return hour * 60 + minute;
   }
@@ -334,7 +361,7 @@ export class LocationDetailComponent {
 
   private upcomingExceptions(
     loc: Location | undefined,
-    daysAhead: number,
+    daysAhead: number
   ): AppLocationException[] {
     if (!loc) return [];
 
@@ -355,7 +382,10 @@ export class LocationDetailComponent {
       });
   }
 
-  private exceptionForDate(loc: Location, dateKey: string): AppLocationException | null {
+  private exceptionForDate(
+    loc: Location,
+    dateKey: string
+  ): AppLocationException | null {
     const exceptions = Array.isArray(loc.exceptions) ? loc.exceptions : [];
     for (const ex of exceptions) {
       if ((ex?.date ?? '').toString().trim() === dateKey) return ex;
@@ -363,7 +393,9 @@ export class LocationDetailComponent {
     return null;
   }
 
-  private isClosureException(ex: AppLocationException | null | undefined): boolean {
+  private isClosureException(
+    ex: AppLocationException | null | undefined
+  ): boolean {
     const hours = (ex?.hours ?? '').toString().trim().toLowerCase();
     return !!hours && hours.includes('closed');
   }
@@ -375,7 +407,8 @@ export class LocationDetailComponent {
     const y = Number(m[1]);
     const mon = Number(m[2]);
     const d = Number(m[3]);
-    if (!Number.isFinite(y) || !Number.isFinite(mon) || !Number.isFinite(d)) return null;
+    if (!Number.isFinite(y) || !Number.isFinite(mon) || !Number.isFinite(d))
+      return null;
     const parsed = new Date(y, mon - 1, d);
     return Number.isNaN(parsed.getTime()) ? null : this.startOfDay(parsed);
   }
@@ -394,7 +427,9 @@ export class LocationDetailComponent {
     }).format(date);
   }
 
-  private async navigationOptions(encodedQuery: string): Promise<Array<{ text: string; url: string }>> {
+  private async navigationOptions(
+    encodedQuery: string
+  ): Promise<Array<{ text: string; url: string }>> {
     const browserFallback: Array<{ text: string; url: string }> = [
       {
         text: 'Google Maps (Web)',

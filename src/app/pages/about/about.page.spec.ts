@@ -1,11 +1,16 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { AboutPage } from './about.page';
+import { APP_TEST_PROVIDERS } from '../../../testing/app-test-providers';
 
 describe('AboutPage', () => {
   let component: AboutPage;
   let fixture: ComponentFixture<AboutPage>;
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [AboutPage],
+      providers: APP_TEST_PROVIDERS,
+    }).compileComponents();
     fixture = TestBed.createComponent(AboutPage);
     component = fixture.componentInstance;
     fixture.detectChanges();

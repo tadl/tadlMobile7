@@ -1,5 +1,5 @@
 // src/app/services/aspen-api-params.interceptor.ts
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import {
   HttpEvent,
   HttpHandler,
@@ -14,9 +14,12 @@ import { ASPEN_API_QUERY_PARAMS } from './aspen-api.config';
 
 @Injectable()
 export class AspenApiParamsInterceptor implements HttpInterceptor {
-  constructor(private globals: Globals) {}
+  private globals = inject(Globals);
 
-  intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
+  intercept(
+    req: HttpRequest<any>,
+    next: HttpHandler
+  ): Observable<HttpEvent<any>> {
     const aspenBase = (this.globals.aspen_api_base ?? '').replace(/\/+$/, '');
     const url = req.url;
 

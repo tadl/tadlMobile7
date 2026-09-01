@@ -13,21 +13,23 @@
 </ion-header>
 
 <ion-content class="locations-content">
-  <ion-refresher slot="fixed" (ionRefresh)="get_locations(); $event.target.complete()">
+  <ion-refresher
+    slot="fixed"
+    (ionRefresh)="get_locations(); $event.target.complete()"
+  >
     <ion-refresher-content></ion-refresher-content>
   </ion-refresher>
 
   <ion-list class="locations-list">
+    @for (loc of locations; track loc) {
     <ion-item
       class="location-item"
       button
-      *ngFor="let loc of locations"
       (click)="view_details(loc)"
       detail="true"
     >
       <ion-label class="location-copy">
         <h2>{{ loc.fullname }}</h2>
-
         <div class="location-body">
           <ion-thumbnail slot="start">
             <ion-img
@@ -36,26 +38,31 @@
               (ionError)="markLocationImageBroken(loc)"
             ></ion-img>
           </ion-thumbnail>
-
           <div class="location-meta">
+            @if (locationStatus(loc); as status) {
             <div
               class="location-hours"
-              *ngIf="locationStatus(loc) as status"
               [class.location-today-exception]="status.isException"
             >
               <div class="location-hours-label">{{ status.label }}</div>
-            <div class="location-hours-detail" *ngIf="status.detail">{{ status.detail }}</div>
+              @if (status.detail) {
+              <div class="location-hours-detail">{{ status.detail }}</div>
+              }
             </div>
+            }
           </div>
         </div>
-
-        <p class="location-address" *ngIf="addressLine(loc)">{{ addressLine(loc) }}</p>
+        @if (addressLine(loc)) {
+        <p class="location-address">{{ addressLine(loc) }}</p>
+        }
       </ion-label>
     </ion-item>
+    }
   </ion-list>
 
-  <ion-item class="empty-state" *ngIf="!loadingLocations && hasLoadedLocations && locations.length === 0">
+  @if (!loadingLocations && hasLoadedLocations && locations.length === 0) {
+  <ion-item class="empty-state">
     <ion-label>No locations found.</ion-label>
   </ion-item>
-
+  }
 </ion-content>

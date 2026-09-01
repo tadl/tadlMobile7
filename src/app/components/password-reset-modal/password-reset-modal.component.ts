@@ -1,7 +1,7 @@
-import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, inject } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
-import { IonicModule, ModalController } from '@ionic/angular';
+import { IonicModule, ModalController } from '@ionic/angular/lazy';
 import { finalize } from 'rxjs';
 
 import { Globals } from '../../globals';
@@ -12,21 +12,19 @@ import { PasswordResetService } from '../../services/password-reset.service';
   selector: 'app-password-reset-modal',
   templateUrl: './password-reset-modal.component.html',
   styleUrls: ['./password-reset-modal.component.scss'],
-  imports: [CommonModule, IonicModule, FormsModule],
+  imports: [IonicModule, FormsModule],
 })
 export class PasswordResetModalComponent {
+  globals = inject(Globals);
+  private modalCtrl = inject(ModalController);
+  private passwordReset = inject(PasswordResetService);
+
   username = '';
   email = '';
   submitting = false;
   submitted = false;
   submitTitle = '';
   submitMessage = '';
-
-  constructor(
-    public globals: Globals,
-    private modalCtrl: ModalController,
-    private passwordReset: PasswordResetService,
-  ) {}
 
   async close() {
     await this.modalCtrl.dismiss();
@@ -39,13 +37,19 @@ export class PasswordResetModalComponent {
 
     if (!username || !email) {
       this.submitTitle = 'Missing Information';
-      this.submitMessage = 'Please enter your username/card number and email to continue.';
+      this.submitMessage =
+        'Please enter your username/card number and email to continue.';
       return;
     }
 
     this.submitting = true;
-    this.passwordReset.submitResetRequest({ username, email })
-      .pipe(finalize(() => { this.submitting = false; }))
+    this.passwordReset
+      .submitResetRequest({ username, email })
+      .pipe(
+        finalize(() => {
+          this.submitting = false;
+        })
+      )
       .subscribe({
         next: (res) => {
           this.submitted = true;
@@ -76,5 +80,4 @@ export class PasswordResetModalComponent {
         },
       });
   }
-
 }

@@ -1,4 +1,4 @@
-import { Component, NgZone, OnInit } from '@angular/core';
+import { Component, NgZone, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import {
@@ -7,14 +7,14 @@ import {
   createAnimation,
   iosTransitionAnimation,
   mdTransitionAnimation,
-} from '@ionic/angular';
+} from '@ionic/angular/lazy';
 import {
   ActionSheetController,
   AlertController,
   ModalController,
   Platform,
   PopoverController,
-} from '@ionic/angular/standalone';
+} from '@ionic/angular';
 import { App } from '@capacitor/app';
 import { Keyboard } from '@capacitor/keyboard';
 import { SplashScreen } from '@capacitor/splash-screen';
@@ -29,28 +29,46 @@ import { CacheWarmService } from './services/cache-warm.service';
 import { DiscoveryLinkRouterService } from './services/discovery-link-router.service';
 import { ServiceAlertService } from './services/service-alert.service';
 import { AccountCacheCleanupService } from './services/account-cache-cleanup.service';
+import { APP_PROFILE } from './app-profile';
 
 @Component({
   standalone: true,
   selector: 'app-root',
   templateUrl: 'app.component.html',
   styleUrls: ['app.component.scss'],
-  imports: [
-    CommonModule,
-    RouterModule,
-    IonicModule,
-  ],
+  imports: [CommonModule, RouterModule, IonicModule],
 })
 export class AppComponent implements OnInit {
+  globals = inject(Globals);
+  private platform = inject(Platform);
+  private auth = inject(AuthService);
+  private loading = inject(LoadingService);
+  private cacheWarm = inject(CacheWarmService);
+  private serviceAlerts = inject(ServiceAlertService);
+  private accountCacheCleanup = inject(AccountCacheCleanupService);
+  private router = inject(Router);
+  private discoveryLinks = inject(DiscoveryLinkRouterService);
+  private zone = inject(NgZone);
+  private modalCtrl = inject(ModalController);
+  private actionSheetCtrl = inject(ActionSheetController);
+  private popoverCtrl = inject(PopoverController);
+  private alertCtrl = inject(AlertController);
+
   readonly appPages: Array<{ title: string; url: string; icon: string }> = [
     { title: 'Home', url: '/home', icon: 'home' },
     { title: 'Account', url: '/account', icon: 'person-circle' },
     { title: 'Search', url: '/search', icon: 'search' },
     { title: 'Locations', url: '/locations', icon: 'compass' },
     { title: 'Events', url: '/events', icon: 'calendar' },
-    { title: 'Newsletter', url: '/news', icon: 'megaphone' },
-    { title: 'Featured Items', url: '/featured', icon: 'star' },
-    { title: 'Webcams', url: '/webcams', icon: 'videocam' },
+    ...(APP_PROFILE.newsletter.enabled
+      ? [{ title: 'Newsletter', url: '/news', icon: 'megaphone' }]
+      : []),
+    ...(APP_PROFILE.features.featured
+      ? [{ title: 'Featured Items', url: '/featured', icon: 'star' }]
+      : []),
+    ...(APP_PROFILE.features.webcams
+      ? [{ title: 'Webcams', url: '/webcams', icon: 'videocam' }]
+      : []),
     { title: 'About', url: '/about', icon: 'information-circle' },
   ];
 
@@ -73,23 +91,9 @@ export class AppComponent implements OnInit {
   private queuedIncomingUrl: string | null = null;
   private lastObservedAccountId: string | null = null;
 
-  constructor(
-    public globals: Globals,
-    private platform: Platform,
-    private auth: AuthService,
-    private loading: LoadingService,
-    private cacheWarm: CacheWarmService,
-    private serviceAlerts: ServiceAlertService,
-    private accountCacheCleanup: AccountCacheCleanupService,
-    private router: Router,
-    private discoveryLinks: DiscoveryLinkRouterService,
-    private zone: NgZone,
-    private modalCtrl: ModalController,
-    private actionSheetCtrl: ActionSheetController,
-    private popoverCtrl: PopoverController,
-    private alertCtrl: AlertController,
-  ) {
+  constructor() {
     this.isLoading$ = this.loading.isLoading$();
+    this.applyProfileTheme();
 
     this.platform.ready().then(async () => {
       try {
@@ -99,9 +103,15 @@ export class AppComponent implements OnInit {
           showDuration: 0,
         }).catch(() => {});
 
-        await this.safeBootStep('getDeviceInfo', () => this.globals.getDeviceInfo());
-        await this.safeBootStep('initThemePreference', () => this.globals.initThemePreference());
-        await this.safeBootStep('initLinkPreference', () => this.globals.initLinkPreference());
+        await this.safeBootStep('getDeviceInfo', () =>
+          this.globals.getDeviceInfo()
+        );
+        await this.safeBootStep('initThemePreference', () =>
+          this.globals.initThemePreference()
+        );
+        await this.safeBootStep('initLinkPreference', () =>
+          this.globals.initLinkPreference()
+        );
         await this.safeBootStep('initNetworkStatusTracking', async () => {
           this.globals.initNetworkStatusTracking();
         });
@@ -149,11 +159,39 @@ export class AppComponent implements OnInit {
     });
   }
 
+  private applyProfileTheme(): void {
+    const hex = APP_PROFILE.primaryColor.trim();
+    const match = /^#([0-9a-f]{6})$/i.exec(hex);
+    if (!match) return;
+
+    const value = Number.parseInt(match[1], 16);
+    const rgb = [(value >> 16) & 255, (value >> 8) & 255, value & 255];
+    const mix = (amount: number) =>
+      `#${rgb
+        .map((channel) =>
+          Math.round(channel + (255 - channel) * amount)
+            .toString(16)
+            .padStart(2, '0')
+        )
+        .join('')}`;
+    const shade = `#${rgb
+      .map((channel) =>
+        Math.round(channel * 0.9)
+          .toString(16)
+          .padStart(2, '0')
+      )
+      .join('')}`;
+    const root = document.documentElement.style;
+
+    root.setProperty('--ion-color-primary', hex);
+    root.setProperty('--ion-color-primary-rgb', rgb.join(', '));
+    root.setProperty('--ion-color-primary-shade', shade);
+    root.setProperty('--ion-color-primary-tint', mix(0.1));
+  }
+
   ngOnInit() {
     this.router.events
-      .pipe(
-        filter((e): e is NavigationStart => e instanceof NavigationStart),
-      )
+      .pipe(filter((e): e is NavigationStart => e instanceof NavigationStart))
       .subscribe(() => {
         this.releaseFocusedElement();
       });
@@ -165,14 +203,17 @@ export class AppComponent implements OnInit {
       error: (err) => console.warn('[Auth] restore failed', err),
     });
 
-    this.auth.authState()
+    this.auth
+      .authState()
       .pipe(
-        distinctUntilChanged((a, b) =>
-          a.isLoggedIn === b.isLoggedIn && a.activeAccountId === b.activeAccountId,
-        ),
+        distinctUntilChanged(
+          (a, b) =>
+            a.isLoggedIn === b.isLoggedIn &&
+            a.activeAccountId === b.activeAccountId
+        )
       )
       .subscribe((s) => {
-        const nextAccountId = s?.isLoggedIn ? (s?.activeAccountId ?? null) : null;
+        const nextAccountId = s?.isLoggedIn ? s?.activeAccountId ?? null : null;
         const previousAccountId = this.lastObservedAccountId;
         this.lastObservedAccountId = nextAccountId;
 
@@ -207,7 +248,7 @@ export class AppComponent implements OnInit {
     this.router.events
       .pipe(
         filter((e): e is NavigationEnd => e instanceof NavigationEnd),
-        take(1),
+        take(1)
       )
       .subscribe(() => this.hideLaunchSplash());
 
@@ -268,12 +309,13 @@ export class AppComponent implements OnInit {
   private async dismissOpenOverlaysIfAny(): Promise<void> {
     try {
       for (let i = 0; i < 8; i += 1) {
-        const [topModal, topActionSheet, topPopover, topAlert] = await Promise.all([
-          this.modalCtrl.getTop(),
-          this.actionSheetCtrl.getTop(),
-          this.popoverCtrl.getTop(),
-          this.alertCtrl.getTop(),
-        ]);
+        const [topModal, topActionSheet, topPopover, topAlert] =
+          await Promise.all([
+            this.modalCtrl.getTop(),
+            this.actionSheetCtrl.getTop(),
+            this.popoverCtrl.getTop(),
+            this.alertCtrl.getTop(),
+          ]);
 
         const topOverlay = topModal ?? topActionSheet ?? topPopover ?? topAlert;
         if (!topOverlay) break;
@@ -301,12 +343,14 @@ export class AppComponent implements OnInit {
     active.blur();
   }
 
-  private async safeBootStep(label: string, fn: () => Promise<void> | void): Promise<void> {
+  private async safeBootStep(
+    label: string,
+    fn: () => Promise<void> | void
+  ): Promise<void> {
     try {
       await fn();
     } catch (err) {
       console.error(`[App] boot step failed: ${label}`, err);
     }
   }
-
 }

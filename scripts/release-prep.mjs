@@ -5,6 +5,9 @@ import { spawnSync } from 'node:child_process';
 
 const IOS_APP_ID = 'org.tadl.tadl';
 const ANDROID_APP_ID = 'org.TADL.TADLMobile';
+const APP_NAME = 'TADL';
+const APP_TITLE = 'TADL Mobile';
+const DISCOVERY_HOST = 'discover.tadl.org';
 
 function fail(msg) {
   console.error(`\n[release-prep] ${msg}`);
@@ -124,7 +127,7 @@ function updateIosProject(versionName, buildNumber, appId) {
 
 function ensureIosEntitlements() {
   const entitlementsPath = resolve('ios/App/App/App.entitlements');
-  const content = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n\t<key>com.apple.developer.associated-domains</key>\n\t<array>\n\t\t<string>applinks:discover.tadl.org</string>\n\t</array>\n</dict>\n</plist>\n`;
+  const content = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n\t<key>com.apple.developer.associated-domains</key>\n\t<array>\n\t\t<string>applinks:${DISCOVERY_HOST}</string>\n\t</array>\n</dict>\n</plist>\n`;
   writeText(entitlementsPath, content);
   console.log('[release-prep] Restored iOS entitlements.');
 }
@@ -170,7 +173,7 @@ function updateIosInfoPlistDisplayName(appName) {
   if (!plist.includes('<key>NSCalendarsFullAccessUsageDescription</key>')) {
     plist = plist.replace(
       /<key>UILaunchStoryboardName<\/key>/,
-      `<key>NSCalendarsFullAccessUsageDescription</key>\n\t<string>Let TADL Mobile access your calendar so you can add library events.</string>\n\t<key>UILaunchStoryboardName</key>`,
+      `<key>NSCalendarsFullAccessUsageDescription</key>\n\t<string>Let ${APP_TITLE} access your calendar so you can add library events.</string>\n\t<key>UILaunchStoryboardName</key>`,
     );
   }
 
@@ -298,10 +301,10 @@ function ensureAndroidManifestDeepLinks() {
         `                <action android:name="android.intent.action.VIEW" />\n` +
         `                <category android:name="android.intent.category.DEFAULT" />\n` +
         `                <category android:name="android.intent.category.BROWSABLE" />\n\n` +
-        `                <data android:scheme="https" android:host="discover.tadl.org" android:pathPrefix="/GroupedWork/" />\n` +
-        `                <data android:scheme="https" android:host="discover.tadl.org" android:pathPrefix="/Record/" />\n` +
-        `                <data android:scheme="https" android:host="discover.tadl.org" android:pathPrefix="/Union/Search" />\n` +
-        `                <data android:scheme="https" android:host="discover.tadl.org" android:pathPrefix="/Search/" />\n` +
+        `                <data android:scheme="https" android:host="${DISCOVERY_HOST}" android:pathPrefix="/GroupedWork/" />\n` +
+        `                <data android:scheme="https" android:host="${DISCOVERY_HOST}" android:pathPrefix="/Record/" />\n` +
+        `                <data android:scheme="https" android:host="${DISCOVERY_HOST}" android:pathPrefix="/Union/Search" />\n` +
+        `                <data android:scheme="https" android:host="${DISCOVERY_HOST}" android:pathPrefix="/Search/" />\n` +
         `            </intent-filter>\n        </activity>`,
     );
   }
@@ -541,6 +544,7 @@ function parseArgs(argv) {
 function preparePlatform(platform, opts, appName) {
   const appId = platform === 'ios' ? IOS_APP_ID : ANDROID_APP_ID;
   const env = {
+    MOBILE_TARGET: platform,
     TADL_TARGET: platform,
     CAP_APP_ID: appId,
   };
@@ -599,7 +603,7 @@ function preparePlatform(platform, opts, appName) {
 
 function main() {
   const opts = parseArgs(process.argv.slice(2));
-  const appName = 'TADL';
+  const appName = APP_NAME;
   const currentGlobals = readCurrentGlobalsMeta();
   const versionWasDerived = !opts.build;
   const updateDateWasDerived = !opts.updateDate;

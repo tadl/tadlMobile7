@@ -17,13 +17,14 @@
     <ion-refresher-content></ion-refresher-content>
   </ion-refresher>
 
-  <ion-card *ngIf="listDescription" class="list-description-card">
+  @if (listDescription) {
+  <ion-card class="list-description-card">
     <ion-card-content>
       <div class="list-description-text">{{ listDescription }}</div>
     </ion-card-content>
   </ion-card>
-
-  <div class="list-owner-actions" *ngIf="canEditList">
+  } @if (canEditList) {
+  <div class="list-owner-actions">
     <ion-button
       fill="outline"
       size="small"
@@ -44,27 +45,36 @@
       Delete List
     </ion-button>
   </div>
-
-  <ion-list *ngIf="titles.length > 0" lines="full" class="full-list">
+  } @if (titles.length > 0) {
+  <ion-list lines="full" class="full-list">
+    @for (t of titles; track trackByTitle($index, t)) {
     <ion-item
       button
       detail="false"
       class="list-detail-row"
-      *ngFor="let t of titles; trackBy: trackByTitle"
       (click)="openTitle(t)"
     >
-      <ion-thumbnail slot="start" *ngIf="coverUrl(t)">
-        <img [src]="coverUrl(t)" alt="" (error)="$event.target.style.display='none'" />
+      @if (coverUrl(t)) {
+      <ion-thumbnail slot="start">
+        <img
+          [src]="coverUrl(t)"
+          alt=""
+          (error)="$event.target.style.display='none'"
+        />
       </ion-thumbnail>
-
+      }
       <ion-label class="ion-text-wrap">
         <h2 class="result-title">
-          <ion-icon [name]="mediaIconNameForTitle(t)" aria-hidden="true"></ion-icon>
+          <ion-icon
+            [name]="mediaIconNameForTitle(t)"
+            aria-hidden="true"
+          ></ion-icon>
           <span class="title">{{ titleText(t) }}</span>
         </h2>
-        <div class="sub" *ngIf="authorText(t)">{{ authorText(t) }}</div>
+        @if (authorText(t)) {
+        <div class="sub">{{ authorText(t) }}</div>
+        }
       </ion-label>
-
       <ion-button
         slot="end"
         fill="clear"
@@ -77,19 +87,23 @@
         <ion-icon name="ellipsis-vertical" slot="icon-only"></ion-icon>
       </ion-button>
     </ion-item>
+    }
   </ion-list>
+  }
 
   <ion-infinite-scroll
     [disabled]="infiniteDisabled"
     threshold="120px"
     (ionInfinite)="loadMore($event)"
   >
-    <ion-infinite-scroll-content loadingText="Loading more..."></ion-infinite-scroll-content>
+    <ion-infinite-scroll-content
+      loadingText="Loading more..."
+    ></ion-infinite-scroll-content>
   </ion-infinite-scroll>
 
-  <ion-item *ngIf="!loading && titles.length === 0">
-    <ion-label class="ion-text-wrap">
-      No titles in this list.
-    </ion-label>
+  @if (!loading && titles.length === 0) {
+  <ion-item>
+    <ion-label class="ion-text-wrap"> No titles in this list. </ion-label>
   </ion-item>
+  }
 </ion-content>

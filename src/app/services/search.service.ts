@@ -1,5 +1,5 @@
 // src/app/services/search.service.ts
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Observable, map, from, switchMap } from 'rxjs';
 import { Globals } from '../globals';
@@ -7,7 +7,12 @@ import { AuthService } from './auth.service';
 import { AccountStoreService } from './account-store.service';
 import { DiscoveryUrlService } from './discovery-url.service';
 
-export type AspenSearchIndex = 'Keyword' | 'Title' | 'Author' | 'Subject' | 'ISBN';
+export type AspenSearchIndex =
+  | 'Keyword'
+  | 'Title'
+  | 'Author'
+  | 'Subject'
+  | 'ISBN';
 export type AspenSearchSource = 'local' | 'combined';
 
 /**
@@ -19,8 +24,8 @@ export type AspenSearchSort = string;
 
 export interface AspenSearchOptions {
   lookfor: string;
-  page?: number;      // 1-based
-  pageSize?: number;  // Aspen param name: "count"
+  page?: number; // 1-based
+  pageSize?: number; // Aspen param name: "count"
   language?: string;
 
   searchIndex?: AspenSearchIndex;
@@ -33,8 +38,8 @@ export interface AspenSearchOptions {
 }
 
 export interface AspenItemRef {
-  id: string;     // e.g. "ils:17026593", "overdrive:<uuid>", "overdrive:kindle:<uuid>", "hoopla:<id>"
-  name: string;   // Display label like "Book", "eBook", "Kindle"
+  id: string; // e.g. "ils:17026593", "overdrive:<uuid>", "overdrive:kindle:<uuid>", "hoopla:<id>"
+  name: string; // Display label like "Book", "eBook", "Kindle"
   source: string; // e.g. "ils", "overdrive", "hoopla"
 }
 
@@ -104,13 +109,11 @@ export interface AspenSearchResult {
 
 @Injectable({ providedIn: 'root' })
 export class SearchService {
-  constructor(
-    private http: HttpClient,
-    private globals: Globals,
-    private auth: AuthService,
-    private accounts: AccountStoreService,
-    private discoveryUrls: DiscoveryUrlService,
-  ) {}
+  private http = inject(HttpClient);
+  private globals = inject(Globals);
+  private auth = inject(AuthService);
+  private accounts = inject(AccountStoreService);
+  private discoveryUrls = inject(DiscoveryUrlService);
 
   getAppSearchResults(opts: AspenSearchOptions): Observable<AspenSearchResult> {
     const page = opts.page ?? 1;
@@ -128,7 +131,10 @@ export class SearchService {
     if (opts.language) params = params.set('language', opts.language);
     if (opts.sort) params = params.set('sort', opts.sort);
     if (opts.includeSortList !== undefined) {
-      params = params.set('includeSortList', opts.includeSortList ? 'true' : 'false');
+      params = params.set(
+        'includeSortList',
+        opts.includeSortList ? 'true' : 'false'
+      );
     }
 
     for (const f of opts.filters ?? []) {
@@ -136,54 +142,79 @@ export class SearchService {
     }
 
     const snap = this.auth.snapshot();
-    const shouldSendCreds = !!(snap.isLoggedIn && snap.activeAccountId && snap.activeAccountMeta);
+    const shouldSendCreds = !!(
+      snap.isLoggedIn &&
+      snap.activeAccountId &&
+      snap.activeAccountMeta
+    );
 
     const searchRequest$ = shouldSendCreds
       ? from(this.accounts.getPassword(snap.activeAccountId!)).pipe(
-        switchMap((password) => {
-          if (!password) {
-            return this.http.post<any>(`${this.globals.aspen_api_base}/SearchAPI`, {}, { params });
-          }
+          switchMap((password) => {
+            if (!password) {
+              return this.http.post<any>(
+                `${this.globals.aspen_api_base}/SearchAPI`,
+                {},
+                { params }
+              );
+            }
 
-          const body = new URLSearchParams();
-          body.set('username', snap.activeAccountMeta!.username);
-          body.set('password', password);
-          const headers = new HttpHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' });
+            const body = new URLSearchParams();
+            body.set('username', snap.activeAccountMeta!.username);
+            body.set('password', password);
+            const headers = new HttpHeaders({
+              'Content-Type': 'application/x-www-form-urlencoded',
+            });
 
-          return this.http.post<any>(`${this.globals.aspen_api_base}/SearchAPI`, body.toString(), { params, headers });
-        }),
-      )
-      : this.http.post<any>(`${this.globals.aspen_api_base}/SearchAPI`, {}, { params });
+            return this.http.post<any>(
+              `${this.globals.aspen_api_base}/SearchAPI`,
+              body.toString(),
+              { params, headers }
+            );
+          })
+        )
+      : this.http.post<any>(
+          `${this.globals.aspen_api_base}/SearchAPI`,
+          {},
+          { params }
+        );
 
     return searchRequest$.pipe(
-        map(raw => {
-          const result = raw?.result ?? raw;
-          const success = !!result?.success;
+      map((raw) => {
+        const result = raw?.result ?? raw;
+        const success = !!result?.success;
 
-          const hits = this.extractHits(result);
+        const hits = this.extractHits(result);
 
-          const totalResults = this.asNumber(result?.totalResults) ?? 0;
+        const totalResults = this.asNumber(result?.totalResults) ?? 0;
 
-          const paging = this.extractPaging(result?.paging, page, pageSize, totalResults);
+        const paging = this.extractPaging(
+          result?.paging,
+          page,
+          pageSize,
+          totalResults
+        );
 
-          return {
-            success,
-            lookfor: (result?.lookfor ?? opts.lookfor) as string,
-            totalResults,
+        return {
+          success,
+          lookfor: (result?.lookfor ?? opts.lookfor) as string,
+          totalResults,
 
-            page: paging.currentPage,
-            pageSize: paging.itemsPerPage,
-            totalPages: paging.totalPages,
+          page: paging.currentPage,
+          pageSize: paging.itemsPerPage,
+          totalPages: paging.totalPages,
 
-            hits,
+          hits,
 
-            facets: (result?.options ?? result?.facetSet ?? undefined) as Record<string, AspenFacetBucket> | undefined,
-            sortList: result?.sortList,
-            paging,
-            raw: result,
-          } satisfies AspenSearchResult;
-        }),
-      );
+          facets: (result?.options ?? result?.facetSet ?? undefined) as
+            | Record<string, AspenFacetBucket>
+            | undefined,
+          sortList: result?.sortList,
+          paging,
+          raw: result,
+        } satisfies AspenSearchResult;
+      })
+    );
   }
 
   private extractHits(result: any): AspenSearchHit[] {
@@ -204,7 +235,9 @@ export class SearchService {
 
       const itemList = this.extractItemList(r?.itemList);
 
-      const catalogUrl = `${this.globals.aspen_discovery_base}/GroupedWork/${encodeURIComponent(key)}`;
+      const catalogUrl = `${
+        this.globals.aspen_discovery_base
+      }/GroupedWork/${encodeURIComponent(key)}`;
 
       hits.push({
         key,
@@ -227,7 +260,11 @@ export class SearchService {
 
   private extractItemList(input: any): AspenItemRef[] {
     if (!input) return [];
-    const sourceItems = Array.isArray(input) ? input : (typeof input === 'object' ? Object.values(input) : []);
+    const sourceItems = Array.isArray(input)
+      ? input
+      : typeof input === 'object'
+      ? Object.values(input)
+      : [];
     if (!Array.isArray(sourceItems)) return [];
     const out: AspenItemRef[] = [];
 
@@ -235,15 +272,22 @@ export class SearchService {
       const id = (x?.id ?? '').toString().trim();
       const name = typeof x?.name === 'string' ? x.name : '';
       const source = typeof x?.source === 'string' ? x.source : 'ils';
-      if (name) out.push({ id: id || `fmt:${name.toLowerCase()}`, name, source });
+      if (name)
+        out.push({ id: id || `fmt:${name.toLowerCase()}`, name, source });
     }
 
     return out;
   }
 
-  private extractAppearsOnLists(input: any): Array<{ id: string | number; title: string }> {
+  private extractAppearsOnLists(
+    input: any
+  ): Array<{ id: string | number; title: string }> {
     if (!input) return [];
-    const values = Array.isArray(input) ? input : (typeof input === 'object' ? Object.values(input) : []);
+    const values = Array.isArray(input)
+      ? input
+      : typeof input === 'object'
+      ? Object.values(input)
+      : [];
     const out: Array<{ id: string | number; title: string }> = [];
     for (const x of values as any[]) {
       const id = (x?.id ?? '').toString().trim();
@@ -266,7 +310,12 @@ export class SearchService {
     return null;
   }
 
-  private extractPaging(p: any, fallbackPage: number, fallbackPageSize: number, totalResults: number): AspenPaging {
+  private extractPaging(
+    p: any,
+    fallbackPage: number,
+    fallbackPageSize: number,
+    totalResults: number
+  ): AspenPaging {
     const currentPage = this.asNumber(p?.currentPage) ?? fallbackPage;
     const itemsPerPage = this.asNumber(p?.itemsPerPage) ?? fallbackPageSize;
 
@@ -291,7 +340,10 @@ export class SearchService {
   private decodeEntities(input: any): string | undefined {
     if (typeof input !== 'string') return undefined;
 
-    let s = input.replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+    let s = input
+      .replace(/&nbsp;/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
 
     try {
       const txt = document.createElement('textarea');

@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import {
   HttpEvent,
   HttpHandler,
@@ -12,25 +12,35 @@ import { LoadingService } from './loading.service';
 
 @Injectable()
 export class LoadingInterceptor implements HttpInterceptor {
+  private loading = inject(LoadingService);
+
   private static readonly DEFAULT_REQUEST_TIMEOUT_MS = 30000;
 
-  constructor(private loading: LoadingService) {}
-
-  intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
+  intercept(
+    req: HttpRequest<any>,
+    next: HttpHandler
+  ): Observable<HttpEvent<any>> {
     // Optional escape hatch: allow callers to set a header to skip global loading
     if (req.headers.get('x-skip-global-loading') === '1') {
       return this.applyTimeoutIfNeeded(req, next);
     }
 
     this.loading.start();
-    return this.applyTimeoutIfNeeded(req, next).pipe(finalize(() => this.loading.stop()));
+    return this.applyTimeoutIfNeeded(req, next).pipe(
+      finalize(() => this.loading.stop())
+    );
   }
 
-  private applyTimeoutIfNeeded(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
+  private applyTimeoutIfNeeded(
+    req: HttpRequest<any>,
+    next: HttpHandler
+  ): Observable<HttpEvent<any>> {
     if (req.headers.get('x-skip-request-timeout') === '1') {
       return next.handle(req);
     }
 
-    return next.handle(req).pipe(timeout(LoadingInterceptor.DEFAULT_REQUEST_TIMEOUT_MS));
+    return next
+      .handle(req)
+      .pipe(timeout(LoadingInterceptor.DEFAULT_REQUEST_TIMEOUT_MS));
   }
 }

@@ -1,12 +1,15 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { IonicModule, ModalController } from '@ionic/angular';
+import { IonicModule, ModalController } from '@ionic/angular/lazy';
 
 import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
 import { AuthService } from '../../services/auth.service';
-import { AccountStoreService, StoredAccountMeta } from '../../services/account-store.service';
+import {
+  AccountStoreService,
+  StoredAccountMeta,
+} from '../../services/account-store.service';
 import { PasswordResetModalComponent } from '../password-reset-modal/password-reset-modal.component';
 
 @Component({
@@ -17,20 +20,18 @@ import { PasswordResetModalComponent } from '../password-reset-modal/password-re
   imports: [CommonModule, IonicModule, FormsModule],
 })
 export class SwitchUserModalComponent implements OnInit {
+  globals = inject(Globals);
+  auth = inject(AuthService);
+  private accounts = inject(AccountStoreService);
+  private toast = inject(ToastService);
+  private modalCtrl = inject(ModalController);
+
   username = '';
   password = '';
   showPassword = false;
 
   storedAccounts: StoredAccountMeta[] = [];
   loadingAccounts = false;
-
-  constructor(
-    public globals: Globals,
-    public auth: AuthService,
-    private accounts: AccountStoreService,
-    private toast: ToastService,
-    private modalCtrl: ModalController,
-  ) {}
 
   ngOnInit() {
     this.refreshStoredAccounts();
@@ -43,7 +44,8 @@ export class SwitchUserModalComponent implements OnInit {
 
   refreshStoredAccounts() {
     this.loadingAccounts = true;
-    this.accounts.listAccounts()
+    this.accounts
+      .listAccounts()
       .then((list) => {
         this.storedAccounts = list ?? [];
       })
@@ -74,7 +76,9 @@ export class SwitchUserModalComponent implements OnInit {
       error: (e) => {
         const msg = e?.message ?? '';
         if (msg === 'missing_password') {
-          this.toast.presentToast('No password stored for that account. Please log in manually.');
+          this.toast.presentToast(
+            'No password stored for that account. Please log in manually.'
+          );
         } else {
           this.toast.presentToast('Could not switch user.');
         }
@@ -108,7 +112,10 @@ export class SwitchUserModalComponent implements OnInit {
       error: (e) => {
         this.password = '';
         const msg = e?.message ?? '';
-        if (msg === 'invalid_login') this.toast.presentToast('Login failed. Check your username/password and try again.');
+        if (msg === 'invalid_login')
+          this.toast.presentToast(
+            'Login failed. Check your username/password and try again.'
+          );
         else this.toast.presentToast('Login failed. Please try again.');
       },
     });

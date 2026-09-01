@@ -1,6 +1,16 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { EMPTY, Observable, concat, distinctUntilChanged, filter, from, map, of, tap } from 'rxjs';
+import {
+  EMPTY,
+  Observable,
+  concat,
+  distinctUntilChanged,
+  filter,
+  from,
+  map,
+  of,
+  tap,
+} from 'rxjs';
 
 import { Globals } from '../globals';
 import { AppCacheService } from './app-cache.service';
@@ -76,10 +86,14 @@ export function locationWeekdayKeys(): LocationWeekdayKey[] {
 
 export function getLocationDayHours(
   location: AppLocation | null | undefined,
-  weekday: LocationWeekdayKey,
+  weekday: LocationWeekdayKey
 ): LocationDayHours {
-  const open = normalizeHoursValue((location as Record<string, unknown> | null)?.[`${weekday}_open`]);
-  const close = normalizeHoursValue((location as Record<string, unknown> | null)?.[`${weekday}_close`]);
+  const open = normalizeHoursValue(
+    (location as Record<string, unknown> | null)?.[`${weekday}_open`]
+  );
+  const close = normalizeHoursValue(
+    (location as Record<string, unknown> | null)?.[`${weekday}_close`]
+  );
   return {
     open: open || null,
     close: close || null,
@@ -88,7 +102,7 @@ export function getLocationDayHours(
 
 export function isLocationClosed(
   location: AppLocation | null | undefined,
-  weekday: LocationWeekdayKey,
+  weekday: LocationWeekdayKey
 ): boolean {
   const { open, close } = getLocationDayHours(location, weekday);
   return !open || !close;
@@ -96,7 +110,7 @@ export function isLocationClosed(
 
 export function formatLocationDayHours(
   location: AppLocation | null | undefined,
-  weekday: LocationWeekdayKey,
+  weekday: LocationWeekdayKey
 ): string {
   const { open, close } = getLocationDayHours(location, weekday);
   if (!open || !close) return 'Closed';
@@ -104,7 +118,7 @@ export function formatLocationDayHours(
 }
 
 export function parseClockLabelToMinutes(
-  value: string | null | undefined,
+  value: string | null | undefined
 ): number | null {
   const raw = normalizeHoursValue(value);
   if (!raw) return null;
@@ -128,7 +142,7 @@ export function parseClockLabelToMinutes(
 
 export function getLocationClosingMinutes(
   location: AppLocation | null | undefined,
-  weekday: LocationWeekdayKey,
+  weekday: LocationWeekdayKey
 ): number | null {
   const { open, close } = getLocationDayHours(location, weekday);
   if (!open || !close) return null;
@@ -149,14 +163,14 @@ function normalizeHoursValue(value: unknown): string {
 
 @Injectable({ providedIn: 'root' })
 export class LocationsService {
+  private http = inject(HttpClient);
+  private globals = inject(Globals);
+  private cache = inject(AppCacheService);
+
   private latestLocations: AppLocation[] | null = null;
   private readonly listCacheKey: string;
 
-  constructor(
-    private http: HttpClient,
-    private globals: Globals,
-    private cache: AppCacheService,
-  ) {
+  constructor() {
     this.listCacheKey = `locations:list:${this.globals.locations_group}`;
   }
 
@@ -165,29 +179,33 @@ export class LocationsService {
       ? of(this.latestLocations)
       : EMPTY;
 
-    const cached$ = from(this.cache.read<AppLocation[]>(this.listCacheKey)).pipe(
+    const cached$ = from(
+      this.cache.read<AppLocation[]>(this.listCacheKey)
+    ).pipe(
       filter((v): v is AppLocation[] => Array.isArray(v)),
       tap((locations) => {
         this.latestLocations = locations;
-      }),
+      })
     );
 
     const network$ = this.http
       .get<{ locations: AppLocation[] }>(this.globals.locations_list_url)
       .pipe(
-        map((res) => Array.isArray(res?.locations) ? res.locations : []),
+        map((res) => (Array.isArray(res?.locations) ? res.locations : [])),
         tap((locations) => {
           void this.hydrateLocations(locations);
-        }),
+        })
       );
 
     return concat(memory$, cached$, network$).pipe(
-      distinctUntilChanged((a, b) => JSON.stringify(a) === JSON.stringify(b)),
+      distinctUntilChanged((a, b) => JSON.stringify(a) === JSON.stringify(b))
     );
   }
 
   getLatestLocationsSnapshot(): AppLocation[] {
-    return Array.isArray(this.latestLocations) ? this.latestLocations.slice() : [];
+    return Array.isArray(this.latestLocations)
+      ? this.latestLocations.slice()
+      : [];
   }
 
   async hydrateLocations(locations: AppLocation[]): Promise<void> {
@@ -200,26 +218,31 @@ export class LocationsService {
         const shortname = (location?.shortname ?? '').toString().trim();
         if (!shortname) return Promise.resolve();
         return this.cache.write(`locations:detail:${shortname}`, location);
-      }),
+      })
     );
   }
 
-  getLocationByShortname(shortname: string, options?: { skipCache?: boolean }): Observable<AppLocation | null> {
+  getLocationByShortname(
+    shortname: string,
+    options?: { skipCache?: boolean }
+  ): Observable<AppLocation | null> {
     const s = (shortname ?? '').toString().trim();
     const cacheKey = `locations:detail:${s}`;
     const skipCache = options?.skipCache === true;
 
     const cached$ = from(this.cache.read<AppLocation>(cacheKey)).pipe(
-      filter((v): v is AppLocation => !!v && typeof v === 'object'),
+      filter((v): v is AppLocation => !!v && typeof v === 'object')
     );
 
     const network$ = this.http
       .get<{ locations: AppLocation[] }>(this.globals.locations_detail_url(s))
       .pipe(
-        map((res) => (Array.isArray(res?.locations) ? res.locations[0] ?? null : null)),
+        map((res) =>
+          Array.isArray(res?.locations) ? res.locations[0] ?? null : null
+        ),
         tap((location) => {
           if (location) this.cache.write(cacheKey, location).catch(() => {});
-        }),
+        })
       );
 
     return skipCache ? network$ : concat(cached$, network$);

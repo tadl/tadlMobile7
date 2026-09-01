@@ -10,56 +10,66 @@
 <ion-content class="ion-padding">
   <!-- Header block (small cover, not hero) -->
   <div class="header">
-    <div class="cover" *ngIf="displayCoverUrl as c">
+    @if (displayCoverUrl; as c) {
+    <div class="cover">
       <img [src]="c" alt="" />
     </div>
+    }
 
     <div class="header-text">
       <h2 class="title">{{ itemDisplayTitle() }}</h2>
-      <div class="meta" *ngIf="work?.author || hit.author">
+      @if (work?.author || hit.author) {
+      <div class="meta">
         {{ work?.author || hit.author }}
       </div>
-      <div class="facts-grid" *ngIf="detailFacts().length">
-        <div class="fact-chip" *ngFor="let fact of detailFacts()">
+      } @if (detailFacts().length) {
+      <div class="facts-grid">
+        @for (fact of detailFacts(); track fact) {
+        <div class="fact-chip">
           <span class="fact-label">{{ fact.label }}</span>
           <span class="fact-value">{{ fact.value }}</span>
         </div>
+        }
       </div>
+      } @if (canManageLists()) {
       <ion-button
         size="small"
         fill="outline"
         class="add-to-list-button"
-        *ngIf="canManageLists()"
         (click)="addToAnyList()"
         [disabled]="listActionBusy"
       >
         {{ listPrimaryActionLabel() }}
       </ion-button>
+      }
     </div>
   </div>
 
-  <div class="desc" *ngIf="itemDescriptionText() as desc">
+  @if (itemDescriptionText(); as desc) {
+  <div class="desc">
     <span>{{ descriptionExpanded ? desc : itemDescriptionPreview(desc) }}</span>
-    <span *ngIf="!descriptionExpanded && descriptionCanExpand(desc)">... </span>
-    <button
-      *ngIf="descriptionCanExpand(desc)"
-      type="button"
-      class="desc-toggle"
-      (click)="toggleDescription()"
-    >
-      {{ descriptionExpanded ? 'less' : 'more' }}
+    @if (!descriptionExpanded && descriptionCanExpand(desc)) {
+    <span>... </span>
+    } @if (descriptionCanExpand(desc)) {
+    <button type="button" class="desc-toggle" (click)="toggleDescription()">
+      {{ descriptionExpanded ? "less" : "more" }}
     </button>
+    }
   </div>
+  }
 
   <!-- CHECKED OUT TO YOU -->
-  <ion-card *ngIf="checkout" class="checkout-card">
+  @if (checkout) {
+  <ion-card class="checkout-card">
     <ion-card-header>
       <ion-card-title>Checked out to you</ion-card-title>
     </ion-card-header>
     <ion-card-content>
-      <div class="checkout-line" *ngIf="checkoutDueText()">Due: {{ checkoutDueText() }}</div>
-      <div class="checkout-line" *ngIf="checkoutRenewInfoText()">{{ checkoutRenewInfoText() }}</div>
-
+      @if (checkoutDueText()) {
+      <div class="checkout-line">Due: {{ checkoutDueText() }}</div>
+      } @if (checkoutRenewInfoText()) {
+      <div class="checkout-line">{{ checkoutRenewInfoText() }}</div>
+      }
       <div class="checkout-actions">
         <ion-button
           expand="block"
@@ -71,144 +81,194 @@
       </div>
     </ion-card-content>
   </ion-card>
+  }
 
   <!-- Formats -->
-  <ion-card *ngIf="work?.formats as fmts">
+  @if (work?.formats; as fmts) {
+  <ion-card>
     <ion-card-header>
       <ion-card-title>Formats</ion-card-title>
     </ion-card-header>
-
     <ion-card-content class="ion-no-padding formats-list">
       <ion-list lines="full">
-        <ion-item class="format-row" *ngFor="let kv of ($any(fmts) | keyvalue : formatSortComparator)">
+        @for (kv of ($any(fmts) | keyvalue : formatSortComparator); track kv) {
+        <ion-item class="format-row">
           <ion-label class="format-label ion-text-wrap">
             <div class="format-title">
-              {{ $any(kv.value).label || ('' + kv.key) }}
+              {{ $any(kv.value).label || "" + kv.key }}
             </div>
-
-            <div class="format-meta" *ngIf="showBaseFormatMeta(('' + kv.key))">
-              <span *ngIf="$any(kv.value).category">{{ $any(kv.value).category }}</span>
-              <span *ngIf="$any(kv.value).category" class="dot">•</span>
-              <span>{{ $any(kv.value).isAvailable ? 'Available' : 'Not available' }}</span>
+            @if (showBaseFormatMeta(('' + kv.key))) {
+            <div class="format-meta">
+              @if ($any(kv.value).category) {
+              <span>{{ $any(kv.value).category }}</span>
+              } @if ($any(kv.value).category) {
+              <span class="dot">•</span>
+              }
+              <span>{{
+                $any(kv.value).isAvailable ? "Available" : "Not available"
+              }}</span>
             </div>
-
-            <ion-note
-              *ngIf="showBaseFormatSubMeta(('' + kv.key)) && (hit?.lastCheckOut || (formatHoldingsCount(('' + kv.key)) || 0) > 0)"
-              class="format-sub"
-            >
-              <span *ngIf="hit?.lastCheckOut">Last borrowed: {{ lastBorrowedText() }}</span>
-              <span *ngIf="hit?.lastCheckOut && (formatHoldingsCount(('' + kv.key)) || 0) > 0" class="dot">•</span>
-              <span *ngIf="(formatHoldingsCount(('' + kv.key)) || 0) > 0">
-                {{ formatHoldingsText(('' + kv.key)) }}
+            } @if (showBaseFormatSubMeta(('' + kv.key)) && (hit.lastCheckOut ||
+            (formatHoldingsCount(('' + kv.key)) || 0) > 0)) {
+            <ion-note class="format-sub">
+              @if (hit.lastCheckOut) {
+              <span>Last borrowed: {{ lastBorrowedText() }}</span>
+              } @if (hit.lastCheckOut && (formatHoldingsCount(('' + kv.key)) ||
+              0) > 0) {
+              <span class="dot">•</span>
+              } @if ((formatHoldingsCount(('' + kv.key)) || 0) > 0) {
+              <span>
+                {{ formatHoldingsText("" + kv.key) }}
               </span>
+              }
             </ion-note>
-
-            <ion-note *ngIf="hasHoldForFormat(('' + kv.key))" class="format-sub you-hold-it">
+            } @if (hasHoldForFormat(('' + kv.key))) {
+            <ion-note class="format-sub you-hold-it">
               You have a hold on this format
             </ion-note>
-
-            <div class="shelf-details" *ngIf="showShelfDetails(('' + kv.key)) && hasFormatShelfDetails(('' + kv.key))">
-              <div class="shelf-detail" *ngFor="let d of visibleFormatShelfDetails(('' + kv.key))">
+            } @if (showShelfDetails(('' + kv.key)) && hasFormatShelfDetails((''
+            + kv.key))) {
+            <div class="shelf-details">
+              @for (d of visibleFormatShelfDetails(('' + kv.key)); track d) {
+              <div class="shelf-detail">
                 {{ formatShelfDetailText(d) }}
               </div>
-              <ion-note class="shelf-more" *ngIf="formatShelfDetailsRemaining(('' + kv.key)) > 0">
-                + {{ formatShelfDetailsRemaining(('' + kv.key)) }} more
+              } @if (formatShelfDetailsRemaining(('' + kv.key)) > 0) {
+              <ion-note class="shelf-more">
+                + {{ formatShelfDetailsRemaining("" + kv.key) }} more
               </ion-note>
+              }
             </div>
-
-            <div class="provider-status-list" *ngIf="hasProviderStatuses(('' + kv.key))">
-              <div class="provider-status" *ngFor="let ps of providerStatusesForFormat(('' + kv.key))">
+            } @if (hasProviderStatuses(('' + kv.key))) {
+            <div class="provider-status-list">
+              @for (ps of providerStatusesForFormat(('' + kv.key)); track ps) {
+              <div class="provider-status">
                 <span class="provider-name">{{ ps.providerLabel }}</span>
                 <span class="dot">•</span>
                 <span>{{ providerStatusSummary(ps) }}</span>
-                <ion-note class="provider-copies" *ngIf="ps.numCopiesMessage">
+                @if (ps.numCopiesMessage) {
+                <ion-note class="provider-copies">
                   {{ ps.numCopiesMessage }}
                 </ion-note>
+                }
               </div>
+              }
             </div>
+            }
           </ion-label>
-
           <div class="format-actions" slot="end">
             <div class="primary-actions">
+              @for (a of effectiveFormatActions(('' + kv.key),
+              ($any(kv.value).actions || [])); track a) {
               <ion-button
                 size="small"
                 fill="solid"
-                *ngFor="let a of effectiveFormatActions(('' + kv.key), ($any(kv.value).actions || []))"
-                [disabled]="holdActionBusy || (hasHoldForFormat(('' + kv.key)) && isIlsHoldAction(a))"
-                (click)="handleFormatAction(a, ('' + kv.key))"
+                [disabled]="
+                  holdActionBusy ||
+                  (hasHoldForFormat('' + kv.key) && isIlsHoldAction(a))
+                "
+                (click)="handleFormatAction(a, '' + kv.key)"
               >
-                {{ (hasHoldForFormat(('' + kv.key)) && isIlsHoldAction(a)) ? 'On Hold' : (a.title || 'Action') }}
+                {{
+                  hasHoldForFormat("" + kv.key) && isIlsHoldAction(a)
+                    ? "On Hold"
+                    : a.title || "Action"
+                }}
               </ion-button>
+              }
             </div>
-
+            @if (showShelfDetails(('' + kv.key)) &&
+            formatShelfDetailsRemaining(('' + kv.key)) > 0) {
             <ion-button
               size="small"
               fill="outline"
               class="copy-details-button"
-              *ngIf="showShelfDetails(('' + kv.key)) && formatShelfDetailsRemaining(('' + kv.key)) > 0"
-              (click)="openCopyDetails(('' + kv.key), $event)"
+              (click)="openCopyDetails('' + kv.key, $event)"
             >
               Copy details
             </ion-button>
+            }
           </div>
         </ion-item>
+        }
       </ion-list>
     </ion-card-content>
   </ion-card>
+  }
 
   <!-- YOU HAVE THIS ON HOLD -->
-  <ion-card *ngIf="hasAnyHoldForItem()" class="hold-card">
+  @if (hasAnyHoldForItem()) {
+  <ion-card class="hold-card">
     <ion-card-header>
       <ion-card-title>{{ holdCardTitle() }}</ion-card-title>
     </ion-card-header>
     <ion-card-content>
-      <div *ngIf="hasMultipleHoldsForItem(); else singleHoldBlock" class="hold-multi-list">
-        <div class="hold-entry" *ngFor="let h of holdsForItem">
+      @if (hasMultipleHoldsForItem()) {
+      <div class="hold-multi-list">
+        @for (h of holdsForItem; track h) {
+        <div class="hold-entry">
           <div class="hold-entry-format">{{ holdFormatText(h) }}</div>
-          <div class="hold-line" *ngIf="holdPositionText(h)">{{ holdPositionText(h) }}</div>
-          <div class="hold-line" *ngIf="holdPickupText(h)">{{ holdPickupText(h) }}</div>
-        <div class="hold-line" *ngIf="holdStatusText(h)">
+          @if (holdPositionText(h)) {
+          <div class="hold-line">{{ holdPositionText(h) }}</div>
+          } @if (holdPickupText(h)) {
+          <div class="hold-line">{{ holdPickupText(h) }}</div>
+          } @if (holdStatusText(h)) {
+          <div class="hold-line">
             {{ holdStatusLabel(h) }}:
             <span class="hold-status" [ngClass]="holdStatusClass(h)">
               {{ holdStatusText(h) }}
             </span>
           </div>
+          }
         </div>
+        }
       </div>
-      <ng-template #singleHoldBlock>
-        <div class="hold-line hold-entry-format">{{ holdFormatText() }}</div>
-        <div class="hold-line" *ngIf="holdPositionText()">{{ holdPositionText() }}</div>
-        <div class="hold-line" *ngIf="holdPickupText()">{{ holdPickupText() }}</div>
-        <div class="hold-line" *ngIf="holdStatusText()">
-          {{ holdStatusLabel() }}:
-          <span class="hold-status" [ngClass]="holdStatusClass()">
-            {{ holdStatusText() }}
-          </span>
-        </div>
-      </ng-template>
-
+      } @else {
+      <div class="hold-line hold-entry-format">{{ holdFormatText() }}</div>
+      @if (holdPositionText()) {
+      <div class="hold-line">{{ holdPositionText() }}</div>
+      } @if (holdPickupText()) {
+      <div class="hold-line">{{ holdPickupText() }}</div>
+      } @if (holdStatusText()) {
+      <div class="hold-line">
+        {{ holdStatusLabel() }}:
+        <span class="hold-status" [ngClass]="holdStatusClass()">
+          {{ holdStatusText() }}
+        </span>
+      </div>
+      } }
       <div class="hold-actions">
-        <ion-button class="hold-action-btn" expand="block" fill="outline" (click)="openHoldManager()">
-          Manage hold{{ hasMultipleHoldsForItem() ? 's' : '' }}
+        <ion-button
+          class="hold-action-btn"
+          expand="block"
+          fill="outline"
+          (click)="openHoldManager()"
+        >
+          Manage hold{{ hasMultipleHoldsForItem() ? "s" : "" }}
         </ion-button>
-        <ion-button class="hold-action-btn" expand="block" fill="outline" (click)="openHoldsPage()">
+        <ion-button
+          class="hold-action-btn"
+          expand="block"
+          fill="outline"
+          (click)="openHoldsPage()"
+        >
           View holds
         </ion-button>
       </div>
     </ion-card-content>
   </ion-card>
-
-  <ion-card *ngIf="hasKnownListMembership()" class="list-card">
+  } @if (hasKnownListMembership()) {
+  <ion-card class="list-card">
     <ion-card-header>
       <ion-card-title>Lists</ion-card-title>
     </ion-card-header>
     <ion-card-content>
       <ion-list lines="none" class="list-memberships">
+        @for (m of knownListMemberships; track m) {
         <ion-item
           button
           detail="false"
           class="list-membership-row"
-          *ngFor="let m of knownListMemberships"
           (click)="openKnownList(m.listId, m.listTitle)"
         >
           <ion-label>{{ m.listTitle }}</ion-label>
@@ -223,8 +283,9 @@
             <ion-icon name="ellipsis-vertical" slot="icon-only"></ion-icon>
           </ion-button>
         </ion-item>
+        }
       </ion-list>
     </ion-card-content>
   </ion-card>
-
+  }
 </ion-content>

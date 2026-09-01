@@ -23,13 +23,16 @@
         (ionClear)="clearSearch()"
         (keyup.enter)="onSubmit()"
       ></ion-searchbar>
-      <ion-button class="search-go" (click)="onSubmit()">
-        Search
-      </ion-button>
+      <ion-button class="search-go" (click)="onSubmit()"> Search </ion-button>
     </ion-item>
 
     <div class="quick-actions-row">
-      <ion-button class="quick-action-btn" size="small" fill="outline" (click)="searchMelcat()">
+      <ion-button
+        class="quick-action-btn"
+        size="small"
+        fill="outline"
+        (click)="searchMelcat()"
+      >
         Search MeLCat
       </ion-button>
       <ion-button
@@ -38,8 +41,11 @@
         fill="outline"
         (click)="openFiltersSheet()"
       >
-        Filters
-        <ion-badge *ngIf="activeFilterCount() > 0" class="filters-count-badge quick-filters-badge">{{ activeFilterCount() }}</ion-badge>
+        Filters @if (activeFilterCount() > 0) {
+        <ion-badge class="filters-count-badge quick-filters-badge"
+          >{{ activeFilterCount() }}</ion-badge
+        >
+        }
       </ion-button>
     </div>
 
@@ -51,15 +57,23 @@
         (click)="onAdvancedChanged(!showAdvanced)"
         [attr.aria-expanded]="showAdvanced"
       >
-        <ion-icon [name]="showAdvanced ? 'chevron-up' : 'chevron-down'" slot="start"></ion-icon>
+        <ion-icon
+          [name]="showAdvanced ? 'chevron-up' : 'chevron-down'"
+          slot="start"
+        ></ion-icon>
         {{ showAdvanced ? 'Hide advanced' : 'Show advanced' }}
       </ion-button>
     </div>
 
-    <div *ngIf="showAdvanced" class="advanced">
+    @if (showAdvanced) {
+    <div class="advanced">
       <ion-item>
         <ion-label>Search by</ion-label>
-        <ion-select [(ngModel)]="searchIndex" interface="popover" [interfaceOptions]="selectInterfaceOptions">
+        <ion-select
+          [(ngModel)]="searchIndex"
+          interface="popover"
+          [interfaceOptions]="selectInterfaceOptions"
+        >
           <ion-select-option value="Keyword">Keyword</ion-select-option>
           <ion-select-option value="Title">Title</ion-select-option>
           <ion-select-option value="Author">Author</ion-select-option>
@@ -67,22 +81,27 @@
           <ion-select-option value="ISBN">ISBN</ion-select-option>
         </ion-select>
       </ion-item>
-
       <ion-item>
         <ion-label>Sort</ion-label>
-        <ion-select [(ngModel)]="sort" interface="popover" [interfaceOptions]="selectInterfaceOptions">
-          <ion-select-option *ngFor="let opt of sortOptions" [value]="opt.value">
+        <ion-select
+          [(ngModel)]="sort"
+          interface="popover"
+          [interfaceOptions]="selectInterfaceOptions"
+        >
+          @for (opt of sortOptions; track opt) {
+          <ion-select-option [value]="opt.value">
             {{ opt.label }}
           </ion-select-option>
+          }
         </ion-select>
       </ion-item>
-
     </div>
+    }
 
     <div class="filters-summary">
       <div class="filters-toolbar">
+        @if (filters.length) {
         <ion-button
-          *ngIf="filters.length"
           class="filters-clear"
           size="small"
           fill="clear"
@@ -90,75 +109,103 @@
         >
           Clear all
         </ion-button>
+        }
       </div>
 
-      <div class="facet-chip-list" *ngIf="filters.length">
-        <ion-chip button *ngFor="let f of filters" (click)="removeFilter(f)" [attr.aria-label]="'Remove filter ' + filterChipLabel(f)">
+      @if (filters.length) {
+      <div class="facet-chip-list">
+        @for (f of filters; track f) {
+        <ion-chip
+          button
+          (click)="removeFilter(f)"
+          [attr.aria-label]="'Remove filter ' + filterChipLabel(f)"
+        >
           <ion-label>{{ filterChipLabel(f) }}</ion-label>
           <ion-icon name="close-circle" aria-hidden="true"></ion-icon>
         </ion-chip>
+        }
       </div>
+      }
     </div>
   </div>
 
-  <ion-refresher slot="fixed" (ionRefresh)="runSearch(true); $event.target.complete()">
+  <ion-refresher
+    slot="fixed"
+    (ionRefresh)="runSearch(true); $event.target.complete()"
+  >
     <ion-refresher-content></ion-refresher-content>
   </ion-refresher>
 
-  <ion-list *ngIf="hits.length > 0">
-    <ng-container *ngFor="let h of hits; let i = index; trackBy: trackById">
-      <ion-item button detail="false" (click)="openDetail(h)">
-        <ion-thumbnail slot="start" *ngIf="h.coverUrl">
-          <img [src]="h.coverUrl" alt="" />
-        </ion-thumbnail>
-
-        <ion-label>
-          <h2 class="result-title">
-            <ion-icon [name]="mediaIconName(h)" aria-hidden="true"></ion-icon>
-            <span>{{ h.title || 'Untitled' }}</span>
-          </h2>
-          <p *ngIf="h.author">{{ h.author }}</p>
-          <p *ngIf="h.lastCheckOut">
-            Last checked out: {{ formatLastCheckOut(h.lastCheckOut) }}
-          </p>
-        </ion-label>
-
-        <ion-button
-          slot="end"
-          fill="clear"
-          size="small"
-          class="row-action"
-          aria-label="Search result actions"
-          [disabled]="rowActionBusy(h)"
-          (click)="openHitActions(h, $event)"
-        >
-          <ion-icon name="ellipsis-vertical" slot="icon-only"></ion-icon>
-        </ion-button>
-      </ion-item>
-
-      <div class="suggest-item-cta-wrap" *ngIf="shouldInsertSuggestItemAfter(i)">
-        <button type="button" class="suggest-item-cta" (click)="suggestItem()">
-          <img class="suggest-item-cta-logo" src="assets/logo-clock-only.png" alt="" />
-          <span class="suggest-item-cta-copy">
-            <span class="suggest-item-cta-title">Not finding what you're looking for?</span>
-            <span class="suggest-item-cta-subtitle">Suggest an item</span>
-          </span>
-          <ion-icon name="chevron-forward" class="suggest-item-cta-arrow" aria-hidden="true"></ion-icon>
-        </button>
-      </div>
-    </ng-container>
+  @if (hits.length > 0) {
+  <ion-list>
+    @for (h of hits; track trackById(i, h); let i = $index) {
+    <ion-item button detail="false" (click)="openDetail(h)">
+      @if (h.coverUrl) {
+      <ion-thumbnail slot="start">
+        <img [src]="h.coverUrl" alt="" />
+      </ion-thumbnail>
+      }
+      <ion-label>
+        <h2 class="result-title">
+          <ion-icon [name]="mediaIconName(h)" aria-hidden="true"></ion-icon>
+          <span>{{ h.title || 'Untitled' }}</span>
+        </h2>
+        @if (h.author) {
+        <p>{{ h.author }}</p>
+        } @if (h.lastCheckOut) {
+        <p>Last checked out: {{ formatLastCheckOut(h.lastCheckOut) }}</p>
+        }
+      </ion-label>
+      <ion-button
+        slot="end"
+        fill="clear"
+        size="small"
+        class="row-action"
+        aria-label="Search result actions"
+        [disabled]="rowActionBusy(h)"
+        (click)="openHitActions(h, $event)"
+      >
+        <ion-icon name="ellipsis-vertical" slot="icon-only"></ion-icon>
+      </ion-button>
+    </ion-item>
+    @if (shouldInsertSuggestItemAfter(i)) {
+    <div class="suggest-item-cta-wrap">
+      <button type="button" class="suggest-item-cta" (click)="suggestItem()">
+        <img
+          class="suggest-item-cta-logo"
+          [src]="globals.logo.compact"
+          alt=""
+        />
+        <span class="suggest-item-cta-copy">
+          <span class="suggest-item-cta-title"
+            >Not finding what you're looking for?</span
+          >
+          <span class="suggest-item-cta-subtitle">Suggest an item</span>
+        </span>
+        <ion-icon
+          name="chevron-forward"
+          class="suggest-item-cta-arrow"
+          aria-hidden="true"
+        ></ion-icon>
+      </button>
+    </div>
+    } }
   </ion-list>
-
-  <ion-item *ngIf="!globals.api_loading && lastExecutedQuery && lastExecutedQuery === lookfor.trim() && hits.length === 0">
+  } @if (!globals.api_loading && lastExecutedQuery && lastExecutedQuery ===
+  lookfor.trim() && hits.length === 0) {
+  <ion-item>
     <ion-label>No results.</ion-label>
   </ion-item>
+  }
 
   <ion-infinite-scroll
     threshold="150px"
     (ionInfinite)="loadMore($event)"
     [disabled]="infiniteDisabled"
   >
-    <ion-infinite-scroll-content loadingSpinner="bubbles"></ion-infinite-scroll-content>
+    <ion-infinite-scroll-content
+      loadingSpinner="bubbles"
+    ></ion-infinite-scroll-content>
   </ion-infinite-scroll>
 </ion-content>
 
@@ -173,42 +220,55 @@
       </ion-toolbar>
     </ion-header>
     <ion-content class="filters-sheet-content">
-      <ion-item lines="none" *ngIf="filters.length" class="sheet-filter-summary">
-        <ion-label>{{ filters.length }} filter{{ filters.length === 1 ? '' : 's' }} active</ion-label>
-        <ion-button size="small" fill="clear" (click)="clearAllFilters()">Clear all</ion-button>
+      @if (filters.length) {
+      <ion-item lines="none" class="sheet-filter-summary">
+        <ion-label
+          >{{ filters.length }} filter{{ filters.length === 1 ? '' : 's' }}
+          active</ion-label
+        >
+        <ion-button size="small" fill="clear" (click)="clearAllFilters()"
+          >Clear all</ion-button
+        >
       </ion-item>
-
-      <ion-list lines="none" *ngIf="facetGroups.length; else noFiltersLoaded">
-        <ion-item-group *ngFor="let group of facetGroups; trackBy: trackFacetGroup" class="facet-group">
-          <ion-item button detail="false" lines="full" (click)="toggleFacetGroup(group.key)" class="facet-group-header">
+      } @if (facetGroups.length) {
+      <ion-list lines="none">
+        @for (group of facetGroups; track trackFacetGroup($index, group)) {
+        <ion-item-group class="facet-group">
+          <ion-item
+            button
+            detail="false"
+            lines="full"
+            (click)="toggleFacetGroup(group.key)"
+            class="facet-group-header"
+          >
             <ion-label>{{ group.label }}</ion-label>
             <ion-icon
               slot="end"
               [name]="isFacetGroupCollapsed(group.key) ? 'chevron-down' : 'chevron-up'"
             ></ion-icon>
           </ion-item>
-
-          <ng-container *ngIf="!isFacetGroupCollapsed(group.key)">
-            <ion-item *ngFor="let option of group.options; trackBy: trackFacetOption">
-              <ion-checkbox
-                slot="start"
-                [checked]="isFacetSelected(option.filter)"
-                (ionChange)="onFacetToggled(group, option, $event.detail.checked)"
-              ></ion-checkbox>
-              <ion-label class="ion-text-wrap">{{ option.display }}</ion-label>
-              <ion-note slot="end">{{ option.count }}</ion-note>
-            </ion-item>
-          </ng-container>
+          @if (!isFacetGroupCollapsed(group.key)) { @for (option of
+          group.options; track trackFacetOption($index, option)) {
+          <ion-item>
+            <ion-checkbox
+              slot="start"
+              [checked]="isFacetSelected(option.filter)"
+              (ionChange)="onFacetToggled(group, option, $event.detail.checked)"
+            ></ion-checkbox>
+            <ion-label class="ion-text-wrap">{{ option.display }}</ion-label>
+            <ion-note slot="end">{{ option.count }}</ion-note>
+          </ion-item>
+          } }
         </ion-item-group>
+        }
       </ion-list>
-
-      <ng-template #noFiltersLoaded>
-        <ion-item lines="none">
-          <ion-label class="ion-text-wrap">
-            Run a search to load available filters.
-          </ion-label>
-        </ion-item>
-      </ng-template>
+      } @else {
+      <ion-item lines="none">
+        <ion-label class="ion-text-wrap">
+          Run a search to load available filters.
+        </ion-label>
+      </ion-item>
+      }
     </ion-content>
   </ng-template>
 </ion-modal>

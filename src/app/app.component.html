@@ -1,8 +1,10 @@
 <ion-app>
   <!-- GLOBAL TOP LOADING BAR (visible during normal navigation + modals + XHR) -->
-  <div class="global-loading" *ngIf="isLoading$ | async">
+  @if (isLoading$ | async) {
+  <div class="global-loading">
     <ion-progress-bar type="indeterminate"></ion-progress-bar>
   </div>
+  }
 
   <ion-split-pane contentId="main-content" when="lg">
     <!-- RIGHT MENU (main navigation) -->
@@ -15,7 +17,8 @@
 
       <ion-content>
         <ion-list class="app-menu-list">
-          <ion-menu-toggle auto-hide="false" *ngFor="let p of appPages">
+          @for (p of appPages; track p) {
+          <ion-menu-toggle auto-hide="false">
             <ion-item
               [routerLink]="p.url"
               routerDirection="forward"
@@ -28,6 +31,7 @@
               <ion-label>{{ p.title }}</ion-label>
             </ion-item>
           </ion-menu-toggle>
+          }
         </ion-list>
       </ion-content>
     </ion-menu>

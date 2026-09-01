@@ -1,10 +1,14 @@
-import { Component, ViewChild } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { IonicModule, IonContent } from '@ionic/angular';
+import { Component, ViewChild, inject } from '@angular/core';
+
+import { IonicModule, IonContent } from '@ionic/angular/lazy';
 import { Router } from '@angular/router';
 import { finalize } from 'rxjs';
 import { Globals } from '../../globals';
-import { FeaturedService, type FeaturedCategoryPage } from '../../services/featured.service';
+import {
+  FeaturedService,
+  type FeaturedCategoryPage,
+} from '../../services/featured.service';
+import { APP_PROFILE } from '../../app-profile';
 
 type FeaturedTabKey = 'books' | 'video' | 'music';
 
@@ -19,9 +23,13 @@ interface FeaturedTile {
   selector: 'app-featured',
   templateUrl: './featured.page.html',
   styleUrls: ['./featured.page.scss'],
-  imports: [CommonModule, IonicModule],
+  imports: [IonicModule],
 })
 export class FeaturedPage {
+  globals = inject(Globals);
+  private featured = inject(FeaturedService);
+  private router = inject(Router);
+
   @ViewChild('content', { static: false }) content?: IonContent;
 
   selectedTab: FeaturedTabKey = 'books';
@@ -38,16 +46,10 @@ export class FeaturedPage {
     music: [],
   };
   private readonly tabCategoryIds: Record<FeaturedTabKey, string[]> = {
-    books: ['tadl_adult_fiction', 'tadl_adult_nonfiction', 'tadl_adult_audiobooks', 'tadl_large_print'],
-    video: ['tadl_all_movie_genres', 'tadl_hot_movies_tv', 'tadl_tv', 'tadl_movie_performing_arts'],
-    music: ['tadl_all_music_genres', 'tadl_music_local', 'tadl_music_pop_rock', 'tadl_music_jazz'],
+    books: APP_PROFILE.featuredCategoryIds.books,
+    video: APP_PROFILE.featuredCategoryIds.video,
+    music: APP_PROFILE.featuredCategoryIds.music,
   };
-
-  constructor(
-    public globals: Globals,
-    private featured: FeaturedService,
-    private router: Router,
-  ) {}
 
   ionViewWillEnter() {
     this.refresh(this.selectedTab);
@@ -79,21 +81,25 @@ export class FeaturedPage {
     }
 
     for (const id of ids) {
-      this.featured.fetchBrowseCategoryPage(id, 1, 6)
-        .pipe(finalize(() => {
-          completed += 1;
-          if (completed === ids.length) {
-            this.updateRenderedTiles(tab, ids, tilesById);
-            if (successfulRequests === 0 && failedRequests > 0) {
-              this.tabErrorByTab[tab] = 'Could not load featured categories for this tab.';
-            } else {
-              this.tabErrorByTab[tab] = null;
+      this.featured
+        .fetchBrowseCategoryPage(id, 1, 6)
+        .pipe(
+          finalize(() => {
+            completed += 1;
+            if (completed === ids.length) {
+              this.updateRenderedTiles(tab, ids, tilesById);
+              if (successfulRequests === 0 && failedRequests > 0) {
+                this.tabErrorByTab[tab] =
+                  'Could not load featured categories for this tab.';
+              } else {
+                this.tabErrorByTab[tab] = null;
+              }
+              this.loadedTabs.add(tab);
+              this.loadingTabs.delete(tab);
+              ev?.target?.complete?.();
             }
-            this.loadedTabs.add(tab);
-            this.loadingTabs.delete(tab);
-            ev?.target?.complete?.();
-          }
-        }))
+          })
+        )
         .subscribe({
           next: (page: FeaturedCategoryPage) => {
             if (!page?.success) {
@@ -103,8 +109,13 @@ export class FeaturedPage {
             successfulRequests += 1;
             tilesById.set(id, {
               id,
-              label: (page.title ?? `Category ${id}`).toString().trim() || `Category ${id}`,
-              covers: (page.items ?? []).map((item) => this.coverUrl(item.image)).filter(Boolean).slice(0, 6),
+              label:
+                (page.title ?? `Category ${id}`).toString().trim() ||
+                `Category ${id}`,
+              covers: (page.items ?? [])
+                .map((item) => this.coverUrl(item.image))
+                .filter(Boolean)
+                .slice(0, 6),
             });
             this.updateRenderedTiles(tab, ids, tilesById);
           },
@@ -116,7 +127,9 @@ export class FeaturedPage {
   }
 
   async onTabChanged(ev: CustomEvent) {
-    const tab = ((ev?.detail?.value ?? 'books').toString().toLowerCase()) as FeaturedTabKey;
+    const tab = (ev?.detail?.value ?? 'books')
+      .toString()
+      .toLowerCase() as FeaturedTabKey;
     if (tab !== 'books' && tab !== 'video' && tab !== 'music') return;
     this.selectedTab = tab;
     await this.content?.scrollToTop(200);
@@ -149,7 +162,13 @@ export class FeaturedPage {
     return (tile?.id ?? '').toString().trim() || `${_idx}`;
   }
 
-  private updateRenderedTiles(tab: FeaturedTabKey, ids: string[], tilesById: Map<string, FeaturedTile>) {
-    this.tilesByTab[tab] = ids.map((categoryId) => tilesById.get(categoryId)).filter((v): v is FeaturedTile => !!v);
+  private updateRenderedTiles(
+    tab: FeaturedTabKey,
+    ids: string[],
+    tilesById: Map<string, FeaturedTile>
+  ) {
+    this.tilesByTab[tab] = ids
+      .map((categoryId) => tilesById.get(categoryId))
+      .filter((v): v is FeaturedTile => !!v);
   }
 }

@@ -1,7 +1,7 @@
-import { Component, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { IonicModule } from '@ionic/angular';
-import { Platform } from '@ionic/angular/standalone';
+import { Component, OnInit, inject } from '@angular/core';
+
+import { IonicModule } from '@ionic/angular/lazy';
+import { Platform } from '@ionic/angular';
 import { SecureStoragePlugin } from 'capacitor-secure-storage-plugin';
 import { Globals } from '../../globals';
 
@@ -10,18 +10,18 @@ import { Globals } from '../../globals';
   selector: 'app-about',
   templateUrl: './about.page.html',
   styleUrls: ['./about.page.scss'],
-  imports: [CommonModule, IonicModule],
+  imports: [IonicModule],
 })
 export class AboutPage implements OnInit {
+  globals = inject(Globals);
+  private platform = inject(Platform);
+
   platforms = '';
   storageDriver: string = '(pending)';
   credentialStorage: string = '(pending)';
   screenSize = '';
 
-  constructor(
-    public globals: Globals,
-    private platform: Platform,
-  ) {
+  constructor() {
     this.platforms = this.platform.platforms().join(', ');
     this.updateScreenSize();
   }
@@ -62,7 +62,8 @@ export class AboutPage implements OnInit {
 
   private describeCredentialStorage(secureAvailable: boolean): string {
     if (secureAvailable) return 'secure-storage';
-    if (this.globals.device_info?.isVirtual) return 'secure-storage (simulator unavailable)';
+    if (this.globals.device_info?.isVirtual)
+      return 'secure-storage (simulator unavailable)';
     return 'secure-storage (unavailable)';
   }
 
@@ -95,7 +96,9 @@ export class AboutPage implements OnInit {
   private async hasSecureStorage(): Promise<boolean> {
     try {
       const platform = await SecureStoragePlugin.getPlatform();
-      return ['ios', 'android', 'web'].includes((platform?.value ?? '').toLowerCase());
+      return ['ios', 'android', 'web'].includes(
+        (platform?.value ?? '').toLowerCase()
+      );
     } catch {
       return false;
     }

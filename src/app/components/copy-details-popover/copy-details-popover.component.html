@@ -9,28 +9,39 @@
 
 <ion-content class="ion-padding">
   <div class="header">
-    <div class="cover" *ngIf="coverUrl">
+    @if (coverUrl) {
+    <div class="cover">
       <img [src]="coverUrl" alt="" />
     </div>
+    }
     <div class="meta">
       <h2 class="title">{{ title }}</h2>
-      <div class="author" *ngIf="author">{{ author }}</div>
+      @if (author) {
+      <div class="author">{{ author }}</div>
+      }
       <div class="format">{{ formatLabel }}</div>
     </div>
   </div>
 
-  <ion-list lines="full" *ngIf="groupedRows.length > 0; else noDetails">
-    <ion-item *ngFor="let d of groupedRows; trackBy: trackByGroupedRow">
+  @if (groupedRows.length > 0) {
+  <ion-list lines="full">
+    @for (d of groupedRows; track trackByGroupedRow($index, d)) {
+    <ion-item>
       <ion-label class="ion-text-wrap">
-        <div class="line strong" *ngIf="d.location">{{ d.location }}</div>
-        <div class="line" *ngIf="d.callNumber">Call number: {{ d.callNumber }}</div>
-        <div class="line" *ngIf="copyCountText(d.count)">{{ copyCountText(d.count) }}</div>
-        <div class="line muted" *ngIf="d.status">{{ d.status }}</div>
+        @if (d.location) {
+        <div class="line strong">{{ d.location }}</div>
+        } @if (d.callNumber) {
+        <div class="line">Call number: {{ d.callNumber }}</div>
+        } @if (copyCountText(d.count)) {
+        <div class="line">{{ copyCountText(d.count) }}</div>
+        } @if (d.status) {
+        <div class="line muted">{{ d.status }}</div>
+        }
       </ion-label>
     </ion-item>
+    }
   </ion-list>
-
-  <ng-template #noDetails>
-    <ion-note>No copy details available.</ion-note>
-  </ng-template>
+  } @else {
+  <ion-note>No copy details available.</ion-note>
+  }
 </ion-content>

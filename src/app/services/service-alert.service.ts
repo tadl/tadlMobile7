@@ -1,15 +1,17 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 
 import { AppCacheService } from './app-cache.service';
 
 @Injectable({ providedIn: 'root' })
 export class ServiceAlertService {
+  private cache = inject(AppCacheService);
+
   private readonly cacheKey = 'proxy:service-alert';
   private readonly alertSubject = new BehaviorSubject<string | null>(null);
   private mutationCount = 0;
 
-  constructor(private cache: AppCacheService) {
+  constructor() {
     void this.restoreFromCache();
   }
 

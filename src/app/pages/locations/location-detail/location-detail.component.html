@@ -3,110 +3,115 @@
     <ion-buttons slot="start">
       <ion-button (click)="close()">Close</ion-button>
     </ion-buttons>
-    <ion-title>{{ location?.fullname || 'Location' }}</ion-title>
+    <ion-title>{{ location?.fullname || "Location" }}</ion-title>
   </ion-toolbar>
 </ion-header>
 
 <ion-content class="location-detail-content">
-  <ng-container *ngIf="location">
-    <div class="hero-wrap" *ngIf="location.image">
-      <img class="hero" [src]="location.image" [alt]="location.fullname" />
-    </div>
-
-    <div class="content">
-      <div class="details-card">
-        <h2 class="title">{{ location.fullname }}</h2>
-
-        <div
-          class="today-pill"
-          [class.today-pill-exception]="hasTodayException(location)"
-          *ngIf="locationStatus(location) as status"
-        >
-          <div class="today-pill-label">{{ status.label }}</div>
-          <div class="today-pill-detail" *ngIf="status.detail">{{ status.detail }}</div>
-        </div>
-
-        <div class="contact">
-          <div class="contact-top">
-            <div class="contact-main">
-              <div class="line" *ngIf="location.address">{{ location.address }}</div>
-              <div class="line" *ngIf="location.citystatezip">{{ location.citystatezip }}</div>
-            </div>
-
-            <ion-button
-              *ngIf="hasNavigationTarget(location)"
-              size="small"
-              class="navigate-button"
-              (click)="openNavigation(location)"
-            >
-              <ion-icon name="navigate-outline" slot="start"></ion-icon>
-              Navigate
-            </ion-button>
-          </div>
-
-          <div class="contact-links" *ngIf="location.phone || location.email">
-            <ion-button
-              *ngIf="location.phone"
-              size="small"
-              fill="outline"
-              class="contact-link-btn"
-              [href]="telHref(location.phone)"
-            >
-              <ion-icon name="call-outline" slot="start"></ion-icon>
-              {{ location.phone }}
-            </ion-button>
-
-            <ion-button
-              *ngIf="location.email"
-              size="small"
-              fill="outline"
-              class="contact-link-btn"
-              [href]="mailtoHref(location.email)"
-            >
-              <ion-icon name="mail-outline" slot="start"></ion-icon>
-              {{ location.email }}
-            </ion-button>
-          </div>
-        </div>
+  @if (location) { @if (location.image) {
+  <div class="hero-wrap">
+    <img class="hero" [src]="location.image" [alt]="location.fullname" />
+  </div>
+  }
+  <div class="content">
+    <div class="details-card">
+      <h2 class="title">{{ location.fullname }}</h2>
+      @if (locationStatus(location); as status) {
+      <div
+        class="today-pill"
+        [class.today-pill-exception]="hasTodayException(location)"
+      >
+        <div class="today-pill-label">{{ status.label }}</div>
+        @if (status.detail) {
+        <div class="today-pill-detail">{{ status.detail }}</div>
+        }
       </div>
-
-      <ng-container *ngIf="upcomingScheduleRows(location) as upcomingRows">
-        <ion-card class="hours-card exceptions-card" *ngIf="upcomingRows.length">
-          <ion-card-header>
-            <div class="exceptions-subtitle">Upcoming Service Exceptions</div>
-          </ion-card-header>
-          <ion-card-content>
-            <div class="hours-grid">
-              <div class="hours-row exception-row" *ngFor="let row of upcomingRows">
-                <div class="day">{{ row.dateLabel }}</div>
-                <div class="hours exception-copy">
-                  <div>{{ row.hoursLabel }}</div>
-                  <div class="exception-reason" *ngIf="row.reason">{{ row.reason }}</div>
-                </div>
-              </div>
-            </div>
-          </ion-card-content>
-        </ion-card>
-      </ng-container>
-
-      <ion-card class="hours-card">
-        <ion-card-header>
-          <div class="hours-subtitle">Weekly schedule</div>
-        </ion-card-header>
-
-        <ion-card-content>
-          <div class="hours-grid">
-            <div
-              class="hours-row"
-              *ngFor="let row of hoursRows(location)"
-              [class.today]="row.isToday"
-            >
-              <div class="day">{{ row.day }}</div>
-              <div class="hours">{{ row.hours }}</div>
+      }
+      <div class="contact">
+        <div class="contact-top">
+          <div class="contact-main">
+            @if (location.address) {
+            <div class="line">{{ location.address }}</div>
+            } @if (location.citystatezip) {
+            <div class="line">{{ location.citystatezip }}</div>
+            }
+          </div>
+          @if (hasNavigationTarget(location)) {
+          <ion-button
+            size="small"
+            class="navigate-button"
+            (click)="openNavigation(location)"
+          >
+            <ion-icon name="navigate-outline" slot="start"></ion-icon>
+            Navigate
+          </ion-button>
+          }
+        </div>
+        @if (location.phone || location.email) {
+        <div class="contact-links">
+          @if (location.phone) {
+          <ion-button
+            size="small"
+            fill="outline"
+            class="contact-link-btn"
+            [href]="telHref(location.phone)"
+          >
+            <ion-icon name="call-outline" slot="start"></ion-icon>
+            {{ location.phone }}
+          </ion-button>
+          } @if (location.email) {
+          <ion-button
+            size="small"
+            fill="outline"
+            class="contact-link-btn"
+            [href]="mailtoHref(location.email)"
+          >
+            <ion-icon name="mail-outline" slot="start"></ion-icon>
+            {{ location.email }}
+          </ion-button>
+          }
+        </div>
+        }
+      </div>
+    </div>
+    @if (upcomingScheduleRows(location); as upcomingRows) { @if
+    (upcomingRows.length) {
+    <ion-card class="hours-card exceptions-card">
+      <ion-card-header>
+        <div class="exceptions-subtitle">Upcoming Service Exceptions</div>
+      </ion-card-header>
+      <ion-card-content>
+        <div class="hours-grid">
+          @for (row of upcomingRows; track row) {
+          <div class="hours-row exception-row">
+            <div class="day">{{ row.dateLabel }}</div>
+            <div class="hours exception-copy">
+              <div>{{ row.hoursLabel }}</div>
+              @if (row.reason) {
+              <div class="exception-reason">{{ row.reason }}</div>
+              }
             </div>
           </div>
-        </ion-card-content>
-      </ion-card>
-    </div>
-  </ng-container>
+          }
+        </div>
+      </ion-card-content>
+    </ion-card>
+    } }
+    <ion-card class="hours-card">
+      <ion-card-header>
+        <div class="hours-subtitle">Weekly schedule</div>
+      </ion-card-header>
+      <ion-card-content>
+        <div class="hours-grid">
+          @for (row of hoursRows(location); track row) {
+          <div class="hours-row" [class.today]="row.isToday">
+            <div class="day">{{ row.day }}</div>
+            <div class="hours">{{ row.hours }}</div>
+          </div>
+          }
+        </div>
+      </ion-card-content>
+    </ion-card>
+  </div>
+  }
 </ion-content>

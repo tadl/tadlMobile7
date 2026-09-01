@@ -4,7 +4,7 @@
       <ion-back-button defaultHref="/home"></ion-back-button>
     </ion-buttons>
 
-    <ion-title>About TADL Mobile</ion-title>
+    <ion-title>About {{ globals.app_title }}</ion-title>
 
     <ion-buttons slot="end">
       <ion-menu-button menu="main"></ion-menu-button>
@@ -20,17 +20,23 @@
 
     <ion-item class="about-item">
       <ion-label>App Version</ion-label>
-      <ion-note slot="end" class="about-value">{{ globals.app_version }}</ion-note>
+      <ion-note slot="end" class="about-value"
+        >{{ globals.app_version }}</ion-note
+      >
     </ion-item>
 
     <ion-item class="about-item">
       <ion-label>Update Version</ion-label>
-      <ion-note slot="end" class="about-value">{{ globals.update_version }}</ion-note>
+      <ion-note slot="end" class="about-value"
+        >{{ globals.update_version }}</ion-note
+      >
     </ion-item>
 
     <ion-item class="about-item">
       <ion-label>Build Number</ion-label>
-      <ion-note slot="end" class="about-value">{{ globals.build_num }}</ion-note>
+      <ion-note slot="end" class="about-value"
+        >{{ globals.build_num }}</ion-note
+      >
     </ion-item>
 
     <ion-item class="about-item">
@@ -55,17 +61,23 @@
 
     <ion-item class="about-item">
       <ion-label>Credential Storage</ion-label>
-      <ion-note slot="end" class="about-value">{{ credentialStorage }}</ion-note>
+      <ion-note slot="end" class="about-value"
+        >{{ credentialStorage }}</ion-note
+      >
     </ion-item>
 
     <ion-item class="about-item">
       <ion-label>Platforms</ion-label>
-      <ion-note slot="end" class="about-value about-value-platforms">{{ platforms }}</ion-note>
+      <ion-note slot="end" class="about-value about-value-platforms"
+        >{{ platforms }}</ion-note
+      >
     </ion-item>
 
     <ion-item class="about-item">
       <ion-label>Network Status</ion-label>
-      <ion-note slot="end" class="about-value">{{ globals.net_status }}</ion-note>
+      <ion-note slot="end" class="about-value"
+        >{{ globals.net_status }}</ion-note
+      >
     </ion-item>
 
     <ion-item class="about-item">
@@ -79,36 +91,49 @@
       <ion-label>Device Information</ion-label>
     </ion-item-divider>
 
-    <ion-item class="about-item" *ngIf="globals.device_info?.name">
+    @if (globals.device_info?.name) {
+    <ion-item class="about-item">
       <ion-label>Device Name</ion-label>
-      <ion-note slot="end" class="about-value">{{ globals.device_info?.name }}</ion-note>
+      <ion-note slot="end" class="about-value"
+        >{{ globals.device_info?.name }}</ion-note
+      >
     </ion-item>
+    }
 
     <ion-item class="about-item">
       <ion-label>Virtual</ion-label>
-      <ion-note slot="end" class="about-value">{{ globals.device_info?.isVirtual }}</ion-note>
+      <ion-note slot="end" class="about-value"
+        >{{ globals.device_info?.isVirtual }}</ion-note
+      >
     </ion-item>
 
     <ion-item class="about-item">
       <ion-label>Manufacturer</ion-label>
-      <ion-note slot="end" class="about-value">{{ globals.device_info?.manufacturer }}</ion-note>
+      <ion-note slot="end" class="about-value"
+        >{{ globals.device_info?.manufacturer }}</ion-note
+      >
     </ion-item>
 
     <ion-item class="about-item">
       <ion-label>Model</ion-label>
-      <ion-note slot="end" class="about-value">{{ globals.device_info?.model }}</ion-note>
+      <ion-note slot="end" class="about-value"
+        >{{ globals.device_info?.model }}</ion-note
+      >
     </ion-item>
 
     <ion-item class="about-item">
       <ion-label>OS</ion-label>
       <ion-note slot="end" class="about-value">
-        {{ globals.device_info?.operatingSystem }} {{ globals.device_info?.osVersion }}
+        {{ globals.device_info?.operatingSystem }} {{
+        globals.device_info?.osVersion }}
       </ion-note>
     </ion-item>
 
     <ion-item class="about-item">
       <ion-label>Webview Version</ion-label>
-      <ion-note slot="end" class="about-value">{{ globals.device_info?.webViewVersion }}</ion-note>
+      <ion-note slot="end" class="about-value"
+        >{{ globals.device_info?.webViewVersion }}</ion-note
+      >
     </ion-item>
   </ion-list>
 
@@ -120,7 +145,7 @@
             fill="clear"
             size="small"
             aria-label="Open privacy policy"
-            (click)="globals.open_page('https://www.tadl.org/mobileapppolicy')"
+            (click)="globals.open_page(globals.privacy_policy_url)"
           >
             Privacy Policy
           </ion-button>

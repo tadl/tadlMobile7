@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { lastValueFrom } from 'rxjs';
 
 import { AuthService } from './auth.service';
@@ -27,20 +27,24 @@ export interface ListLookupResult {
 
 @Injectable({ providedIn: 'root' })
 export class ListLookupService {
+  private auth = inject(AuthService);
+  private listsService = inject(ListsService);
+  private cache = inject(AppCacheService);
+
   private readonly stateByAccountId = new Map<string, ListLookupState>();
 
-  constructor(
-    private auth: AuthService,
-    private listsService: ListsService,
-    private cache: AppCacheService,
-  ) {}
-
-  async lookup(recordIds: string[], options?: { refresh?: boolean }): Promise<ListLookupResult> {
+  async lookup(
+    recordIds: string[],
+    options?: { refresh?: boolean }
+  ): Promise<ListLookupResult> {
     const accountId = this.currentAccountId();
     if (!accountId) throw new Error('not_logged_in');
 
     await this.ensureListsLoaded(accountId, options?.refresh === true);
-    return this.filteredResult(this.ensureState(accountId), this.normalizeRecordIds(recordIds));
+    return this.filteredResult(
+      this.ensureState(accountId),
+      this.normalizeRecordIds(recordIds)
+    );
   }
 
   async membershipsForRecord(recordId: string): Promise<ListMembershipRef[]> {
@@ -69,7 +73,9 @@ export class ListLookupService {
     const state = this.ensureState(accountId);
     if (state.listsLoaded) return state.lists.length;
 
-    const cached = await this.cache.read<AspenUserList[]>(`lists:user:${accountId}`);
+    const cached = await this.cache.read<AspenUserList[]>(
+      `lists:user:${accountId}`
+    );
     if (!Array.isArray(cached)) return null;
 
     state.lists = cached.slice();
@@ -84,14 +90,20 @@ export class ListLookupService {
     state.listsLoaded = true;
   }
 
-  observeListPage(listId: string, listTitle: string, titles: AspenListTitle[]): void {
+  observeListPage(
+    listId: string,
+    listTitle: string,
+    titles: AspenListTitle[]
+  ): void {
     const state = this.activeState();
     const normalizedListId = (listId ?? '').toString().trim();
     const normalizedTitle = (listTitle ?? '').toString().trim() || 'List';
     if (!state || !normalizedListId) return;
 
     for (const title of titles ?? []) {
-      const recordId = this.normalizeRecordId((title?.id ?? title?.shortId ?? '').toString().trim());
+      const recordId = this.normalizeRecordId(
+        (title?.id ?? title?.shortId ?? '').toString().trim()
+      );
       if (!recordId) continue;
       const existing = state.membershipsByRecordId[recordId] ?? [];
       if (existing.some((entry) => entry.listId === normalizedListId)) continue;
@@ -130,9 +142,9 @@ export class ListLookupService {
     const normalizedListId = (listId ?? '').toString().trim();
     if (!state || !recordKey || !normalizedListId) return;
 
-    state.membershipsByRecordId[recordKey] = (state.membershipsByRecordId[recordKey] ?? []).filter(
-      (entry) => entry.listId !== normalizedListId,
-    );
+    state.membershipsByRecordId[recordKey] = (
+      state.membershipsByRecordId[recordKey] ?? []
+    ).filter((entry) => entry.listId !== normalizedListId);
     state.membershipIndexUpdatedAt = Date.now();
   }
 
@@ -149,8 +161,12 @@ export class ListLookupService {
     });
 
     for (const recordId of Object.keys(state.membershipsByRecordId)) {
-      state.membershipsByRecordId[recordId] = (state.membershipsByRecordId[recordId] ?? []).map((entry) =>
-        entry.listId === normalizedListId ? { ...entry, listTitle: normalizedTitle } : entry,
+      state.membershipsByRecordId[recordId] = (
+        state.membershipsByRecordId[recordId] ?? []
+      ).map((entry) =>
+        entry.listId === normalizedListId
+          ? { ...entry, listTitle: normalizedTitle }
+          : entry
       );
     }
   }
@@ -160,11 +176,13 @@ export class ListLookupService {
     const normalizedListId = (listId ?? '').toString().trim();
     if (!state || !normalizedListId) return;
 
-    state.lists = state.lists.filter((list) => (list?.id ?? '').toString().trim() !== normalizedListId);
+    state.lists = state.lists.filter(
+      (list) => (list?.id ?? '').toString().trim() !== normalizedListId
+    );
     for (const recordId of Object.keys(state.membershipsByRecordId)) {
-      state.membershipsByRecordId[recordId] = (state.membershipsByRecordId[recordId] ?? []).filter(
-        (entry) => entry.listId !== normalizedListId,
-      );
+      state.membershipsByRecordId[recordId] = (
+        state.membershipsByRecordId[recordId] ?? []
+      ).filter((entry) => entry.listId !== normalizedListId);
     }
     if (state.lastListUsed === normalizedListId) state.lastListUsed = null;
     state.membershipIndexUpdatedAt = Date.now();
@@ -203,7 +221,10 @@ export class ListLookupService {
     return created;
   }
 
-  private async ensureListsLoaded(accountId: string, refresh: boolean): Promise<void> {
+  private async ensureListsLoaded(
+    accountId: string,
+    refresh: boolean
+  ): Promise<void> {
     const state = this.ensureState(accountId);
     if (state.listsLoaded && !refresh) return;
 
@@ -212,10 +233,15 @@ export class ListLookupService {
     state.listsLoaded = true;
   }
 
-  private filteredResult(state: ListLookupState, recordIds: string[]): ListLookupResult {
+  private filteredResult(
+    state: ListLookupState,
+    recordIds: string[]
+  ): ListLookupResult {
     const membershipsByRecordId: Record<string, ListMembershipRef[]> = {};
     for (const recordId of recordIds) {
-      membershipsByRecordId[recordId] = (state.membershipsByRecordId[recordId] ?? []).slice();
+      membershipsByRecordId[recordId] = (
+        state.membershipsByRecordId[recordId] ?? []
+      ).slice();
     }
 
     return {
@@ -231,8 +257,8 @@ export class ListLookupService {
       new Set(
         (recordIds ?? [])
           .map((recordId) => this.normalizeRecordId(recordId))
-          .filter((recordId): recordId is string => !!recordId),
-      ),
+          .filter((recordId): recordId is string => !!recordId)
+      )
     );
   }
 

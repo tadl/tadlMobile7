@@ -88,7 +88,7 @@
           interface="popover"
           [interfaceOptions]="selectInterfaceOptions"
         >
-          @for (opt of sortOptions; track opt) {
+          @for (opt of sortOptions; track opt.value) {
           <ion-select-option [value]="opt.value">
             {{ opt.label }}
           </ion-select-option>

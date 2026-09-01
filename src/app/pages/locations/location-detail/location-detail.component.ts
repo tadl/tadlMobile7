@@ -34,6 +34,7 @@ type HoursRow = {
 };
 
 type UpcomingScheduleRow = {
+  dateKey: string;
   dateLabel: string;
   hoursLabel: string;
   reason: string;
@@ -53,11 +54,23 @@ export class LocationDetailComponent {
   private actionSheet = inject(ActionSheetController);
 
   @Input() shortname?: string;
-  @Input() location?: Location;
+  private currentLocation?: Location;
+  @Input()
+  set location(value: Location | undefined) {
+    this.currentLocation = value;
+    this.refreshScheduleRows(value);
+  }
+  get location(): Location | undefined {
+    return this.currentLocation;
+  }
+
+  upcomingRows: UpcomingScheduleRow[] = [];
+  weeklyHoursRows: HoursRow[] = [];
 
   loading = false;
 
   ionViewDidEnter() {
+    this.refreshScheduleRows();
     // Fetch “real” detail via shortname (even if we already have a list object)
     if (this.shortname) {
       this.load_detail(this.shortname);
@@ -160,16 +173,17 @@ export class LocationDetailComponent {
     return !!this.locationStatus(loc)?.isException;
   }
 
-  upcomingScheduleRows(loc?: Location): UpcomingScheduleRow[] {
+  private buildUpcomingScheduleRows(loc?: Location): UpcomingScheduleRow[] {
     const exceptions = this.upcomingExceptions(loc, 7);
     return exceptions.map((ex) => ({
+      dateKey: (ex.date ?? '').toString().trim(),
       dateLabel: this.formatLongDate(ex.date),
       hoursLabel: (ex.hours ?? '').toString().trim() || 'Hours updated',
       reason: (ex.reason ?? '').toString().trim(),
     }));
   }
 
-  hoursRows(loc?: Location): HoursRow[] {
+  private buildHoursRows(loc?: Location): HoursRow[] {
     if (!loc) return [];
 
     const todayKey = this.todayKey();
@@ -190,6 +204,11 @@ export class LocationDetailComponent {
       hours: formatLocationDayHours(loc, r.key),
       isToday: r.key === todayKey,
     }));
+  }
+
+  private refreshScheduleRows(loc = this.location): void {
+    this.upcomingRows = this.buildUpcomingScheduleRows(loc);
+    this.weeklyHoursRows = this.buildHoursRows(loc);
   }
 
   private todayKey(): LocationWeekdayKey {

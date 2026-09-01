@@ -74,15 +74,14 @@
         }
       </div>
     </div>
-    @if (upcomingScheduleRows(location); as upcomingRows) { @if
-    (upcomingRows.length) {
+    @if (upcomingRows.length) {
     <ion-card class="hours-card exceptions-card">
       <ion-card-header>
         <div class="exceptions-subtitle">Upcoming Service Exceptions</div>
       </ion-card-header>
       <ion-card-content>
         <div class="hours-grid">
-          @for (row of upcomingRows; track row) {
+          @for (row of upcomingRows; track row.dateKey) {
           <div class="hours-row exception-row">
             <div class="day">{{ row.dateLabel }}</div>
             <div class="hours exception-copy">
@@ -96,14 +95,14 @@
         </div>
       </ion-card-content>
     </ion-card>
-    } }
+    }
     <ion-card class="hours-card">
       <ion-card-header>
         <div class="hours-subtitle">Weekly schedule</div>
       </ion-card-header>
       <ion-card-content>
         <div class="hours-grid">
-          @for (row of hoursRows(location); track row) {
+          @for (row of weeklyHoursRows; track row.key) {
           <div class="hours-row" [class.today]="row.isToday">
             <div class="day">{{ row.day }}</div>
             <div class="hours">{{ row.hours }}</div>

@@ -22,9 +22,9 @@
       <div class="meta">
         {{ work?.author || hit.author }}
       </div>
-      } @if (detailFacts().length) {
+      } @if (detailFacts.length) {
       <div class="facts-grid">
-        @for (fact of detailFacts(); track fact) {
+        @for (fact of detailFacts; track fact.label) {
         <div class="fact-chip">
           <span class="fact-label">{{ fact.label }}</span>
           <span class="fact-value">{{ fact.value }}</span>
@@ -91,7 +91,8 @@
     </ion-card-header>
     <ion-card-content class="ion-no-padding formats-list">
       <ion-list lines="full">
-        @for (kv of ($any(fmts) | keyvalue : formatSortComparator); track kv) {
+        @for (kv of ($any(fmts) | keyvalue : formatSortComparator); track
+        kv.key) {
         <ion-item class="format-row">
           <ion-label class="format-label ion-text-wrap">
             <div class="format-title">
@@ -129,7 +130,8 @@
             } @if (showShelfDetails(('' + kv.key)) && hasFormatShelfDetails((''
             + kv.key))) {
             <div class="shelf-details">
-              @for (d of visibleFormatShelfDetails(('' + kv.key)); track d) {
+              @for (d of visibleFormatShelfDetails(('' + kv.key)); track
+              d.location + '|' + d.callNumber + '|' + d.status) {
               <div class="shelf-detail">
                 {{ formatShelfDetailText(d) }}
               </div>
@@ -141,7 +143,8 @@
             </div>
             } @if (hasProviderStatuses(('' + kv.key))) {
             <div class="provider-status-list">
-              @for (ps of providerStatusesForFormat(('' + kv.key)); track ps) {
+              @for (ps of providerStatusesForFormat(('' + kv.key)); track
+              ps.source + '|' + ps.providerLabel) {
               <div class="provider-status">
                 <span class="provider-name">{{ ps.providerLabel }}</span>
                 <span class="dot">•</span>
@@ -159,7 +162,8 @@
           <div class="format-actions" slot="end">
             <div class="primary-actions">
               @for (a of effectiveFormatActions(('' + kv.key),
-              ($any(kv.value).actions || [])); track a) {
+              ($any(kv.value).actions || [])); track a.source + '|' + a.url +
+              '|' + a.title) {
               <ion-button
                 size="small"
                 fill="solid"
@@ -205,7 +209,7 @@
     <ion-card-content>
       @if (hasMultipleHoldsForItem()) {
       <div class="hold-multi-list">
-        @for (h of holdsForItem; track h) {
+        @for (h of holdsForItem; track h.id) {
         <div class="hold-entry">
           <div class="hold-entry-format">{{ holdFormatText(h) }}</div>
           @if (holdPositionText(h)) {
@@ -264,7 +268,7 @@
     </ion-card-header>
     <ion-card-content>
       <ion-list lines="none" class="list-memberships">
-        @for (m of knownListMemberships; track m) {
+        @for (m of knownListMemberships; track m.listId) {
         <ion-item
           button
           detail="false"

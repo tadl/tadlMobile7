@@ -12,22 +12,22 @@
   </ion-toolbar>
 
   @if (showVenueFilter) {
-    <ion-toolbar>
-      <ion-item lines="none">
-        <ion-label>Location</ion-label>
-        <ion-select
-          interface="popover"
-          [value]="selectedVenueCode"
-          (ionChange)="onVenueChange($event.detail.value)"
-        >
-          @for (v of venues; track venueValue(v)) {
-            <ion-select-option [value]="venueValue(v)">
-              {{ venueLabel(v) }}
-            </ion-select-option>
-          }
-        </ion-select>
-      </ion-item>
-    </ion-toolbar>
+  <ion-toolbar>
+    <ion-item lines="none">
+      <ion-label>Location</ion-label>
+      <ion-select
+        interface="popover"
+        [value]="selectedVenueCode"
+        (ionChange)="onVenueChange($event.detail.value)"
+      >
+        @for (v of venues; track venueValue(v)) {
+        <ion-select-option [value]="venueValue(v)">
+          {{ venueLabel(v) }}
+        </ion-select-option>
+        }
+      </ion-select>
+    </ion-item>
+  </ion-toolbar>
   }
 </ion-header>
 
@@ -41,7 +41,7 @@
     @for (ev of events; track trackByUrl($index, ev)) {
     <ion-item button (click)="openEvent(ev)" detail="true">
       <ion-thumbnail slot="start">
-        <ion-img [src]="imageFor(ev)" [alt]="titleFor(ev)"></ion-img>
+        <img [src]="imageFor(ev)" [alt]="titleFor(ev)" loading="lazy" />
       </ion-thumbnail>
       <ion-label>
         <h2>{{ ev.title }}</h2>

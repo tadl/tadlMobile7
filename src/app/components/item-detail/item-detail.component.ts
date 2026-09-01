@@ -98,6 +98,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
 
   work: AspenGroupedWork | null = null;
   displayCoverUrl = '';
+  detailFacts: DetailFact[] = [];
 
   /** if we got here from HoldsPage, it passes the hold as hit.raw */
   hold: AspenHold | null = null;
@@ -169,11 +170,13 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
 
     const key = (this.hit?.key ?? '').toString().trim();
     this.displayCoverUrl = this.normalizeCoverUrl(this.hit?.coverUrl);
+    this.detailFacts = this.buildDetailFacts();
     if (!key) return;
 
     this.items.getGroupedWork(key).subscribe({
       next: (w) => {
         this.work = w ?? null;
+        this.detailFacts = this.buildDetailFacts();
         if (!this.displayCoverUrl) {
           this.displayCoverUrl = this.normalizeCoverUrl(this.work?.cover);
         }
@@ -219,7 +222,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     return `${title}: ${subtitle}`;
   }
 
-  detailFacts(): DetailFact[] {
+  private buildDetailFacts(): DetailFact[] {
     const facts: DetailFact[] = [];
 
     const year = this.publicationYearText();

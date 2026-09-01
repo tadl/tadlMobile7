@@ -24,11 +24,12 @@
     @for (n of newsletters; track n) {
     <ion-item button detail="true" (click)="view_details(n)">
       <ion-thumbnail slot="start">
-        <ion-img
+        <img
           [src]="thumbFor(n)"
           [alt]="titleFor(n)"
-          (ionError)="markImageBroken(n)"
-        ></ion-img>
+          loading="lazy"
+          (error)="markImageBroken(n)"
+        />
       </ion-thumbnail>
       <ion-label>
         <h2 [innerText]="titleFor(n)"></h2>

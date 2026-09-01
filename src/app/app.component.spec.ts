@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { AppComponent } from './app.component';
 import { APP_TEST_PROVIDERS } from '../testing/app-test-providers';
+import { APP_PROFILE } from './app-profile';
 
 describe('AppComponent', () => {
   beforeEach(async () => {
@@ -18,31 +19,35 @@ describe('AppComponent', () => {
 
   it('should have menu labels', () => {
     const app = TestBed.createComponent(AppComponent).componentInstance;
-    expect(app.appPages.map((item) => item.title)).toEqual([
+    const labels = app.appPages.map((item) => item.title);
+    expect(labels.slice(0, 5)).toEqual([
       'Home',
       'Account',
       'Search',
       'Locations',
       'Events',
-      'Newsletter',
-      'Featured Items',
-      'Webcams',
-      'About',
     ]);
+    expect(labels.includes('Newsletter')).toBe(APP_PROFILE.newsletter.enabled);
+    expect(labels.includes('Featured Items')).toBe(
+      APP_PROFILE.features.featured
+    );
+    expect(labels.includes('Webcams')).toBe(APP_PROFILE.features.webcams);
+    expect(labels.at(-1)).toBe('About');
   });
 
   it('should have urls', () => {
     const app = TestBed.createComponent(AppComponent).componentInstance;
-    expect(app.appPages.map((item) => item.url)).toEqual([
+    const urls = app.appPages.map((item) => item.url);
+    expect(urls.slice(0, 5)).toEqual([
       '/home',
       '/account',
       '/search',
       '/locations',
       '/events',
-      '/news',
-      '/featured',
-      '/webcams',
-      '/about',
     ]);
+    expect(urls.includes('/news')).toBe(APP_PROFILE.newsletter.enabled);
+    expect(urls.includes('/featured')).toBe(APP_PROFILE.features.featured);
+    expect(urls.includes('/webcams')).toBe(APP_PROFILE.features.webcams);
+    expect(urls.at(-1)).toBe('/about');
   });
 });

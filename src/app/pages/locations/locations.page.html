@@ -32,11 +32,12 @@
         <h2>{{ loc.fullname }}</h2>
         <div class="location-body">
           <ion-thumbnail slot="start">
-            <ion-img
+            <img
               [src]="imageFor(loc)"
               [alt]="loc.fullname"
-              (ionError)="markLocationImageBroken(loc)"
-            ></ion-img>
+              loading="lazy"
+              (error)="markLocationImageBroken(loc)"
+            />
           </ion-thumbnail>
           <div class="location-meta">
             @if (locationStatus(loc); as status) {

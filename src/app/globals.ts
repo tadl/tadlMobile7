@@ -40,8 +40,8 @@ export class Globals {
   private link_mode_initialized = false;
 
   // ---- app identity / toggles ----
-  public app_version: string = '7.2.0';
-  public update_version: string = '20260901';
+  public app_version: string = '7.2.1';
+  public update_version: string = '20260902';
   public build_num: string = '00';
 
   public device_info: any;

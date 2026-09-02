@@ -15,7 +15,7 @@ import {
 } from '@angular/core';
 import { DomSanitizer } from '@angular/platform-browser';
 import { ActionSheetController, IonicModule } from '@ionic/angular/lazy';
-import { ModalController } from '@ionic/angular';
+import { ModalController } from '@ionic/angular/lazy';
 import { ActivatedRoute } from '@angular/router';
 import { Capacitor } from '@capacitor/core';
 import { CapacitorCalendar } from '@ebarooni/capacitor-calendar';

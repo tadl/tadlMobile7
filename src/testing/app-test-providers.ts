@@ -1,5 +1,9 @@
 import { provideHttpClient } from '@angular/common/http';
-import { EnvironmentProviders, Provider } from '@angular/core';
+import {
+  EnvironmentProviders,
+  importProvidersFrom,
+  Provider,
+} from '@angular/core';
 import { provideRouter } from '@angular/router';
 import {
   ActionSheetController,
@@ -10,13 +14,13 @@ import {
   Platform,
   PopoverController,
   ToastController,
-  provideIonicAngular,
-} from '@ionic/angular';
+  IonicModule,
+} from '@ionic/angular/lazy';
 
 export const APP_TEST_PROVIDERS: Array<Provider | EnvironmentProviders> = [
   provideHttpClient(),
   provideRouter([]),
-  provideIonicAngular(),
+  importProvidersFrom(IonicModule.forRoot()),
   ActionSheetController,
   AlertController,
   LoadingController,

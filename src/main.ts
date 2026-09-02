@@ -1,4 +1,4 @@
-import { provideZoneChangeDetection } from '@angular/core';
+import { importProvidersFrom, provideZoneChangeDetection } from '@angular/core';
 import { bootstrapApplication } from '@angular/platform-browser';
 import {
   PreloadAllModules,
@@ -13,10 +13,8 @@ import {
 import { HTTP_INTERCEPTORS } from '@angular/common/http';
 
 import {
+  IonicModule,
   IonicRouteStrategy,
-  provideIonicAngular,
-} from '@ionic/angular';
-import {
   ModalController,
   AlertController,
   ActionSheetController,
@@ -25,7 +23,7 @@ import {
   LoadingController,
   PopoverController,
   Platform,
-} from '@ionic/angular';
+} from '@ionic/angular/lazy';
 
 import { addIcons } from 'ionicons';
 import {
@@ -120,9 +118,9 @@ bootstrapApplication(AppComponent, {
     provideZoneChangeDetection(),
     { provide: RouteReuseStrategy, useClass: IonicRouteStrategy },
 
-    provideIonicAngular(),
+    importProvidersFrom(IonicModule.forRoot()),
 
-    // Controllers MUST match the same import path used by injectors (standalone)
+    // Controllers must use the same lazy compatibility build as IonicModule.
     ModalController,
     AlertController,
     ActionSheetController,

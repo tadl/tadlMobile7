@@ -8,7 +8,7 @@ import {
 import { Capacitor } from '@capacitor/core';
 import { AppLauncher } from '@capacitor/app-launcher';
 import { Globals } from '../../../globals';
-import { ModalController } from '@ionic/angular';
+import { ModalController } from '@ionic/angular/lazy';
 import {
   LocationsService,
   type AppLocation,

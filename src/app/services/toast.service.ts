@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { ToastButton, ToastController } from '@ionic/angular';
+import { ToastButton, ToastController } from '@ionic/angular/lazy';
 import { ServiceAlertService } from './service-alert.service';
 
 @Injectable({ providedIn: 'root' })

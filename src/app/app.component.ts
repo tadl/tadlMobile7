@@ -14,7 +14,7 @@ import {
   ModalController,
   Platform,
   PopoverController,
-} from '@ionic/angular';
+} from '@ionic/angular/lazy';
 import { App } from '@capacitor/app';
 import { Keyboard } from '@capacitor/keyboard';
 import { SplashScreen } from '@capacitor/splash-screen';

@@ -4,7 +4,7 @@ import { IonicModule } from '@ionic/angular/lazy';
 import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
 import { LocationDetailComponent } from './location-detail/location-detail.component';
-import { ModalController } from '@ionic/angular';
+import { ModalController } from '@ionic/angular/lazy';
 import {
   LocationsService,
   type AppLocation,

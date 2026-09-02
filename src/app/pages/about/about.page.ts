@@ -1,7 +1,7 @@
 import { Component, OnInit, inject } from '@angular/core';
 
 import { IonicModule } from '@ionic/angular/lazy';
-import { Platform } from '@ionic/angular';
+import { Platform } from '@ionic/angular/lazy';
 import { SecureStoragePlugin } from 'capacitor-secure-storage-plugin';
 import { Globals } from '../../globals';
 

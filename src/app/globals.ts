@@ -4,7 +4,7 @@ import {
   ModalController,
   MenuController,
   Platform,
-} from '@ionic/angular';
+} from '@ionic/angular/lazy';
 import { Browser } from '@capacitor/browser';
 import { Device } from '@capacitor/device';
 import { App } from '@capacitor/app';

@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { IonicModule } from '@ionic/angular/lazy';
-import { ModalController } from '@ionic/angular';
+import { ModalController } from '@ionic/angular/lazy';
 import { Subject, takeUntil } from 'rxjs';
 
 import { Globals } from '../../globals';

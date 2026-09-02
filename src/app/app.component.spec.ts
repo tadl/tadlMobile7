@@ -17,6 +17,22 @@ describe('AppComponent', () => {
     expect(app).toBeTruthy();
   });
 
+  it('should expose accessible light and dark primary color tokens', () => {
+    TestBed.createComponent(AppComponent);
+    const style = document.documentElement.style;
+
+    expect(style.getPropertyValue('--app-primary')).toBe(
+      APP_PROFILE.primaryColor
+    );
+    expect(style.getPropertyValue('--app-primary-contrast')).toBe('#ffffff');
+    expect(style.getPropertyValue('--app-primary-dark')).toBe(
+      APP_PROFILE.darkPrimaryColor
+    );
+    expect(style.getPropertyValue('--app-primary-dark-contrast')).toBe(
+      '#000000'
+    );
+  });
+
   it('should have menu labels', () => {
     const app = TestBed.createComponent(AppComponent).componentInstance;
     const labels = app.appPages.map((item) => item.title);

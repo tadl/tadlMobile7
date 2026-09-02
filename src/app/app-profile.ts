@@ -14,6 +14,7 @@ export interface AppProfile {
   websiteBase: string;
   privacyPolicyUrl: string;
   primaryColor: string;
+  darkPrimaryColor: string;
   logo: {
     standard: string;
     standardDark: string;
@@ -58,6 +59,7 @@ export const APP_PROFILE: AppProfile = {
   websiteBase: 'https://www.tadl.org',
   privacyPolicyUrl: 'https://www.tadl.org/mobileapppolicy',
   primaryColor: '#07153A',
+  darkPrimaryColor: '#8DB6FF',
   logo: {
     standard: 'assets/logo.png',
     standardDark: 'assets/logo-dark.png',

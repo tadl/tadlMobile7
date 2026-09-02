@@ -160,7 +160,21 @@ export class AppComponent implements OnInit {
   }
 
   private applyProfileTheme(): void {
-    const hex = APP_PROFILE.primaryColor.trim();
+    const root = document.documentElement.style;
+    this.applyColorTokens(root, '--app-primary', APP_PROFILE.primaryColor);
+    this.applyColorTokens(
+      root,
+      '--app-primary-dark',
+      APP_PROFILE.darkPrimaryColor
+    );
+  }
+
+  private applyColorTokens(
+    root: CSSStyleDeclaration,
+    prefix: string,
+    color: string
+  ): void {
+    const hex = color.trim();
     const match = /^#([0-9a-f]{6})$/i.exec(hex);
     if (!match) return;
 
@@ -181,12 +195,26 @@ export class AppComponent implements OnInit {
           .padStart(2, '0')
       )
       .join('')}`;
-    const root = document.documentElement.style;
+    const luminance = rgb
+      .map((channel) => {
+        const srgb = channel / 255;
+        return srgb <= 0.04045
+          ? srgb / 12.92
+          : Math.pow((srgb + 0.055) / 1.055, 2.4);
+      })
+      .reduce(
+        (sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index],
+        0
+      );
+    const contrast = luminance > 0.179 ? '#000000' : '#ffffff';
+    const contrastRgb = contrast === '#000000' ? '0, 0, 0' : '255, 255, 255';
 
-    root.setProperty('--ion-color-primary', hex);
-    root.setProperty('--ion-color-primary-rgb', rgb.join(', '));
-    root.setProperty('--ion-color-primary-shade', shade);
-    root.setProperty('--ion-color-primary-tint', mix(0.1));
+    root.setProperty(prefix, hex);
+    root.setProperty(`${prefix}-rgb`, rgb.join(', '));
+    root.setProperty(`${prefix}-contrast`, contrast);
+    root.setProperty(`${prefix}-contrast-rgb`, contrastRgb);
+    root.setProperty(`${prefix}-shade`, shade);
+    root.setProperty(`${prefix}-tint`, mix(0.1));
   }
 
   ngOnInit() {

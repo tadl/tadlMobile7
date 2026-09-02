@@ -172,24 +172,6 @@
   .hours-row .hours {
     font-size: 16px;
   }
-
-  .exception-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 6px;
-  }
-
-  .exception-row .day {
-    padding-right: 0;
-    white-space: normal;
-  }
-
-  .exception-row .hours {
-    margin-left: 0;
-    text-align: left;
-    white-space: normal;
-    overflow-wrap: anywhere;
-  }
 }
 
 .hours-card {

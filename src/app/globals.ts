@@ -117,7 +117,7 @@ export class Globals {
   public melcat_base: string = 'https://search.mel.org';
   public melcat_search_path: string =
     '/iii/encore/HomePage,queryComponent.searchFormComponent.sdirect';
-  public my_melcat_url: string = 'https://dcb3.mel.org/patroninfo?agency=zv330';
+  public my_melcat_url: string = this.myMelcatUrl(APP_PROFILE.myMelcatAgency);
   public suggest_item_url: string = APP_PROFILE.suggestItemUrl;
 
   // Locations APIs
@@ -130,6 +130,14 @@ export class Globals {
     return `${
       this.locations_base
     }/locations.json?shortname=${encodeURIComponent((shortname || '').trim())}`;
+  }
+
+  private myMelcatUrl(agency: string): string {
+    const normalizedAgency = (agency ?? '').trim();
+    const baseUrl = 'https://dcb3.mel.org/patroninfo';
+    return normalizedAgency
+      ? `${baseUrl}?agency=${encodeURIComponent(normalizedAgency)}`
+      : baseUrl;
   }
 
   melcatSearchUrl(query: string): string {

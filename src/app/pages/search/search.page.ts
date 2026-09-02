@@ -150,11 +150,16 @@ export class SearchPage implements OnInit, OnDestroy {
   }
 
   async suggestItem() {
+    if (!this.globals.suggest_item_url.trim()) return;
     await this.globals.open_page(this.globals.suggest_item_url);
   }
 
   showSuggestItemCta(): boolean {
-    return !!this.lastExecutedQuery && this.hits.length > 0;
+    return (
+      !!this.globals.suggest_item_url.trim() &&
+      !!this.lastExecutedQuery &&
+      this.hits.length > 0
+    );
   }
 
   shouldInsertSuggestItemAfter(index: number): boolean {

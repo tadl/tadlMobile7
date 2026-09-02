@@ -26,6 +26,7 @@ export interface AppProfile {
   aspenApiParam: string;
   locationsGroup: string;
   finesPaymentUrl: string;
+  myMelcatAgency: string;
   suggestItemUrl: string;
   events: {
     provider: EventsProvider;
@@ -69,6 +70,7 @@ export const APP_PROFILE: AppProfile = {
   aspenApiParam: 'tadl-prod',
   locationsGroup: 'tadl',
   finesPaymentUrl: 'https://pay.catalog.tadl.org/pay',
+  myMelcatAgency: 'zv330',
   suggestItemUrl: 'https://www.tadl.org/suggestion',
   events: {
     provider: 'tadl-feed',

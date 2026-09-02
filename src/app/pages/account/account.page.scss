@@ -146,6 +146,15 @@
 .section-action {
   margin: 0;
   min-height: 44px;
+  --background: rgba(255, 255, 255, 0.96);
+  --background-activated: #dce8fb;
+  --background-focused: #e8f0fc;
+  --background-hover: #f5f8fd;
+  --color: #07153a;
+  --color-activated: #07153a;
+  --color-focused: #07153a;
+  --color-hover: #07153a;
+  --box-shadow: 0 1px 3px rgba(0, 0, 0, 0.24);
   font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.02em;

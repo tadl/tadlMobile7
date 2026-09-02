@@ -641,6 +641,7 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
     });
 
     const normalized = body.innerHTML
+      .replace(/([©®™])\uFE0F/g, '$1')
       .replace(/&nbsp;|&#160;/g, ' ')
       .replace(/\s{2,}/g, ' ')
       .trim();

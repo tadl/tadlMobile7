@@ -39,4 +39,17 @@ describe('EventDetailComponent', () => {
     expect(html).not.toContain('javascript:');
     expect(warn).not.toHaveBeenCalled();
   });
+
+  it('removes unsupported emoji presentation from legal symbols', () => {
+    component.event = {
+      description: '<p>Positive Approach to Care™️ is a workshop.</p>',
+    };
+
+    const html = component.descriptionHtml;
+    const renderedText = new DOMParser().parseFromString(html, 'text/html').body
+      .textContent;
+
+    expect(renderedText).toContain('Care™ is a workshop');
+    expect(html).not.toContain('\uFE0F');
+  });
 });

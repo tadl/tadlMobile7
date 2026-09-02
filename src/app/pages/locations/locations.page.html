@@ -21,7 +21,7 @@
   </ion-refresher>
 
   <ion-list class="locations-list">
-    @for (loc of locations; track loc) {
+    @for (loc of locations; track loc.shortname || loc.id) {
     <ion-item
       class="location-item"
       button

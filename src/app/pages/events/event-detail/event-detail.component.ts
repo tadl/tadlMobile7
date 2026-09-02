@@ -574,21 +574,50 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
   private buildDescriptionHtml(raw: string): string {
     if (!raw) return '';
 
-    const sanitized =
-      this.sanitizer.sanitize(SecurityContext.HTML, raw)?.trim() ?? '';
-    if (!sanitized) return '';
-
     const parser = new DOMParser();
-    const doc = parser.parseFromString(sanitized, 'text/html');
+    const doc = parser.parseFromString(raw, 'text/html');
     const body = doc.body;
     if (!body) return '';
 
     // Remove embedded CMS/media assets and any non-content blocks.
     body
       .querySelectorAll(
-        'drupal-media, img, picture, video, audio, iframe, object, embed, script, style'
+        'drupal-media, img, picture, video, audio, iframe, object, embed, script, style, form, input, button, textarea, select, option, link, meta, base, template, svg, math'
       )
       .forEach((node) => node.remove());
+
+    const allowedTags = new Set([
+      'a',
+      'b',
+      'blockquote',
+      'br',
+      'code',
+      'div',
+      'em',
+      'h1',
+      'h2',
+      'h3',
+      'h4',
+      'h5',
+      'h6',
+      'hr',
+      'i',
+      'li',
+      'ol',
+      'p',
+      'pre',
+      'span',
+      'strong',
+      'table',
+      'tbody',
+      'td',
+      'tfoot',
+      'th',
+      'thead',
+      'tr',
+      'u',
+      'ul',
+    ]);
 
     // Keep links safe and consistent.
     body.querySelectorAll('a').forEach((link) => {
@@ -603,7 +632,10 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
 
     // Trim attributes everywhere else to avoid style/class noise.
     body.querySelectorAll('*').forEach((element) => {
-      if (element.tagName.toLowerCase() !== 'a') {
+      const tag = element.tagName.toLowerCase();
+      if (!allowedTags.has(tag)) {
+        element.replaceWith(...Array.from(element.childNodes));
+      } else if (tag !== 'a') {
         this.stripAttributes(element, []);
       }
     });
@@ -613,7 +645,9 @@ export class EventDetailComponent implements OnInit, OnChanges, OnDestroy {
       .replace(/\s{2,}/g, ' ')
       .trim();
 
-    return normalized;
+    return (
+      this.sanitizer.sanitize(SecurityContext.HTML, normalized)?.trim() ?? ''
+    );
   }
 
   private calendarEndDate(start: Date): Date {

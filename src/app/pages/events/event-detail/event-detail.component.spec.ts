@@ -21,4 +21,22 @@ describe('EventDetailComponent', () => {
   it('should create', () => {
     expect(component).toBeTruthy();
   });
+
+  it('cleans CMS markup before Angular performs final sanitization', () => {
+    const warn = spyOn(console, 'warn');
+    component.event = {
+      description:
+        '<div class="fusion-row" style="width: 100%"><h3 style="text-align:center">Book Club</h3><script>alert(1)</script><a href="javascript:alert(1)" onclick="alert(1)">Bad link</a><a href="tel:2312589411" style="color: green">Call us</a></div>',
+    };
+
+    const html = component.descriptionHtml;
+
+    expect(html).toContain('<h3>Book Club</h3>');
+    expect(html).toContain('href="tel:2312589411"');
+    expect(html).not.toContain('class=');
+    expect(html).not.toContain('style=');
+    expect(html).not.toContain('<script');
+    expect(html).not.toContain('javascript:');
+    expect(warn).not.toHaveBeenCalled();
+  });
 });

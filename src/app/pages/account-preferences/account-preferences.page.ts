@@ -49,19 +49,13 @@ export class AccountPreferencesPage {
   private activePassword = '';
   private ignoreCircHistoryChange = false;
 
-  readonly pickupOptions: SelectOption[] = [
-    { name: 'Woodmere', code: '23' },
-    { name: 'Interlochen', code: '24' },
-    { name: 'Kingsley', code: '25' },
-    { name: 'Peninsula', code: '26' },
-    { name: 'Fife Lake', code: '27' },
-    { name: 'East Bay', code: '28' },
-  ];
-
-  readonly searchOptions: SelectOption[] = [
-    { name: 'All locations', code: '22' },
-    ...this.pickupOptions,
-  ];
+  readonly pickupOptions: SelectOption[] = Object.entries(
+    this.globals.legacyPickupLibraryToAspenLocationId
+  ).reduce<SelectOption[]>((options, [code, locationId]) => {
+    const location = this.globals.pickupLocationByAspenId(locationId);
+    if (location) options.push({ code, name: location.name });
+    return options;
+  }, []);
 
   ionViewWillEnter() {
     this.loadPreferences();
@@ -96,23 +90,6 @@ export class AccountPreferencesPage {
         circ_prefs_changed: true,
         pickup_library: next,
         default_search: this.preferences.default_search,
-        keep_circ_history: this.preferences.keep_circ_history,
-        keep_hold_history: this.preferences.keep_hold_history,
-      },
-      undefined,
-      false
-    );
-  }
-
-  onDefaultSearchChanged(ev: CustomEvent) {
-    const next = (ev?.detail as any)?.value?.toString?.() ?? '';
-    if (!this.preferences || !next || this.saving) return;
-
-    this.submitUpdate(
-      {
-        circ_prefs_changed: true,
-        pickup_library: this.preferences.pickup_library,
-        default_search: next,
         keep_circ_history: this.preferences.keep_circ_history,
         keep_hold_history: this.preferences.keep_hold_history,
       },

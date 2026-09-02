@@ -89,21 +89,6 @@
       </ion-select>
     </ion-item>
     <ion-item>
-      <ion-label>Default Search Location</ion-label>
-      <ion-select
-        slot="end"
-        interface="popover"
-        aria-label="Default search location"
-        [value]="preferences.default_search"
-        [disabled]="saving"
-        (ionChange)="onDefaultSearchChanged($event)"
-      >
-        @for (opt of searchOptions; track opt) {
-        <ion-select-option [value]="opt.code">{{ opt.name }}</ion-select-option>
-        }
-      </ion-select>
-    </ion-item>
-    <ion-item>
       <ion-label>Keep Circulation History</ion-label>
       <ion-toggle
         slot="end"

@@ -41,6 +41,8 @@
   --app-radius-md: 8px;
   --app-radius-lg: 8px;
   --app-radius-xl: 8px;
+  --app-status-success: #397a48;
+  --app-status-suspended: #a14b4b;
   --ion-color-primary: var(--app-primary, #3880ff);
   --ion-color-primary-rgb: var(--app-primary-rgb, 56, 128, 255);
   --ion-color-primary-contrast: var(--app-primary-contrast, #ffffff);
@@ -138,6 +140,8 @@ ion-searchbar {
 
 /* Slightly increase muted-text contrast in dark mode. */
 .ion-palette-dark {
+  --app-status-success: #70d487;
+  --app-status-suspended: #ff9e9e;
   --ion-color-primary: var(--app-primary-dark, #8db6ff);
   --ion-color-primary-rgb: var(--app-primary-dark-rgb, 141, 182, 255);
   --ion-color-primary-contrast: var(--app-primary-dark-contrast, #000000);

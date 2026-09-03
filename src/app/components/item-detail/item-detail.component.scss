@@ -166,11 +166,11 @@
 
 .hold-status.status-active,
 .hold-status.status-ready {
-  color: #4c8f5a;
+  color: var(--app-status-success);
 }
 
 .hold-status.status-suspended {
-  color: #a14b4b;
+  color: var(--app-status-suspended);
 }
 
 .hold-actions {

@@ -33,6 +33,11 @@ describe('AppComponent', () => {
     );
   });
 
+  it('should retain the TADL brand palette', () => {
+    expect(APP_PROFILE.primaryColor).toBe('#49688E');
+    expect(APP_PROFILE.darkPrimaryColor).toBe('#8DB6FF');
+  });
+
   it('should have menu labels', () => {
     const app = TestBed.createComponent(AppComponent).componentInstance;
     const labels = app.appPages.map((item) => item.title);

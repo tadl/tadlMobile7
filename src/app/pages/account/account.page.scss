@@ -111,8 +111,8 @@
   background-image:
     linear-gradient(
       to bottom right,
-      rgba(7, 17, 38, 0.72),
-      rgba(11, 26, 56, 0.58)
+      rgba(73, 104, 142, 0.96),
+      rgba(73, 104, 142, 0.94)
     ),
     url('/assets/header-bg.jpg');
   background-size: cover;
@@ -150,10 +150,10 @@
   --background-activated: #dce8fb;
   --background-focused: #e8f0fc;
   --background-hover: #f5f8fd;
-  --color: #07153a;
-  --color-activated: #07153a;
-  --color-focused: #07153a;
-  --color-hover: #07153a;
+  --color: var(--app-primary, #49688e);
+  --color-activated: var(--app-primary, #49688e);
+  --color-focused: var(--app-primary, #49688e);
+  --color-hover: var(--app-primary, #49688e);
   --box-shadow: 0 1px 3px rgba(0, 0, 0, 0.24);
   font-size: 14px;
   font-weight: 700;

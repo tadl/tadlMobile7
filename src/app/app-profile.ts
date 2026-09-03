@@ -58,7 +58,7 @@ export const APP_PROFILE: AppProfile = {
   libraryName: 'Traverse Area District Library',
   websiteBase: 'https://www.tadl.org',
   privacyPolicyUrl: 'https://www.tadl.org/mobileapppolicy',
-  primaryColor: '#07153A',
+  primaryColor: '#49688E',
   darkPrimaryColor: '#8DB6FF',
   logo: {
     standard: 'assets/logo.png',

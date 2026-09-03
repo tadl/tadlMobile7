@@ -33,18 +33,18 @@ ion-segment {
 
 ion-segment-button {
   --color: rgba(26, 33, 46, 0.88);
-  --color-checked: #ffffff;
+  --color-checked: var(--ion-color-primary-contrast);
   --indicator-color: var(--ion-color-primary);
   min-height: 44px;
   font-weight: 600;
 }
 
 :host-context(.md) ion-segment-button {
-  --color-checked: #111827;
+  --color-checked: var(--ion-color-primary-contrast);
 }
 
 :host-context(.ios) ion-segment-button {
-  --color-checked: #ffffff;
+  --color-checked: var(--ion-color-primary-contrast);
 }
 
 :host-context(.ion-palette-dark) .sticky-segment-wrap {
@@ -59,7 +59,7 @@ ion-segment-button {
 
 :host-context(.ion-palette-dark) ion-segment-button {
   --color: rgba(236, 241, 249, 0.86);
-  --color-checked: #ffffff;
+  --color-checked: var(--ion-color-primary-contrast);
 }
 
 .refreshing-note {

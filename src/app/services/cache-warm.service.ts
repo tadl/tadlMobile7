@@ -106,6 +106,8 @@ export class CacheWarmService {
     const body = new URLSearchParams();
     body.set('username', username);
     body.set('password', password);
+    // Explicit capability: older clients cannot handle asynchronous history states.
+    body.set('historyCoordinator', '1');
     const headers = new HttpHeaders({
       'Content-Type': 'application/x-www-form-urlencoded',
     });

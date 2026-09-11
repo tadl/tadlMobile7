@@ -1,7 +1,7 @@
 import { Component, inject } from '@angular/core';
 
 import { IonicModule, ModalController } from '@ionic/angular/lazy';
-import { concatMap, finalize, of } from 'rxjs';
+import { concat, concatMap, exhaustMap, finalize, of, Subject, takeUntil, takeWhile, timer } from 'rxjs';
 
 import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
@@ -31,6 +31,8 @@ export class CheckoutHistoryPage {
 
   loading = false;
   loadingMore = false;
+  historyMessage = '';
+  private readonly viewLeft = new Subject<void>();
 
   items: AspenReadingHistoryItem[] = [];
   page = 1;
@@ -40,7 +42,13 @@ export class CheckoutHistoryPage {
   infiniteDisabled = true;
 
   ionViewWillEnter() {
+    this.items = [];
     this.refresh();
+  }
+
+  ionViewDidLeave() {
+    this.viewLeft.next();
+    this.items = [];
   }
 
   refresh(ev?: any) {
@@ -84,6 +92,14 @@ export class CheckoutHistoryPage {
             false
           );
         }),
+        concatMap(res => ['pending', 'importing'].includes(res.historyStatus || '')
+          ? concat(of(res), timer(3000, 3000).pipe(
+              exhaustMap(() => this.history.fetchReadingHistoryPage(1, this.pageSize, this.sort, '', false)),
+              takeWhile((status, index) => ['pending', 'importing'].includes(status.historyStatus || '') && index < 59, true),
+              takeUntil(timer(180000)),
+            ))
+          : of(res)),
+        takeUntil(this.viewLeft),
         finalize(() => {
           this.loading = false;
           ev?.target?.complete?.();
@@ -91,6 +107,9 @@ export class CheckoutHistoryPage {
       )
       .subscribe({
         next: (res) => {
+          if (this.auth.snapshot().activeAccountId !== snap.activeAccountId) return;
+          this.historyMessage = res.historyStatus && res.historyStatus !== 'ready'
+            ? (res.message || 'Checkout history is unavailable.') : '';
           if (!res?.success) {
             this.items = [];
             this.toast.presentToast(
@@ -105,6 +124,7 @@ export class CheckoutHistoryPage {
           this.infiniteDisabled = !(this.page < this.totalPages);
         },
         error: () => {
+          this.historyMessage = 'Could not load checkout history. Pull to refresh and try again.';
           this.items = [];
           this.toast.presentToast('Could not load checkout history.');
         },
@@ -112,6 +132,7 @@ export class CheckoutHistoryPage {
   }
 
   loadMore(ev: any) {
+    const accountId = this.auth.snapshot().activeAccountId;
     if (this.loadingMore || this.loading || this.infiniteDisabled) {
       ev?.target?.complete?.();
       return;
@@ -127,6 +148,7 @@ export class CheckoutHistoryPage {
     this.history
       .fetchReadingHistoryPage(nextPage, this.pageSize, this.sort, '', false)
       .pipe(
+        takeUntil(this.viewLeft),
         finalize(() => {
           this.loadingMore = false;
           ev?.target?.complete?.();
@@ -134,6 +156,13 @@ export class CheckoutHistoryPage {
       )
       .subscribe({
         next: (res) => {
+          if (this.auth.snapshot().activeAccountId !== accountId) return;
+          if (res.historyStatus && res.historyStatus !== 'ready') {
+            this.items = [];
+            this.historyMessage = res.message || 'Checkout history is unavailable.';
+            this.infiniteDisabled = true;
+            return;
+          }
           if (!res?.success) {
             this.toast.presentToast(
               res?.message || 'Could not load more history.'

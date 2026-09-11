@@ -98,6 +98,14 @@
         (ionChange)="onKeepCircHistoryToggle($event)"
       ></ion-toggle>
     </ion-item>
+    @if (historyUpdateMessage) {
+    <ion-item>
+      <ion-label class="ion-text-wrap" role="status">{{ historyUpdateMessage }}</ion-label>
+      @if (historyRetryEnabled !== null && !saving) {
+      <ion-button slot="end" (click)="updateCircHistory(historyRetryEnabled)">Retry</ion-button>
+      }
+    </ion-item>
+    }
   </ion-list>
   } @if (preferences) {
   <ion-list>

@@ -17,6 +17,10 @@
     <ion-refresher-content></ion-refresher-content>
   </ion-refresher>
 
+  @if (loading && historyMessage) {
+  <ion-item><ion-label class="ion-text-wrap" role="status">{{ historyMessage }}</ion-label></ion-item>
+  }
+
   @if (items.length > 0) {
   <ion-list lines="full" class="full-list">
     @for (i of items; track trackByItem($index, i)) {
@@ -50,7 +54,7 @@
   } @if (!loading && items.length === 0) {
   <ion-item>
     <ion-label class="ion-text-wrap">
-      No checkout history available.
+      {{ historyMessage || 'No checkout history available.' }}
     </ion-label>
   </ion-item>
   }

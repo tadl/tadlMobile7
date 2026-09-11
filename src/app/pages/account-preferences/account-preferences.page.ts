@@ -6,7 +6,8 @@ import {
   ActionSheetController,
   AlertController,
 } from '@ionic/angular/lazy';
-import { finalize } from 'rxjs';
+import { exhaustMap, finalize, switchMap, takeUntil, takeWhile, timer, of } from 'rxjs';
+import { HistorySettingsService } from '../../services/history-settings.service';
 
 import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
@@ -34,6 +35,9 @@ export class AccountPreferencesPage {
   private auth = inject(AuthService);
   private accounts = inject(AccountStoreService);
   private prefsService = inject(AccountPreferencesService);
+  private historySettings = inject(HistorySettingsService);
+  historyUpdateMessage = '';
+  historyRetryEnabled: boolean | null = null;
   private actionSheetController = inject(ActionSheetController);
   private alertController = inject(AlertController);
   private toast = inject(ToastService);
@@ -58,6 +62,8 @@ export class AccountPreferencesPage {
   }, []);
 
   ionViewWillEnter() {
+    this.historyUpdateMessage = '';
+    this.historyRetryEnabled = null;
     this.loadPreferences();
   }
 
@@ -110,7 +116,7 @@ export class AccountPreferencesPage {
     if (!checked) {
       const sheet = await this.actionSheetController.create({
         header:
-          'Warning: turning off checkout history will permanently delete your existing history.',
+          'Turning off checkout history permanently deletes your history from both the library catalog and Aspen.',
         buttons: [
           {
             text: 'Delete Checkout History',
@@ -134,20 +140,43 @@ export class AccountPreferencesPage {
     this.updateCircHistory(true);
   }
 
-  private updateCircHistory(enabled: boolean) {
+  updateCircHistory(enabled: boolean) {
     if (!this.preferences) return;
-
-    this.submitUpdate(
-      {
-        circ_prefs_changed: true,
-        pickup_library: this.preferences.pickup_library,
-        default_search: this.preferences.default_search,
-        keep_circ_history: enabled,
-        keep_hold_history: this.preferences.keep_hold_history,
+    const accountId = this.activeAccountId;
+    const username = this.activeUsername;
+    const password = this.activePassword;
+    if (!accountId || !username || !password || this.saving) return;
+    this.saving = true;
+    this.historyRetryEnabled = null;
+    this.historyUpdateMessage = 'Updating checkout history…';
+    this.historySettings.update(accountId, username, password, enabled).pipe(
+      switchMap(result => result.success && !result.complete
+        ? timer(0, 2000).pipe(
+            exhaustMap(() => this.historySettings.status(accountId, username, password)),
+            takeWhile((status, index) => status.success && !status.complete && index < 89, true),
+            takeUntil(timer(180000)),
+          )
+        : of(result)),
+      finalize(() => { this.saving = false; }),
+    ).subscribe({
+      next: result => {
+        if (this.auth.snapshot().activeAccountId !== accountId) return;
+        this.historyUpdateMessage = result.message;
+        const confirmed = result.success && result.complete &&
+          result.historyStatus === (enabled ? 'ready' : 'disabled');
+        this.historyRetryEnabled = confirmed ? null : enabled;
+        if (confirmed && this.preferences) {
+          this.preferences.keep_circ_history = enabled;
+          void this.prefsService.persistPreferencesForAccount(accountId, this.preferences);
+        }
+        if (result.complete || !result.success) void this.refreshPreferencesFromServer();
       },
-      undefined,
-      false
-    );
+      error: () => {
+        if (this.auth.snapshot().activeAccountId !== accountId) return;
+        this.historyUpdateMessage = 'Could not confirm the change in both systems. Please retry.';
+        this.historyRetryEnabled = enabled;
+      },
+    });
   }
 
   async updateUsername() {

@@ -2,13 +2,9 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import {
   Observable,
-  concat,
-  filter as rxFilter,
   from,
   map,
-  of,
   switchMap,
-  tap,
   throwError,
 } from 'rxjs';
 
@@ -43,6 +39,7 @@ export interface AspenReadingHistoryPage {
   pageTotal: number;
   sort: string;
   message?: string;
+  historyStatus?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -60,7 +57,7 @@ export class HistoryService {
     pageSize = 20,
     sort = 'checkedOut',
     queryFilter = '',
-    useCache = true
+    _useCache = true
   ): Observable<AspenReadingHistoryPage> {
     const snap = this.auth.snapshot();
     if (!snap.isLoggedIn || !snap.activeAccountId || !snap.activeAccountMeta) {
@@ -76,24 +73,18 @@ export class HistoryService {
       ]);
     }
 
+    const accountId = snap.activeAccountId;
     const p = Math.max(1, Number(page) || 1);
     const sz = Math.max(1, Number(pageSize) || 50);
-    const cacheKey = `history:${snap.activeAccountId}:${p}:${sz}:${sort}:${queryFilter}`;
-
-    const cached$ = useCache
-      ? from(this.cache.read<AspenReadingHistoryPage>(cacheKey)).pipe(
-          rxFilter(
-            (v): v is AspenReadingHistoryPage => !!v && Array.isArray(v.items)
-          )
-        )
-      : of<AspenReadingHistoryPage>();
-
-    const network$ = from(this.accounts.getPassword(snap.activeAccountId)).pipe(
+    // Verify history with the server before displaying it, including after
+    // an opt-out from another device. Remove legacy persisted copies.
+    const network$ = from(this.cache.removeByPrefixes([`history:${snap.activeAccountId}:`])).pipe(
+      switchMap(() => this.accounts.getPassword(accountId)),
       switchMap((password) => {
         if (!password) return throwError(() => new Error('missing_password'));
 
         let params = new HttpParams()
-          .set('method', 'getPatronReadingHistory')
+          .set('operation', 'read')
           .set('page', String(p))
           .set('pageSize', String(sz))
           .set('sort_by', sort);
@@ -113,7 +104,7 @@ export class HistoryService {
         return this.userApiQueue
           .run(snap.activeAccountId, () =>
             this.http.post<any>(
-              `${this.globals.aspen_api_base}/UserAPI`,
+              `${this.globals.aspen_api_base}/ReadingHistory`,
               body.toString(),
               { params, headers }
             )
@@ -141,17 +132,14 @@ export class HistoryService {
                   sort: (r?.sort ?? sort).toString(),
                   message:
                     typeof r?.message === 'string' ? r.message : undefined,
+                  historyStatus: r?.historyStatus,
                 } satisfies AspenReadingHistoryPage)
-            ),
-            tap((pageResult) => {
-              if (pageResult?.success)
-                this.cache.write(cacheKey, pageResult).catch(() => {});
-            })
+            )
           );
       })
     );
 
-    return concat(cached$, network$);
+    return network$;
   }
 
   private normalizeHistoryItem(

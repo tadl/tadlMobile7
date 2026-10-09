@@ -1,4 +1,5 @@
 import { Component, inject } from '@angular/core';
+import type { PopoverOptions } from '@ionic/core';
 
 import { FormsModule } from '@angular/forms';
 import {
@@ -46,6 +47,12 @@ export class AccountPreferencesPage {
   saving = false;
 
   preferences: AccountPreferences | null = null;
+
+  readonly pickupInterfaceOptions: Partial<PopoverOptions> = {
+    cssClass: 'pickup-library-popover',
+    size: 'auto',
+    alignment: 'center',
+  };
 
   private token = '';
   private activeAccountId = '';

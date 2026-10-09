@@ -192,6 +192,22 @@ ion-popover.search-select-popover ion-label {
   text-overflow: unset;
 }
 
+/* Select overlays live outside the preferences page, so size them globally. */
+ion-popover.pickup-library-popover {
+  --width: max-content;
+  /* Allow Ionic's 30px iOS edge margins in addition to device safe areas. */
+  --max-width: calc(100vw - 60px - var(--ion-safe-area-left, 0px) - var(--ion-safe-area-right, 0px));
+  --min-width: min(320px, var(--max-width));
+}
+
+ion-popover.pickup-library-popover ion-radio::part(label),
+ion-popover.pickup-library-popover ion-select-popover .select-option-label:not(.select-option-label-has-rich-content) {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  overflow-wrap: anywhere;
+}
+
 /* Shared list-row label treatment used on Home and Account. */
 .menu-row-title {
   font-size: 1rem;

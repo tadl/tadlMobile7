@@ -32,6 +32,17 @@
     max-width: 58%;
   }
 
+  ion-select.pickup-library-select {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  ion-select.pickup-library-select::part(text) {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
   .pref-item {
     --min-height: auto;
   }

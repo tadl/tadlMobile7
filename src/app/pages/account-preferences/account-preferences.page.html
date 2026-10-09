@@ -74,10 +74,12 @@
       <ion-label>Circulation Preferences</ion-label>
     </ion-item-divider>
     <ion-item>
-      <ion-label>Pickup Library</ion-label>
       <ion-select
-        slot="end"
+        class="pickup-library-select"
+        label="Pickup Library"
+        labelPlacement="stacked"
         interface="popover"
+        [interfaceOptions]="pickupInterfaceOptions"
         aria-label="Pickup library"
         [value]="preferences.pickup_library"
         [disabled]="saving"

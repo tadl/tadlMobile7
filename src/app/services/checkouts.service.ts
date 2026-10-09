@@ -211,7 +211,9 @@ export class CheckoutsService {
   }
 
   private checkoutsFromResponse(r: any): AspenCheckout[] {
-    if (!r?.success) return [];
+    if (!r?.success) {
+      throw new Error(r?.message || 'Could not refresh checkouts.');
+    }
     const list = Array.isArray(r?.checkedOutItems)
       ? (r.checkedOutItems as AspenCheckout[])
       : [];

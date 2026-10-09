@@ -361,10 +361,10 @@ export class CheckoutsPage {
           const failed = results.length - ok;
           const rateLimited = results.some((r) => r.rateLimited);
           if (rateLimited) {
-            this.toast.presentToast(
-              'Aspen rate-limited the bulk renew request. Some items may not have updated yet.',
-              6000
-            );
+            const message =
+              'Aspen rate-limited the bulk renew request. Some items may not have updated yet.';
+            if (ok > 0) this.refreshAfterRenewal(message);
+            else this.toast.presentToast(message, 6000);
           } else if (failed === 0) {
             this.refreshAfterRenewal(
               `Renewed ${ok} item${ok === 1 ? '' : 's'}.`
@@ -430,6 +430,7 @@ export class CheckoutsPage {
             ...(this.ilsCheckouts ?? []),
           ]);
         }
+        this.refreshAfterRenewal();
       }
     });
 
@@ -446,9 +447,9 @@ export class CheckoutsPage {
 
   private checkoutKey(c: AspenCheckout): string {
     const raw =
-      (c as any)?.id ??
       (c as any)?.itemId ??
       (c as any)?.barcode ??
+      (c as any)?.id ??
       (c as any)?.recordId ??
       '';
     return String(raw).trim();
@@ -536,15 +537,20 @@ export class CheckoutsPage {
     return due;
   }
 
-  private refreshAfterRenewal(successMessage: string): void {
-    this.checkouts.fetchFreshActiveCheckouts().subscribe({
+  private refreshAfterRenewal(successMessage?: string): void {
+    // A network request alone can still return Aspen's cached due dates.
+    this.checkouts.fetchFreshActiveCheckouts(true).subscribe({
       next: (list) => {
         this.ilsCheckouts = this.sortCheckouts((list ?? []).slice());
         this.syncProfileCheckoutCount(this.ilsCheckouts.length);
-        this.toast.presentToast(successMessage);
+        if (successMessage) this.toast.presentToast(successMessage);
       },
       error: () => {
-        this.toast.presentToast(successMessage);
+        this.toast.presentToast(
+          successMessage
+            ? `${successMessage} Could not refresh due dates. Pull to refresh.`
+            : 'Could not refresh checkouts.'
+        );
       },
     });
   }

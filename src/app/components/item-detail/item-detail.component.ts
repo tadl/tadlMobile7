@@ -9,7 +9,7 @@ import {
 } from '@ionic/angular/lazy';
 import { Router } from '@angular/router';
 import { Subscription, forkJoin, of } from 'rxjs';
-import { catchError, finalize } from 'rxjs/operators';
+import { catchError, finalize, map, switchMap } from 'rxjs/operators';
 import { lastValueFrom } from 'rxjs';
 
 import { Globals } from '../../globals';
@@ -805,20 +805,46 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     }
 
     this.checkoutActionBusy = true;
+    const checkout = this.checkout;
 
     this.checkouts
-      .renewCheckout(this.checkout)
-      .pipe(finalize(() => (this.checkoutActionBusy = false)))
+      .renewCheckout(checkout)
+      .pipe(
+        switchMap((res) => {
+          if (!res?.success) return of(res);
+
+          this.needsCheckoutsRefresh = true;
+          // renewItem returns a message, not the updated due date or renewal count.
+          return this.checkouts.fetchFreshActiveCheckouts(true).pipe(
+            map((list) => {
+              this.checkout = list.find((candidate) =>
+                checkout.itemId != null
+                  ? candidate.itemId === checkout.itemId
+                  : checkout.barcode
+                  ? candidate.barcode === checkout.barcode
+                  : candidate.id === checkout.id
+              ) ?? null;
+              return res;
+            }),
+            catchError(() => {
+              this.toast.presentToast(
+                'Renewed, but could not refresh the due date. Close details and pull to refresh.'
+              );
+              return of(null);
+            })
+          );
+        }),
+        finalize(() => (this.checkoutActionBusy = false))
+      )
       .subscribe({
         next: (res) => {
+          if (!res) return;
           if (!res?.success) {
             this.toast.presentToast(res?.message || 'Could not renew.');
             return;
           }
 
-          this.needsCheckoutsRefresh = true;
           this.toast.presentToast(`Renewed: ${this.itemDisplayTitle()}`);
-          this.applyRenewMutationToCheckout(this.checkout, res?.raw);
         },
         error: () => this.toast.presentToast('Could not renew.'),
       });
@@ -2248,54 +2274,6 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
         },
         error: () => {},
       });
-  }
-
-  private applyRenewMutationToCheckout(
-    checkout: AspenCheckout | null,
-    raw: any
-  ) {
-    if (!checkout) return;
-
-    const parseEpochSeconds = (v: any): number | null => {
-      const n = Number(v);
-      if (!Number.isFinite(n) || n <= 0) return null;
-      return n > 1e12 ? Math.floor(n / 1000) : Math.floor(n);
-    };
-
-    const rawDue =
-      raw?.dueDate ??
-      raw?.due_date ??
-      raw?.newDueDate ??
-      raw?.new_due_date ??
-      raw?.dueDateTs ??
-      raw?.duedate;
-
-    const rawRenewalDate =
-      raw?.renewalDate ??
-      raw?.renewal_date ??
-      raw?.newRenewalDate ??
-      raw?.new_renewal_date;
-
-    const dueEpoch = parseEpochSeconds(rawDue);
-    if (dueEpoch) {
-      (checkout as any).dueDate = dueEpoch;
-      (checkout as any).overdue = false;
-    }
-
-    if (rawRenewalDate != null) {
-      (checkout as any).renewalDate = String(rawRenewalDate);
-    }
-
-    const used = Number((checkout as any)?.renewCount ?? 0);
-    (checkout as any).renewCount = Number.isFinite(used) ? used + 1 : 1;
-
-    const max = Number((checkout as any)?.maxRenewals);
-    if (Number.isFinite(max) && max >= 0) {
-      (checkout as any).canRenew =
-        Number((checkout as any).renewCount ?? 0) < max;
-    }
-
-    this.checkout = { ...(checkout as any) } as AspenCheckout;
   }
 
   private extractHoldFromHit(

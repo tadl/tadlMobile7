@@ -4,8 +4,12 @@
 }
 
 .category-card {
-  margin: 10px 0;
-  height: calc(100% - 20px);
+  width: 100%;
+  margin: 0;
+}
+
+.category-card ion-card-title {
+  overflow-wrap: anywhere;
 }
 
 .sticky-segment-wrap {
@@ -74,11 +78,14 @@ ion-segment-button {
 
 .category-grid {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 4px 16px;
+  /* Use the space left by the split-pane menu, not the full device width. */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: 20px;
 }
 
 .category-grid ion-item-group {
+  display: flex;
+  min-width: 0;
   margin: 0;
 }
 
@@ -131,16 +138,6 @@ ion-segment-button {
     width: min(100%, 1100px);
   }
 
-  .category-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px 20px;
-    align-items: stretch;
-  }
-
-  .category-card {
-    margin: 0;
-  }
-
   .category-card ion-card-header {
     padding: 14px 16px 8px;
   }
@@ -156,10 +153,5 @@ ion-segment-button {
 
   .refreshing-note {
     margin-bottom: 14px;
-  }
-
-  .cover-grid {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-    gap: 10px;
   }
 }

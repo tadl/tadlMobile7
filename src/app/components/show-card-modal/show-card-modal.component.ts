@@ -27,7 +27,7 @@ export class ShowCardModalComponent implements AfterViewInit, OnChanges {
 
   @Input() barcode!: string;
 
-  // optional: show the MeLCat username/id under the barcode
+  // Optional: show the Evergreen patron record ID used for MeLCat.
   @Input() melcatId?: string;
 
   close() {

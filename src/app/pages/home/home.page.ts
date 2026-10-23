@@ -10,6 +10,7 @@ import { Globals } from '../../globals';
 import { AuthState, AuthService } from '../../services/auth.service';
 import { PatronService } from '../../services/patron.service';
 import { ToastService } from '../../services/toast.service';
+import { melcatIdFromProfile } from '../../services/melcat-id';
 import { ShowCardModalComponent } from '../../components/show-card-modal/show-card-modal.component';
 import {
   LocationsService,
@@ -89,13 +90,7 @@ export class HomePage {
   async showCard() {
     const snap = this.auth.snapshot();
     const barcode = (snap?.profile?.ils_barcode ?? '').toString().trim();
-    const melcatId = (
-      snap?.profile?.username ??
-      snap?.profile?.unique_ils_id ??
-      ''
-    )
-      .toString()
-      .trim();
+    const melcatId = melcatIdFromProfile(snap?.profile);
     if (!barcode) {
       this.toast.presentToast('No barcode found on this account.');
       return;

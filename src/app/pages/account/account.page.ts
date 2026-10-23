@@ -10,6 +10,7 @@ import { Router } from '@angular/router';
 
 import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
+import { melcatIdFromProfile } from '../../services/melcat-id';
 import { AuthService } from '../../services/auth.service';
 import {
   AccountStoreService,
@@ -219,13 +220,7 @@ export class AccountPage implements OnInit {
   async showCard() {
     const snap = this.auth.snapshot();
     const barcode = (snap?.profile?.ils_barcode ?? '').toString().trim();
-    const melcatId = (
-      snap?.profile?.username ??
-      snap?.profile?.unique_ils_id ??
-      ''
-    )
-      .toString()
-      .trim();
+    const melcatId = melcatIdFromProfile(snap?.profile);
     if (!barcode) {
       this.toast.presentToast('No barcode found on this account.');
       return;

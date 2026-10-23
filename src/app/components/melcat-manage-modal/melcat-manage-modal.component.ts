@@ -4,6 +4,7 @@ import { IonicModule, ModalController } from '@ionic/angular/lazy';
 
 import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
+import { melcatIdFromProfile } from '../../services/melcat-id';
 import { AuthService } from '../../services/auth.service';
 
 @Component({
@@ -27,14 +28,7 @@ export class MelcatManageModalComponent implements OnInit {
 
   ngOnInit() {
     const snap = this.auth.snapshot();
-    this.melcatId = (
-      snap?.profile?.melcat_id ??
-      snap?.profile?.username ??
-      snap?.profile?.unique_ils_id ??
-      ''
-    )
-      .toString()
-      .trim();
+    this.melcatId = melcatIdFromProfile(snap?.profile);
   }
 
   async close() {

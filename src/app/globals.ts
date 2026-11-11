@@ -14,7 +14,7 @@ import { Preferences } from '@capacitor/preferences';
 import { format } from 'date-fns';
 import { APP_PROFILE } from './app-profile';
 import { BUNDLED_APP_CONFIG } from './app-config.defaults';
-import type { AppConfig, AppConfigLocation, AppConfigSearchScope } from './services/app-config.types';
+import type { AppConfig, AppConfigLocation } from './services/app-config.types';
 
 export interface PickupLocationOption {
   code: string; // e.g. "TADL-WOOD"
@@ -99,10 +99,6 @@ export class Globals {
 
   get locationRegistry(): AppConfigLocation[] {
     return this.appConfig().locations;
-  }
-
-  get searchScopes(): AppConfigSearchScope[] {
-    return this.appConfig().searchScopes;
   }
 
   // Callers validate network/cache data before publishing a complete snapshot.

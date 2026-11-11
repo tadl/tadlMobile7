@@ -7,18 +7,11 @@ export interface AppConfigLocation {
   pickupEnabled: boolean;
 }
 
-export interface AppConfigSearchScope {
-  id: string;
-  name: string;
-  filters: string[];
-}
-
 export interface AppConfig {
   schemaVersion: 1;
   backend: string;
   revision: string;
   locations: AppConfigLocation[];
-  searchScopes: AppConfigSearchScope[];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -44,9 +37,7 @@ export function parseAppConfig(value: unknown, expectedBackend: string): AppConf
   if (backend !== expectedBackend || !revision) return null;
 
   const rawLocations = value['locations'];
-  const rawScopes = value['searchScopes'];
   if (!Array.isArray(rawLocations) || !rawLocations.length || rawLocations.length > 100) return null;
-  if (!Array.isArray(rawScopes) || !rawScopes.length || rawScopes.length > 100) return null;
 
   const locations: AppConfigLocation[] = [];
   const evergreenIds = new Set<number>();
@@ -77,25 +68,5 @@ export function parseAppConfig(value: unknown, expectedBackend: string): AppConf
   }
   if (!locations.some(location => location.pickupEnabled)) return null;
 
-  const searchScopes: AppConfigSearchScope[] = [];
-  const scopeIds = new Set<string>();
-  for (const raw of rawScopes) {
-    if (!isRecord(raw)) return null;
-    const id = text(raw['id'], 128);
-    const name = text(raw['name'], 160);
-    const rawFilters = raw['filters'];
-    if (!id || !name || scopeIds.has(id)) return null;
-    if (!Array.isArray(rawFilters) || rawFilters.length > 20) return null;
-    const filters: string[] = [];
-    for (const rawFilter of rawFilters) {
-      const filter = text(rawFilter, 256);
-      if (!filter) return null;
-      filters.push(filter);
-    }
-    scopeIds.add(id);
-    searchScopes.push({ id, name, filters });
-  }
-  if (!searchScopes.some(scope => scope.id === 'all' && scope.filters.length === 0)) return null;
-
-  return { schemaVersion: 1, backend, revision, locations, searchScopes };
+  return { schemaVersion: 1, backend, revision, locations };
 }

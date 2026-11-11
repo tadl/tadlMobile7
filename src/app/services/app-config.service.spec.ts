@@ -30,18 +30,16 @@ function configFixture(): AppConfig {
       name: 'Example Former Branch',
       pickupEnabled: false,
     }],
-    searchScopes: [{ id: 'all', name: 'All Libraries', filters: [] }],
   };
 }
 
 describe('App config validation', () => {
-  it('preserves display order, new locations, search filters, and disabled historical labels', () => {
+  it('preserves display order, new locations, and disabled historical labels', () => {
     const config = configFixture();
     config.locations.unshift({
       evergreenId: 503, aspenId: 32, pickupCode: 'EXAMPLE-NEW',
       shortname: 'example-new', name: 'Example New Branch', pickupEnabled: true,
     });
-    config.searchScopes.push({ id: 'main', name: 'Main Library', filters: ['building:Main Library'] });
     expect(parseAppConfig(config, backend)).toEqual(config);
   });
 
@@ -66,21 +64,14 @@ describe('App config validation', () => {
     }
   });
 
-  it('rejects empty usable mappings, duplicate search scopes, and unsafe or excessive values', () => {
+  it('rejects empty usable mappings and unsafe or excessive values', () => {
     const config = configFixture();
     expect(parseAppConfig({ ...config, locations: [] }, backend)).toBeNull();
     expect(parseAppConfig({ ...config, locations: [config.locations[1]] }, backend)).toBeNull();
-    expect(parseAppConfig({ ...config, searchScopes: [config.searchScopes[0], config.searchScopes[0]] }, backend)).toBeNull();
-    expect(parseAppConfig({ ...config, searchScopes: [{ id: 'x', name: 'X', filters: ['bad\nfilter'] }] }, backend)).toBeNull();
+    expect(parseAppConfig({ ...config, locations: [{ ...config.locations[0], name: 'bad\nname' }] }, backend)).toBeNull();
     expect(parseAppConfig({ ...config, locations: [{ ...config.locations[0], name: 'x'.repeat(161) }] }, backend)).toBeNull();
   });
 
-  it('requires the reserved default search scope to mean an unfiltered search', () => {
-    const config = configFixture();
-    expect(parseAppConfig({ ...config, searchScopes: [{ id: 'main', name: 'Main', filters: [] }] }, backend)).toBeNull();
-    expect(parseAppConfig({ ...config, searchScopes: [{ id: 'all', name: 'All', filters: ['building:Main'] }] }, backend)).toBeNull();
-    expect(parseAppConfig(config, backend)).toEqual(config);
-  });
 });
 
 describe('AppConfigService', () => {

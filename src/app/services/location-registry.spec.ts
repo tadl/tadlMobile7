@@ -30,7 +30,6 @@ describe('Runtime location registry integration', () => {
         { evergreenId: 902, aspenId: 802, pickupCode: 'TEST-NEW', shortname: 'new', name: 'New Test Branch', pickupEnabled: true },
         { evergreenId: 903, aspenId: 803, pickupCode: 'TEST-MAIN', shortname: 'main', name: 'Test Main Branch', pickupEnabled: true },
       ],
-      searchScopes: [{ id: 'all', name: 'All locations', filters: [] }],
     };
   }
 

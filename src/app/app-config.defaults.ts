@@ -56,5 +56,4 @@ export const BUNDLED_APP_CONFIG: AppConfig = {
       pickupEnabled: true,
     },
   ],
-  searchScopes: [{ id: 'all', name: 'All locations', filters: [] }],
 };

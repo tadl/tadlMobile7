@@ -53,9 +53,8 @@ The events service also supports The Events Calendar's WordPress REST response, 
 
 Startup loads the last valid cached configuration, then refreshes public
 `GET /API/AppConfig?api=<backend>` in the background. The proxy dashboard's
-**Settings → Mobile locations and search scopes** manages Evergreen/Aspen identifiers,
-pickup codes, short names, friendly names, enabled pickups, and optional search
-scopes. Each backend has its own configuration. No patron login is needed.
+**Settings → Mobile locations** manages Evergreen/Aspen identifiers,
+pickup codes, short names, friendly names, and enabled pickups. Each backend has its own configuration. No patron login is needed.
 
 The app validates the complete response before replacing its current mapping.
 Invalid or unavailable responses leave the last valid configuration in use;
@@ -65,10 +64,9 @@ throttled to five minutes after success (30 seconds after failure).
 
 Pickup preferences and hold pickers update from the same runtime registry.
 Disabled locations remain available for displaying existing holds/preferences,
-but cannot be chosen for new pickups. Search scopes use exact Aspen `filter[]`
-values and appear under advanced search when additional scopes are configured.
-The reserved `all` scope has no filters. Pagination keeps the filters used for
-the initial result page, even if configuration refreshes in the background.
+but cannot be chosen for new pickups. Search location remains an Aspen search
+filter; the app does not expose the helper's default search-location preference.
+Saving pickup preferences preserves the existing search preference value.
 
 Deploy the proxy first; released apps keep their existing API behavior. Then
 build/test these clients against the public configuration endpoint. Subsequent

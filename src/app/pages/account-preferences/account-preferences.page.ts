@@ -22,6 +22,7 @@ import {
 interface SelectOption {
   code: string;
   name: string;
+  disabled?: boolean;
 }
 
 @Component({
@@ -60,13 +61,16 @@ export class AccountPreferencesPage {
   private activePassword = '';
   private ignoreCircHistoryChange = false;
 
-  readonly pickupOptions: SelectOption[] = Object.entries(
-    this.globals.legacyPickupLibraryToAspenLocationId
-  ).reduce<SelectOption[]>((options, [code, locationId]) => {
-    const location = this.globals.pickupLocationByAspenId(locationId);
-    if (location) options.push({ code, name: location.name });
-    return options;
-  }, []);
+  get pickupOptions(): SelectOption[] {
+    const selected = this.preferences?.pickup_library;
+    return this.globals.locationRegistry
+      .filter((location) => location.pickupEnabled || String(location.evergreenId) === selected)
+      .map((location) => ({
+        code: String(location.evergreenId),
+        name: location.name,
+        ...(!location.pickupEnabled ? { disabled: true } : {}),
+      }));
+  }
 
   ionViewWillEnter() {
     this.historyUpdateMessage = '';
@@ -97,6 +101,7 @@ export class AccountPreferencesPage {
   onPickupLibraryChanged(ev: CustomEvent) {
     const next = (ev?.detail as any)?.value?.toString?.() ?? '';
     if (!this.preferences || !next || this.saving) return;
+    if (!this.pickupOptions.some((option) => option.code === next && !option.disabled)) return;
 
     this.submitUpdate(
       {

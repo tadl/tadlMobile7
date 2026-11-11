@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import {
   AlertController,
   ModalController,
@@ -13,6 +13,8 @@ import { Network } from '@capacitor/network';
 import { Preferences } from '@capacitor/preferences';
 import { format } from 'date-fns';
 import { APP_PROFILE } from './app-profile';
+import { BUNDLED_APP_CONFIG } from './app-config.defaults';
+import type { AppConfig, AppConfigLocation, AppConfigSearchScope } from './services/app-config.types';
 
 export interface PickupLocationOption {
   code: string; // e.g. "TADL-WOOD"
@@ -71,40 +73,60 @@ export class Globals {
   // Centralized Aspen ILS API selector (your proxy requires this)
   public aspen_api_param_api: string = APP_PROFILE.aspenApiParam;
 
-  // Pickup locations (Aspen LocationID + PickupBranch code)
-  // NOTE: Aspen expects newLocation formatted as "<locationId>_<pickupBranchCode>"
-  public pickupLocations: AspenPickupLocationOption[] = APP_PROFILE.pickupLocations;
+  private readonly appConfig = signal<AppConfig>(BUNDLED_APP_CONFIG);
+  private readonly activePickupLocations = computed<AspenPickupLocationOption[]>(() =>
+    this.appConfig().locations.flatMap((location) =>
+      location.pickupEnabled && location.aspenId !== null && location.pickupCode
+        ? [{ id: location.aspenId, code: location.pickupCode, name: location.name }]
+        : []
+    )
+  );
+  private readonly legacyPickupMap = computed<Record<string, number>>(() =>
+    Object.fromEntries(this.appConfig().locations.flatMap((location) =>
+      location.pickupEnabled && location.aspenId !== null
+        ? [[String(location.evergreenId), location.aspenId]]
+        : []
+    ))
+  );
 
-  // Legacy Preferences pickup_library ids -> Aspen location ids.
-  // Legacy:
-  // 23 Traverse City, 24 Interlochen, 25 Kingsley, 26 Peninsula, 27 Fife Lake, 28 East Bay
-  // Aspen:
-  // 7 Woodmere, 4 Interlochen, 5 Kingsley, 6 Peninsula, 3 Fife Lake, 2 East Bay
-  public legacyPickupLibraryToAspenLocationId: Record<string, number> =
-    APP_PROFILE.legacyPickupLibraryToAspenLocationId;
+  get pickupLocations(): AspenPickupLocationOption[] {
+    return this.activePickupLocations();
+  }
+
+  get legacyPickupLibraryToAspenLocationId(): Record<string, number> {
+    return this.legacyPickupMap();
+  }
+
+  get locationRegistry(): AppConfigLocation[] {
+    return this.appConfig().locations;
+  }
+
+  get searchScopes(): AppConfigSearchScope[] {
+    return this.appConfig().searchScopes;
+  }
+
+  // Callers validate network/cache data before publishing a complete snapshot.
+  applyAppConfig(config: AppConfig): void {
+    if (config.backend === this.aspen_api_param_api) this.appConfig.set(config);
+  }
 
   pickupNameForCode(code: string): string | null {
     const c = (code ?? '').trim();
-    const loc = this.pickupLocations.find((x) => x.code === c);
-    return loc ? loc.name : null;
+    return this.locationRegistry.find((location) => location.pickupCode === c)?.name ?? null;
   }
 
-  pickupLocationByAspenId(
-    id: string | number
-  ): AspenPickupLocationOption | null {
+  pickupLocationByAspenId(id: string | number): AspenPickupLocationOption | null {
     const n = Number(id);
     if (!Number.isFinite(n)) return null;
-    return this.pickupLocations.find((x) => x.id === n) ?? null;
+    const location = this.locationRegistry.find((row) => row.aspenId === n);
+    return location?.pickupCode && location.aspenId !== null
+      ? { id: location.aspenId, code: location.pickupCode, name: location.name }
+      : null;
   }
 
-  pickupLocationFromLegacyPreferencesCode(
-    legacyCode: string | number
-  ): AspenPickupLocationOption | null {
-    const code = (legacyCode ?? '').toString().trim();
-    if (!code) return null;
-    const aspenId = this.legacyPickupLibraryToAspenLocationId[code];
-    if (!aspenId) return null;
-    return this.pickupLocationByAspenId(aspenId);
+  pickupLocationFromLegacyPreferencesCode(legacyCode: string | number): AspenPickupLocationOption | null {
+    const aspenId = this.legacyPickupLibraryToAspenLocationId[String(legacyCode ?? '').trim()];
+    return aspenId ? this.pickupLocations.find((location) => location.id === aspenId) ?? null : null;
   }
 
   pickupAspenNewLocation(loc: { id: number; code: string }): string {

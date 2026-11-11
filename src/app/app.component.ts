@@ -26,6 +26,7 @@ import { Globals } from './globals';
 import { AuthService } from './services/auth.service';
 import { LoadingService } from './services/loading.service';
 import { CacheWarmService } from './services/cache-warm.service';
+import { AppConfigService } from './services/app-config.service';
 import { DiscoveryLinkRouterService } from './services/discovery-link-router.service';
 import { ServiceAlertService } from './services/service-alert.service';
 import { AccountCacheCleanupService } from './services/account-cache-cleanup.service';
@@ -44,6 +45,7 @@ export class AppComponent implements OnInit {
   private auth = inject(AuthService);
   private loading = inject(LoadingService);
   private cacheWarm = inject(CacheWarmService);
+  private appConfig = inject(AppConfigService);
   private serviceAlerts = inject(ServiceAlertService);
   private accountCacheCleanup = inject(AccountCacheCleanupService);
   private router = inject(Router);
@@ -218,6 +220,10 @@ export class AppComponent implements OnInit {
   }
 
   ngOnInit() {
+    fromEvent(window, 'online').subscribe(() => { void this.appConfig.refresh(); });
+    fromEvent(document, 'visibilitychange').subscribe(() => {
+      if (document.visibilityState === 'visible') void this.appConfig.refresh();
+    });
     this.router.events
       .pipe(filter((e): e is NavigationStart => e instanceof NavigationStart))
       .subscribe(() => {
@@ -263,6 +269,7 @@ export class AppComponent implements OnInit {
   }
 
   private handleAppResume() {
+    void this.appConfig.refresh();
     const snap = this.auth.snapshot();
     if (!snap.isLoggedIn || !snap.activeAccountId) return;
 

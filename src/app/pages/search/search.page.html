@@ -67,6 +67,28 @@
 
     @if (showAdvanced) {
     <div class="advanced">
+      @if (globals.searchScopes.length > 1 || searchLocationUnavailable) {
+      <ion-item>
+        <ion-select
+          label="Search location"
+          aria-label="Search location"
+          [value]="locationScopeId"
+          interface="popover"
+          [interfaceOptions]="selectInterfaceOptions"
+          (ionChange)="changeSearchLocation($event.detail.value)"
+        >
+          @if (searchLocationUnavailable) {
+          <ion-select-option [value]="locationScopeId" [disabled]="true">Unavailable location</ion-select-option>
+          }
+          @for (scope of globals.searchScopes; track scope.id) {
+          <ion-select-option [value]="scope.id">{{ scope.name }}</ion-select-option>
+          }
+        </ion-select>
+      </ion-item>
+      @if (searchLocationUnavailable) {
+      <ion-note class="ion-padding" role="status">This search location is unavailable. Choose another location or try again after reconnecting.</ion-note>
+      }
+      }
       <ion-item>
         <ion-label>Search by</ion-label>
         <ion-select

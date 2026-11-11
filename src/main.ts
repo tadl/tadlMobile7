@@ -1,4 +1,4 @@
-import { importProvidersFrom, provideZoneChangeDetection } from '@angular/core';
+import { importProvidersFrom, provideZoneChangeDetection, provideAppInitializer, inject } from '@angular/core';
 import { bootstrapApplication } from '@angular/platform-browser';
 import {
   PreloadAllModules,
@@ -68,6 +68,7 @@ import {
 
 import { routes } from './app/app.routes';
 import { AppComponent } from './app/app.component';
+import { AppConfigService } from './app/services/app-config.service';
 import { AspenApiParamsInterceptor } from './app/services/aspen-api-params.interceptor';
 import { LoadingInterceptor } from './app/services/loading.interceptor';
 import { ServiceAlertInterceptor } from './app/services/service-alert.interceptor';
@@ -116,6 +117,7 @@ addIcons({
 bootstrapApplication(AppComponent, {
   providers: [
     provideZoneChangeDetection(),
+    provideAppInitializer(() => inject(AppConfigService).initialize()),
     { provide: RouteReuseStrategy, useClass: IonicRouteStrategy },
 
     importProvidersFrom(IonicModule.forRoot()),

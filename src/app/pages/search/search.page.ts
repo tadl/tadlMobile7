@@ -104,6 +104,10 @@ export class SearchPage implements OnInit, OnDestroy {
   ];
   readonly selectInterfaceOptions = { cssClass: 'search-select-popover' };
 
+  locationScopeId = 'all';
+  private requestFilters: string[] = [];
+  private searchRequestInFlight = false;
+
   filters: string[] = [];
   facetGroups: SearchFacetGroup[] = [];
   collapsedFacetGroups: Record<string, boolean> = {};
@@ -131,6 +135,16 @@ export class SearchPage implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.queryParamSub?.unsubscribe();
     this.queryParamSub = null;
+  }
+
+  get searchLocationUnavailable(): boolean {
+    return !this.globals.searchScopes.some(scope => scope.id === this.locationScopeId);
+  }
+
+  changeSearchLocation(value: unknown): void {
+    if (typeof value !== 'string' || !this.globals.searchScopes.some(scope => scope.id === value)) return;
+    this.locationScopeId = value;
+    this.runSearch(true);
   }
 
   async onSubmit() {
@@ -180,6 +194,7 @@ export class SearchPage implements OnInit, OnDestroy {
   private applyRouteQueryParams(qp: ParamMap) {
     const deepLinkToken = (qp.get('dl') ?? '').toString().trim();
     const q = (qp.get('lookfor') ?? '').trim();
+    const nextScopeId = (qp.get('locationScope') ?? '').trim() || 'all';
 
     const advancedParam = (qp.get('advanced') ?? '').trim();
     const advanced =
@@ -211,14 +226,15 @@ export class SearchPage implements OnInit, OnDestroy {
       : normalizedExternalFilters;
 
     const hasSearchCriteria =
-      !!q || effectiveFilters.length > 0 || nextExternalFilters.length > 0;
+      !!q || effectiveFilters.length > 0 || nextExternalFilters.length > 0 || nextScopeId !== 'all';
     const shouldShowAdvanced =
-      advanced || effectiveFilters.length > 0 || nextExternalFilters.length > 0;
+      advanced || effectiveFilters.length > 0 || nextExternalFilters.length > 0 || nextScopeId !== 'all';
 
     const nextCoreStateKey = JSON.stringify({
       q,
       searchIndex: nextSearchIndex,
       sort: nextSort,
+      locationScope: nextScopeId,
       filters: effectiveFilters,
     });
 
@@ -230,6 +246,7 @@ export class SearchPage implements OnInit, OnDestroy {
 
     const queryChanged =
       q !== this.lookfor ||
+      nextScopeId !== this.locationScopeId ||
       nextSearchIndex !== this.searchIndex ||
       nextSort !== this.sort ||
       !this.sameStringArray(effectiveFilters, this.filters);
@@ -245,6 +262,7 @@ export class SearchPage implements OnInit, OnDestroy {
     this.showAdvanced = shouldShowAdvanced;
     this.searchIndex = nextSearchIndex;
     this.sort = nextSort;
+    this.locationScopeId = nextScopeId;
     this.filters = effectiveFilters;
     this.facetsEnabled = true;
 
@@ -319,6 +337,19 @@ export class SearchPage implements OnInit, OnDestroy {
   }
 
   runSearch(reset: boolean) {
+    if (this.searchRequestInFlight) {
+      if (reset) this.pendingMappedFilterSearch = true;
+      return;
+    }
+    const scope = this.globals.searchScopes.find(item => item.id === this.locationScopeId);
+    if (!scope) {
+      this.lastExecutedQuery = '';
+      this.hits = [];
+      this.infiniteDisabled = true;
+      this.syncSearchUrl(this.lookfor);
+      this.toast.presentToast('That search location is unavailable. Choose another location.');
+      return;
+    }
     const q = (this.lookfor ?? '').trim();
     this.filters = this.filters.filter(
       (f) => this.filterField(f) !== 'sort_by'
@@ -326,7 +357,7 @@ export class SearchPage implements OnInit, OnDestroy {
     const sortValue = this.normalizedSortValue(this.sort);
     if (sortValue !== this.sort) this.sort = sortValue;
     const hasSearchCriteria =
-      !!q || this.filters.length > 0 || this.pendingExternalFilters.length > 0;
+      !!q || this.filters.length > 0 || this.pendingExternalFilters.length > 0 || scope.filters.length > 0;
 
     if (!hasSearchCriteria) {
       this.lastExecutedQuery = '';
@@ -355,6 +386,9 @@ export class SearchPage implements OnInit, OnDestroy {
     // prevent overlapping requests
     if (this.globals.api_loading) return;
 
+    // Keep pagination tied to the exact location configuration used for page one.
+    this.requestFilters = Array.from(new Set([...scope.filters, ...this.filters]));
+    this.searchRequestInFlight = true;
     this.globals.api_loading = true;
 
     this.searchService
@@ -366,11 +400,12 @@ export class SearchPage implements OnInit, OnDestroy {
         source: 'local',
         sort: sortValue,
         includeSortList: true,
-        filters: this.filters,
+        filters: this.requestFilters.slice(),
       })
       .pipe(
         finalize(() => {
           this.globals.api_loading = false;
+          this.searchRequestInFlight = false;
           if (this.pendingMappedFilterSearch) {
             this.pendingMappedFilterSearch = false;
             this.runSearch(true);
@@ -379,6 +414,7 @@ export class SearchPage implements OnInit, OnDestroy {
       )
       .subscribe({
         next: (res) => {
+          if (this.pendingMappedFilterSearch) return;
           if (!res.success) {
             this.toast.presentToast('Search failed. Please try again.');
             this.hits = reset ? [] : this.hits;
@@ -438,6 +474,7 @@ export class SearchPage implements OnInit, OnDestroy {
     const sortValue = this.normalizedSortValue(this.sort);
     if (sortValue !== this.sort) this.sort = sortValue;
 
+    this.searchRequestInFlight = true;
     this.globals.api_loading = true;
     this.searchService
       .getAppSearchResults({
@@ -448,16 +485,22 @@ export class SearchPage implements OnInit, OnDestroy {
         source: 'local',
         sort: sortValue,
         includeSortList: true,
-        filters: this.filters,
+        filters: this.requestFilters.slice(),
       })
       .pipe(
         finalize(() => {
           this.globals.api_loading = false;
+          this.searchRequestInFlight = false;
+          if (this.pendingMappedFilterSearch) {
+            this.pendingMappedFilterSearch = false;
+            this.runSearch(true);
+          }
           ev?.target?.complete();
         })
       )
       .subscribe({
         next: (res) => {
+          if (this.pendingMappedFilterSearch) return;
           if (!res.success) {
             // roll back page if it failed
             this.page = Math.max(1, this.page - 1);
@@ -1262,7 +1305,7 @@ export class SearchPage implements OnInit, OnDestroy {
   private syncSearchUrl(query: string): void {
     const lookfor = (query ?? '').trim();
     const hasQuery = !!lookfor;
-    const hasSearchCriteria = hasQuery || this.filters.length > 0;
+    const hasSearchCriteria = hasQuery || this.filters.length > 0 || this.locationScopeId !== 'all';
     const queryParams: Record<string, any> = {
       lookfor: hasSearchCriteria ? lookfor : null,
       advanced:
@@ -1278,6 +1321,7 @@ export class SearchPage implements OnInit, OnDestroy {
           ? this.sort
           : null,
       filter: hasSearchCriteria && this.filters.length ? this.filters : null,
+      locationScope: this.locationScopeId !== 'all' ? this.locationScopeId : null,
       extFilter: null,
       dl: null,
     };

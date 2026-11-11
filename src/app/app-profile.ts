@@ -1,9 +1,3 @@
-export interface AppPickupLocation {
-  id: number;
-  code: string;
-  name: string;
-}
-
 export type EventsProvider = 'tadl-feed' | 'wordpress-tribe';
 export type NewsletterProvider = 'tadl-feed' | 'wordpress-posts';
 
@@ -43,8 +37,6 @@ export interface AppProfile {
     featured: boolean;
     webcams: boolean;
   };
-  pickupLocations: AppPickupLocation[];
-  legacyPickupLibraryToAspenLocationId: Record<string, number>;
   featuredCategoryIds: {
     books: string[];
     video: string[];
@@ -87,22 +79,6 @@ export const APP_PROFILE: AppProfile = {
   features: {
     featured: true,
     webcams: true,
-  },
-  pickupLocations: [
-    { id: 7, code: 'TADL-WOOD', name: 'Woodmere (Main) Branch Library' },
-    { id: 2, code: 'TADL-EBB', name: 'East Bay Branch Library' },
-    { id: 3, code: 'TADL-FLPL', name: 'Fife Lake Public Library' },
-    { id: 4, code: 'TADL-IPL', name: 'Interlochen Public Library' },
-    { id: 5, code: 'TADL-KBL', name: 'Kingsley Branch Library' },
-    { id: 6, code: 'TADL-PCL', name: 'Peninsula Community Library' },
-  ],
-  legacyPickupLibraryToAspenLocationId: {
-    '23': 7,
-    '24': 4,
-    '25': 5,
-    '26': 6,
-    '27': 3,
-    '28': 2,
   },
   featuredCategoryIds: {
     books: [

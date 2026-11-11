@@ -85,8 +85,8 @@
         [disabled]="saving"
         (ionChange)="onPickupLibraryChanged($event)"
       >
-        @for (opt of pickupOptions; track opt) {
-        <ion-select-option [value]="opt.code">{{ opt.name }}</ion-select-option>
+        @for (opt of pickupOptions; track opt.code) {
+        <ion-select-option [value]="opt.code" [disabled]="opt.disabled === true">{{ opt.name }}</ion-select-option>
         }
       </ion-select>
     </ion-item>

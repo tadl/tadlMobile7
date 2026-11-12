@@ -41,13 +41,16 @@ Library-specific web configuration is centralized in `src/app/app-profile.ts`. I
 
 The current TADL providers are:
 
-- Aspen API: `https://aspen.tools.tadl.org/API` with `api=tadl-prod`
-- Discovery: `https://discover.tadl.org`
+- Aspen API: `https://aspen.tools.tadl.org/API` with `api=tadl-test`
+- Discovery: `https://tadl-test.libdiscovery.org`
 - Locations: `https://locations.tools.tadl.org/locations.json?group=tadl`
 - Events: TADL mobile events feed
 - Newsletter: TADL newsletter feed
 
 The events service also supports The Events Calendar's WordPress REST response, and the newsletter service supports WordPress posts. This is used by the contract-library variants.
+
+This branch targets Aspen 26.08 testing. See [the testing checklist](docs/ASPEN_26_08_TESTING.md)
+for compatibility findings, live-check results, and the production release handoff.
 
 ## Runtime locations
 

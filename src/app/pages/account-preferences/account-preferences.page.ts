@@ -163,10 +163,10 @@ export class AccountPreferencesPage {
     this.historyUpdateMessage = 'Updating checkout history…';
     this.historySettings.update(accountId, username, password, enabled).pipe(
       switchMap(result => result.success && !result.complete
-        ? timer(0, 2000).pipe(
+        ? timer(0, 5000).pipe(
             exhaustMap(() => this.historySettings.status(accountId, username, password)),
-            takeWhile((status, index) => status.success && !status.complete && index < 89, true),
-            takeUntil(timer(180000)),
+            takeWhile(status => status.success && !status.complete, true),
+            takeUntil(timer(600000)),
           )
         : of(result)),
       finalize(() => { this.saving = false; }),

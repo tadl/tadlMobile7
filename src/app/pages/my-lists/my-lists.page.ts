@@ -64,7 +64,6 @@ export class MyListsPage {
           this.listLookup.replaceLists(this.lists);
         },
         error: () => {
-          this.lists = [];
           this.toast.presentToast('Could not load your lists.');
         },
       });

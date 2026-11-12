@@ -133,8 +133,9 @@ export class CacheWarmService {
       this.auth.applyActiveProfile(profile);
     }
 
-    const rawLists = raw?.listapi?.result?.lists;
-    if (Array.isArray(rawLists)) {
+    const listResult = raw?.listapi?.result;
+    const rawLists = listResult?.lists;
+    if (listResult?.success && Array.isArray(rawLists)) {
       const lists = rawLists as AspenUserList[];
       await this.cache.write(`lists:user:${accountId}`, lists);
     }

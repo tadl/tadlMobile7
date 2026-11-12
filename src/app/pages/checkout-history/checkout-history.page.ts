@@ -93,10 +93,11 @@ export class CheckoutHistoryPage {
           );
         }),
         concatMap(res => ['pending', 'importing'].includes(res.historyStatus || '')
-          ? concat(of(res), timer(3000, 3000).pipe(
+          // Newer Aspen versions queue the initial import on a five-minute cron.
+          ? concat(of(res), timer(5000, 5000).pipe(
               exhaustMap(() => this.history.fetchReadingHistoryPage(1, this.pageSize, this.sort, '', false)),
-              takeWhile((status, index) => ['pending', 'importing'].includes(status.historyStatus || '') && index < 59, true),
-              takeUntil(timer(180000)),
+              takeWhile(status => ['pending', 'importing'].includes(status.historyStatus || ''), true),
+              takeUntil(timer(600000)),
             ))
           : of(res)),
         takeUntil(this.viewLeft),

@@ -89,8 +89,10 @@ export class ListsService {
       this.userListsFetch$ ??
       this.callListApi('getUserLists').pipe(
         map((r: any) => {
-          if (!r?.success) return [];
-          const lists = Array.isArray(r?.lists) ? r.lists : [];
+          if (!r?.success || !Array.isArray(r?.lists)) {
+            throw new Error(typeof r?.message === 'string' ? r.message : 'Could not refresh reading lists.');
+          }
+          const lists = r.lists;
           return lists.map((list: AspenUserList) => ({
             ...list,
             cover: this.normalizeDiscoveryUrl(list?.cover),
@@ -134,31 +136,36 @@ export class ListsService {
       page: String(Math.max(1, Number(page) || 1)),
       numTitles: String(Math.max(1, Number(numTitles) || 50)),
     }).pipe(
-      map((r: any) => ({
-        success: !!r?.success,
-        listTitle: typeof r?.listTitle === 'string' ? r.listTitle : undefined,
-        listDescription:
-          typeof r?.listDescription === 'string'
-            ? r.listDescription
+      map((r: any) => {
+        if (r?.success && !Array.isArray(r?.titles)) {
+          throw new Error('Could not refresh reading list titles.');
+        }
+        return {
+          success: !!r?.success,
+          listTitle: typeof r?.listTitle === 'string' ? r.listTitle : undefined,
+          listDescription:
+            typeof r?.listDescription === 'string'
+              ? r.listDescription
+              : undefined,
+          titles: Array.isArray(r?.titles)
+            ? (r.titles as AspenListTitle[]).map((t) => ({
+                ...t,
+                image: this.normalizeDiscoveryUrl((t as any)?.image),
+                small_image: this.normalizeDiscoveryUrl((t as any)?.small_image),
+              }))
+            : [],
+          totalResults: Number.isFinite(Number(r?.totalResults))
+            ? Number(r.totalResults)
             : undefined,
-        titles: Array.isArray(r?.titles)
-          ? (r.titles as AspenListTitle[]).map((t) => ({
-              ...t,
-              image: this.normalizeDiscoveryUrl((t as any)?.image),
-              small_image: this.normalizeDiscoveryUrl((t as any)?.small_image),
-            }))
-          : [],
-        totalResults: Number.isFinite(Number(r?.totalResults))
-          ? Number(r.totalResults)
-          : undefined,
-        page_current: Number.isFinite(Number(r?.page_current))
-          ? Number(r.page_current)
-          : undefined,
-        page_total: Number.isFinite(Number(r?.page_total))
-          ? Number(r.page_total)
-          : undefined,
-        message: typeof r?.message === 'string' ? r.message : undefined,
-      })),
+          page_current: Number.isFinite(Number(r?.page_current))
+            ? Number(r.page_current)
+            : undefined,
+          page_total: Number.isFinite(Number(r?.page_total))
+            ? Number(r.page_total)
+            : undefined,
+          message: typeof r?.message === 'string' ? r.message : undefined,
+        };
+      }),
       tap((result) => {
         if (accountId && result?.success)
           this.cache.write(cacheKey, result).catch(() => {});

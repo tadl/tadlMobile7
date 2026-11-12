@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Preferences } from '@capacitor/preferences';
+import { backendStorageKey } from './backend-storage';
 
 interface CacheEnvelope<T> {
   updatedAt: number;
@@ -8,7 +9,7 @@ interface CacheEnvelope<T> {
 
 @Injectable({ providedIn: 'root' })
 export class AppCacheService {
-  private readonly prefix = 'cache:v1:';
+  private readonly prefix = backendStorageKey('cache:v1:');
   private readonly maxValueBytes = 1_000_000;
   private readonly lastSerializedByKey = new Map<string, string>();
 

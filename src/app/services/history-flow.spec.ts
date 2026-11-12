@@ -47,13 +47,39 @@ describe('Coordinated history UI', () => {
     const page = TestBed.runInInjectionContext(() => new CheckoutHistoryPage());
     page.ionViewWillEnter();
     expect(page.historyMessage).toBe('Importing history.');
-    tick(3000);
+    tick(5000);
     expect(history.fetchReadingHistoryPage).toHaveBeenCalledTimes(2);
     page.ionViewDidLeave();
     tick(6000);
     expect(history.fetchReadingHistoryPage).toHaveBeenCalledTimes(2);
     expect(page.items).toEqual([]);
     expect(page.loading).toBeFalse();
+  }));
+
+  it('waits through a five-minute Aspen import queue and displays the completed history', fakeAsync(() => {
+    let ready = false;
+    history.fetchReadingHistoryPage.and.callFake(() => of({
+      success: true,
+      items: ready ? [{ title: 'Example history book', groupedWorkId: 'example-work' }] : [],
+      totalResults: ready ? 1 : 0, pageCurrent: 1, pageTotal: 1,
+      sort: 'checkedOut', historyStatus: ready ? 'ready' : 'importing',
+      message: ready ? '' : 'Importing history.',
+    }));
+    const page = TestBed.runInInjectionContext(() => new CheckoutHistoryPage());
+    page.ionViewWillEnter();
+    tick(305000);
+    expect(page.loading).toBeTrue();
+    expect(page.items).toEqual([]);
+    expect(page.historyMessage).toBe('Importing history.');
+
+    ready = true;
+    tick(5000);
+    expect(page.loading).toBeFalse();
+    expect(page.items.map(item => item.title)).toEqual(['Example history book']);
+    expect(page.historyMessage).toBe('');
+    const callsAfterCompletion = history.fetchReadingHistoryPage.calls.count();
+    tick(10000);
+    expect(history.fetchReadingHistoryPage.calls.count()).toBe(callsAfterCompletion);
   }));
 
   it('only persists a preference after both systems confirm it', fakeAsync(() => {
@@ -74,7 +100,7 @@ describe('Coordinated history UI', () => {
     tick(0);
     expect(prefs.persistPreferencesForAccount).not.toHaveBeenCalled();
     expect(page.saving).toBeTrue();
-    tick(2000);
+    tick(5000);
     expect(page.preferences?.keep_circ_history).toBeFalse();
     expect(prefs.persistPreferencesForAccount).toHaveBeenCalledTimes(1);
     expect(page.historyRetryEnabled).toBeNull();
@@ -97,4 +123,32 @@ describe('Coordinated history UI', () => {
     expect(page.historyUpdateMessage).toBe('Not confirmed.');
     expect(page.saving).toBeFalse();
   });
+
+  it('waits for a queued import before confirming a pending opt-out', fakeAsync(() => {
+    let complete = false;
+    settings.update.and.returnValue(of({
+      success: true, complete: false, historyStatus: 'importing', message: 'Waiting for import.',
+    }));
+    settings.status.and.callFake(() => of({
+      success: true, complete, historyStatus: complete ? 'disabled' : 'importing',
+      message: complete ? 'History is off.' : 'Waiting for import.',
+    }));
+    const page = TestBed.runInInjectionContext(() => new AccountPreferencesPage());
+    Object.assign(page, {
+      activeAccountId: 'synthetic-account', activeUsername: 'synthetic-user',
+      activePassword: 'synthetic-password', preferences: { keep_circ_history: true },
+    });
+    spyOn<any>(page, 'refreshPreferencesFromServer').and.resolveTo();
+    page.updateCircHistory(false);
+    tick(305000);
+    expect(page.saving).toBeTrue();
+    expect(prefs.persistPreferencesForAccount).not.toHaveBeenCalled();
+
+    complete = true;
+    tick(5000);
+    expect(page.saving).toBeFalse();
+    expect(page.preferences?.keep_circ_history).toBeFalse();
+    expect(prefs.persistPreferencesForAccount).toHaveBeenCalledTimes(1);
+    expect(page.historyRetryEnabled).toBeNull();
+  }));
 });

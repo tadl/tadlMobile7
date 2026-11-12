@@ -2,6 +2,7 @@
 import { Injectable } from '@angular/core';
 import { Preferences } from '@capacitor/preferences';
 import { SecureStoragePlugin } from 'capacitor-secure-storage-plugin';
+import { backendStorageKey } from './backend-storage';
 
 export interface StoredAccountMeta {
   id: string;            // stable internal id (uuid-ish)
@@ -14,21 +15,19 @@ export interface StoredAccount extends StoredAccountMeta {
   // password is not stored here; it lives in secure storage
 }
 
-const PREF_ACCOUNTS_INDEX = 'accounts:index';
-const PREF_ACTIVE_ACCOUNT_ID = 'accounts:active';
-const PREF_PROFILE_CACHE_PREFIX = 'accounts:profile:'; // + accountId
-
-const SECURE_PASSWORD_PREFIX = 'accounts:password:';   // + accountId
-
 @Injectable({ providedIn: 'root' })
 export class AccountStoreService {
+  private readonly accountsIndexKey = backendStorageKey('accounts:index');
+  private readonly activeAccountKey = backendStorageKey('accounts:active');
+  private readonly profileCachePrefix = backendStorageKey('accounts:profile:');
+  private readonly passwordPrefix = backendStorageKey('accounts:password:');
   private passwordCache = new Map<string, string | null>();
   private passwordLoads = new Map<string, Promise<string | null>>();
 
   // ---------- Accounts index (Preferences) ----------
 
   async listAccounts(): Promise<StoredAccountMeta[]> {
-    const { value } = await Preferences.get({ key: PREF_ACCOUNTS_INDEX });
+    const { value } = await Preferences.get({ key: this.accountsIndexKey });
     if (!value) return [];
     try {
       const parsed = JSON.parse(value);
@@ -75,7 +74,7 @@ export class AccountStoreService {
   async removeAccount(accountId: string): Promise<void> {
     const accounts = await this.listAccounts();
     const next = accounts.filter(a => a.id !== accountId);
-    await Preferences.set({ key: PREF_ACCOUNTS_INDEX, value: JSON.stringify(next) });
+    await Preferences.set({ key: this.accountsIndexKey, value: JSON.stringify(next) });
 
     // remove password
     await this.deletePassword(accountId);
@@ -94,7 +93,7 @@ export class AccountStoreService {
 
   async setPassword(accountId: string, password: string): Promise<void> {
     await SecureStoragePlugin.set({
-      key: SECURE_PASSWORD_PREFIX + accountId,
+      key: this.passwordPrefix + accountId,
       value: password,
     });
     this.passwordCache.set(accountId, password);
@@ -113,7 +112,7 @@ export class AccountStoreService {
 
     const load = (async () => {
       try {
-        const res = await SecureStoragePlugin.get({ key: SECURE_PASSWORD_PREFIX + accountId });
+        const res = await SecureStoragePlugin.get({ key: this.passwordPrefix + accountId });
         const value = res?.value ?? null;
         this.passwordCache.set(accountId, value);
         return value;
@@ -131,7 +130,7 @@ export class AccountStoreService {
 
   async deletePassword(accountId: string): Promise<void> {
     try {
-      await SecureStoragePlugin.remove({ key: SECURE_PASSWORD_PREFIX + accountId });
+      await SecureStoragePlugin.remove({ key: this.passwordPrefix + accountId });
     } catch {
       // ignore
     }
@@ -163,15 +162,15 @@ export class AccountStoreService {
   // ---------- Active account ----------
 
   async getActiveAccountId(): Promise<string | null> {
-    const { value } = await Preferences.get({ key: PREF_ACTIVE_ACCOUNT_ID });
+    const { value } = await Preferences.get({ key: this.activeAccountKey });
     return value ?? null;
   }
 
   async setActiveAccountId(accountId: string | null): Promise<void> {
     if (accountId) {
-      await Preferences.set({ key: PREF_ACTIVE_ACCOUNT_ID, value: accountId });
+      await Preferences.set({ key: this.activeAccountKey, value: accountId });
     } else {
-      await Preferences.remove({ key: PREF_ACTIVE_ACCOUNT_ID });
+      await Preferences.remove({ key: this.activeAccountKey });
       this.clearPasswordCache();
     }
   }
@@ -188,13 +187,13 @@ export class AccountStoreService {
   async cacheProfile(accountId: string, profile: any): Promise<void> {
     const sanitized = this.sanitizeProfile(profile);
     await Preferences.set({
-      key: PREF_PROFILE_CACHE_PREFIX + accountId,
+      key: this.profileCachePrefix + accountId,
       value: JSON.stringify(sanitized),
     });
   }
 
   async getCachedProfile(accountId: string): Promise<any | null> {
-    const { value } = await Preferences.get({ key: PREF_PROFILE_CACHE_PREFIX + accountId });
+    const { value } = await Preferences.get({ key: this.profileCachePrefix + accountId });
     if (!value) return null;
     try {
       const parsed = JSON.parse(value);
@@ -203,7 +202,7 @@ export class AccountStoreService {
       // Backfill sanitized value so any legacy cached sensitive fields are removed at rest.
       if (JSON.stringify(parsed) !== JSON.stringify(sanitized)) {
         await Preferences.set({
-          key: PREF_PROFILE_CACHE_PREFIX + accountId,
+          key: this.profileCachePrefix + accountId,
           value: JSON.stringify(sanitized),
         });
       }
@@ -215,7 +214,7 @@ export class AccountStoreService {
   }
 
   async clearCachedProfile(accountId: string): Promise<void> {
-    await Preferences.remove({ key: PREF_PROFILE_CACHE_PREFIX + accountId });
+    await Preferences.remove({ key: this.profileCachePrefix + accountId });
   }
 
   // ---------- Helpers ----------
@@ -273,7 +272,7 @@ export class AccountStoreService {
       });
     }
 
-    await Preferences.set({ key: PREF_ACCOUNTS_INDEX, value: JSON.stringify(normalized) });
+    await Preferences.set({ key: this.accountsIndexKey, value: JSON.stringify(normalized) });
 
     for (const duplicateId of duplicateIds) {
       if (!duplicateId) continue;

@@ -42,8 +42,8 @@ export class Globals {
   private link_mode_initialized = false;
 
   // ---- app identity / toggles ----
-  public app_version: string = '7.2.10';
-  public update_version: string = '20261030';
+  public app_version: string = '7.2.11';
+  public update_version: string = '20261112';
   public build_num: string = '00';
 
   public device_info: any;

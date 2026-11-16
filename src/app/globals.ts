@@ -42,9 +42,9 @@ export class Globals {
   private link_mode_initialized = false;
 
   // ---- app identity / toggles ----
-  public app_version: string = '7.2.12';
+  public app_version: string = '7.2.13';
   public update_version: string = '20261116';
-  public build_num: string = '00';
+  public build_num: string = '01';
 
   public device_info: any;
   public system_color: any = window.matchMedia('(prefers-color-scheme: dark)');

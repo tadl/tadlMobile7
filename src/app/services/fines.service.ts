@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
-import { Observable, from, map, shareReplay, switchMap } from 'rxjs';
+import { Observable, finalize, from, map, shareReplay, switchMap } from 'rxjs';
 
 import { Globals } from '../globals';
 import { AuthService } from './auth.service';
@@ -35,7 +35,7 @@ export class FinesService {
   private accounts = inject(AccountStoreService);
   private userApiQueue = inject(UserApiQueueService);
 
-  private activeFetch$: Observable<AspenPatronFinesResponse> | null = null;
+  private activeFetches = new Map<string, Observable<AspenPatronFinesResponse>>();
 
   fetchPatronFines(): Observable<AspenPatronFinesResponse> {
     const snap = this.auth.snapshot();
@@ -50,10 +50,11 @@ export class FinesService {
       ]);
     }
 
-    const existing = this.activeFetch$;
+    const accountId = snap.activeAccountId;
+    const existing = this.activeFetches.get(accountId);
     if (existing) return existing;
 
-    const request$ = from(this.accounts.getPassword(snap.activeAccountId)).pipe(
+    const request$: Observable<AspenPatronFinesResponse> = from(this.accounts.getPassword(accountId)).pipe(
       switchMap((password) => {
         if (!password) {
           return from([
@@ -104,15 +105,15 @@ export class FinesService {
             })
           );
       }),
-      map((result) => result),
+      finalize(() => {
+        if (this.activeFetches.get(accountId) === request$) {
+          this.activeFetches.delete(accountId);
+        }
+      }),
       shareReplay({ bufferSize: 1, refCount: true })
     );
 
-    this.activeFetch$ = request$;
-    request$.subscribe({
-      complete: () => (this.activeFetch$ = null),
-      error: () => (this.activeFetch$ = null),
-    });
+    this.activeFetches.set(accountId, request$);
     return request$;
   }
 

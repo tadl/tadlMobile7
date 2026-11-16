@@ -13,6 +13,8 @@ import {
   map,
   of,
   switchMap,
+  Subscription,
+  takeWhile,
   timer,
   toArray,
 } from 'rxjs';
@@ -44,6 +46,8 @@ export class CheckoutsPage {
   private modalCtrl = inject(ModalController);
   private actionSheetCtrl = inject(ActionSheetController);
   private formatFamily = inject(FormatFamilyService);
+  private refreshSubscription?: Subscription;
+  private displayedAccountId: string | null = null;
 
   private static readonly BULK_ACTION_DELAY_MS = 450;
   loading = false;
@@ -58,13 +62,23 @@ export class CheckoutsPage {
     this.refresh();
   }
 
+  ionViewDidLeave() {
+    this.refreshSubscription?.unsubscribe();
+  }
+
   refresh(ev?: any) {
+    const snap = this.auth.snapshot();
+    if (this.displayedAccountId !== snap.activeAccountId) {
+      this.refreshSubscription?.unsubscribe();
+      this.displayedAccountId = snap.activeAccountId;
+      this.ilsCheckouts = [];
+      this.renewingKeys.clear();
+    }
     if (this.loading) {
       ev?.target?.complete?.();
       return;
     }
 
-    const snap = this.auth.snapshot();
     if (!snap.isLoggedIn || !snap.activeAccountId) {
       this.ilsCheckouts = [];
       ev?.target?.complete?.();
@@ -77,7 +91,7 @@ export class CheckoutsPage {
       ? this.checkouts.fetchFreshActiveCheckouts(true)
       : this.checkouts.fetchActiveCheckouts();
 
-    checkouts$
+    this.refreshSubscription = checkouts$
       .pipe(
         finalize(() => {
           this.loading = false;
@@ -86,10 +100,14 @@ export class CheckoutsPage {
       )
       .subscribe({
         next: (list) => {
+          if (this.auth.snapshot().activeAccountId !== snap.activeAccountId) return;
           this.ilsCheckouts = this.sortCheckouts((list ?? []).slice());
           this.syncProfileCheckoutCount(this.ilsCheckouts.length);
         },
-        error: () => this.toast.presentToast('Could not refresh checkouts.'),
+        error: () => {
+          if (this.auth.snapshot().activeAccountId !== snap.activeAccountId) return;
+          this.toast.presentToast('Could not refresh checkouts.');
+        },
       });
   }
 
@@ -297,6 +315,7 @@ export class CheckoutsPage {
   }
 
   private renewSingle(c: AspenCheckout) {
+    const accountId = this.auth.snapshot().activeAccountId;
     if (!this.checkoutCanRenew(c) || this.renewAllBusy) return;
     const key = this.checkoutKey(c);
     if (!key || this.renewingKeys.has(key)) return;
@@ -307,17 +326,22 @@ export class CheckoutsPage {
       .pipe(finalize(() => this.renewingKeys.delete(key)))
       .subscribe({
         next: (res) => {
+          if (this.auth.snapshot().activeAccountId !== accountId) return;
           if (!res?.success) {
             this.toast.presentToast(res?.message || 'Could not renew.');
             return;
           }
           this.refreshAfterRenewal(`Renewed: ${this.checkoutTitle(c)}`);
         },
-        error: () => this.toast.presentToast('Could not renew.'),
+        error: () => {
+          if (this.auth.snapshot().activeAccountId !== accountId) return;
+          this.toast.presentToast('Could not renew.');
+        },
       });
   }
 
   private renewAll() {
+    const accountId = this.auth.snapshot().activeAccountId;
     const renewable = (this.ilsCheckouts ?? []).filter((c) =>
       this.checkoutCanRenew(c)
     );
@@ -330,7 +354,8 @@ export class CheckoutsPage {
       .pipe(
         concatMap((checkout, idx) =>
           timer(idx === 0 ? 0 : CheckoutsPage.BULK_ACTION_DELAY_MS).pipe(
-            switchMap(() => this.checkouts.renewCheckout(checkout)),
+            switchMap(() => this.auth.snapshot().activeAccountId === accountId
+              ? this.checkouts.renewCheckout(checkout) : of(null)),
             map((res) => ({
               checkout,
               success: !!res?.success,
@@ -349,6 +374,7 @@ export class CheckoutsPage {
             )
           )
         ),
+        takeWhile(() => this.auth.snapshot().activeAccountId === accountId),
         toArray(),
         finalize(() => {
           this.renewAllBusy = false;
@@ -357,6 +383,7 @@ export class CheckoutsPage {
       )
       .subscribe({
         next: (results) => {
+          if (this.auth.snapshot().activeAccountId !== accountId) return;
           const ok = results.filter((r) => r.success).length;
           const failed = results.length - ok;
           const rateLimited = results.some((r) => r.rateLimited);
@@ -378,12 +405,14 @@ export class CheckoutsPage {
           }
         },
         error: () => {
+          if (this.auth.snapshot().activeAccountId !== accountId) return;
           this.toast.presentToast('Could not complete renew all.');
         },
       });
   }
 
   async openCheckout(c: AspenCheckout) {
+    const accountId = this.auth.snapshot().activeAccountId;
     if (this.isMelcatCheckout(c)) {
       await this.openMelcatManager('checkout', c);
       return;
@@ -417,6 +446,7 @@ export class CheckoutsPage {
     this.globals.modal_open = true;
 
     m.onDidDismiss().then((res) => {
+      if (this.auth.snapshot().activeAccountId !== accountId) return;
       const data = res?.data;
       if (data?.refreshCheckouts) {
         const updatedCheckout = data?.checkout as
@@ -538,14 +568,17 @@ export class CheckoutsPage {
   }
 
   private refreshAfterRenewal(successMessage?: string): void {
+    const accountId = this.auth.snapshot().activeAccountId;
     // A network request alone can still return Aspen's cached due dates.
     this.checkouts.fetchFreshActiveCheckouts(true).subscribe({
       next: (list) => {
+        if (this.auth.snapshot().activeAccountId !== accountId) return;
         this.ilsCheckouts = this.sortCheckouts((list ?? []).slice());
         this.syncProfileCheckoutCount(this.ilsCheckouts.length);
         if (successMessage) this.toast.presentToast(successMessage);
       },
       error: () => {
+        if (this.auth.snapshot().activeAccountId !== accountId) return;
         this.toast.presentToast(
           successMessage
             ? `${successMessage} Could not refresh due dates. Pull to refresh.`

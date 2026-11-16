@@ -64,6 +64,7 @@ export interface AspenHold {
 
 export interface PatronHoldsResponse {
   success: boolean;
+  message?: string;
   holds: {
     available: Record<string, AspenHold> | AspenHold[];
     unavailable: Record<string, AspenHold> | AspenHold[];
@@ -99,7 +100,7 @@ export class HoldsService {
   private userApiQueue = inject(UserApiQueueService);
   private preferences = inject(AccountPreferencesService);
 
-  private activeFetch$: Observable<AspenHold[]> | null = null;
+  private readonly activeFetches = new Map<string, Observable<AspenHold[]>>();
 
   // ---------- Cache ----------
 
@@ -137,16 +138,17 @@ export class HoldsService {
       filter((v): v is AspenHold[] => Array.isArray(v))
     );
 
-    const network$ =
-      this.activeFetch$ ??
-      this.fetchHoldsNetwork(snap, cacheKey).pipe(
+    const accountId = snap.activeAccountId;
+    let network$ = this.activeFetches.get(accountId);
+    if (!network$) {
+      network$ = this.fetchHoldsNetwork(snap, cacheKey).pipe(
         finalize(() => {
-          this.activeFetch$ = null;
+          this.activeFetches.delete(accountId);
         }),
         shareReplay({ bufferSize: 1, refCount: true })
       );
-
-    this.activeFetch$ = network$;
+      this.activeFetches.set(accountId, network$);
+    }
 
     return concat(cached$, network$);
   }
@@ -478,10 +480,15 @@ export class HoldsService {
   }
 
   private holdsFromResponse(r: PatronHoldsResponse): AspenHold[] {
-    if (!r?.success) return [];
+    const available = r?.holds?.available;
+    const unavailable = r?.holds?.unavailable;
+    if (r?.success !== true || !available || typeof available !== 'object' ||
+      !unavailable || typeof unavailable !== 'object') {
+      throw new Error(typeof r?.message === 'string' ? r.message : 'Could not refresh holds.');
+    }
     const all = [
-      ...this.normalizeHoldCollection(r?.holds?.available),
-      ...this.normalizeHoldCollection(r?.holds?.unavailable),
+      ...this.normalizeHoldCollection(available),
+      ...this.normalizeHoldCollection(unavailable),
     ];
     return all
       .filter((h) => h?.type === 'ils' || h?.source === 'ils')
@@ -581,7 +588,7 @@ export class HoldsService {
               map((raw) => raw?.result ?? raw),
               tap((r) => this.persistReturnedHelperToken(snap, r)),
               map((r: any) => {
-                const success = r?.success !== undefined ? !!r.success : true;
+                const success = r?.success === true;
                 return {
                   success,
                   title: typeof r?.title === 'string' ? r.title : undefined,

@@ -1152,6 +1152,7 @@ export class SearchPage implements OnInit, OnDestroy {
     pickupBranch: string,
     selectedFormatLabel?: string
   ): void {
+    const accountId = this.auth.snapshot().activeAccountId;
     if (this.rowActionBusy(hit)) return;
     this.setRowBusy(hit, true);
     this.holds
@@ -1159,6 +1160,7 @@ export class SearchPage implements OnInit, OnDestroy {
       .pipe(finalize(() => this.setRowBusy(hit, false)))
       .subscribe({
         next: (res) => {
+          if (this.auth.snapshot().activeAccountId !== accountId) return;
           if (!res?.success) {
             this.toast.presentToast(res?.message || 'Could not place hold.');
             return;
@@ -1193,7 +1195,10 @@ export class SearchPage implements OnInit, OnDestroy {
             }
           );
         },
-        error: () => this.toast.presentToast('Could not place hold.'),
+        error: () => {
+          if (this.auth.snapshot().activeAccountId !== accountId) return;
+          this.toast.presentToast('Could not place hold.');
+        },
       });
   }
 

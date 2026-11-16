@@ -33,6 +33,7 @@ export class AuthService {
   private readonly profileRefreshThrottleMs = 5 * 60 * 1000;
   private lastProfileRefreshAt = 0;
   private lastProfileRefreshAccountId: string | null = null;
+  private sessionRevision = 0;
 
   private state$ = new BehaviorSubject<AuthState>({
     isLoggedIn: false,
@@ -166,6 +167,7 @@ export class AuthService {
     if (!u || !p) {
       return throwError(() => new Error('missing_credentials'));
     }
+    this.sessionRevision += 1;
 
     return this.patron.getPatronProfile(u, p).pipe(
       switchMap((res) => {
@@ -208,6 +210,7 @@ export class AuthService {
    * - sets active + caches fresh profile
    */
   switchAccount(accountId: string): Observable<AuthState> {
+    this.sessionRevision += 1;
     return from(this.accounts.listAccounts()).pipe(
       map((list) => list.find((a) => a.id === accountId) ?? null),
       switchMap((meta) => {
@@ -273,6 +276,8 @@ export class AuthService {
    * - keeps stored accounts + passwords by default (matches your current app)
    */
   logout(): Observable<AuthState> {
+    // Invalidate pending refreshes immediately, before storage finishes logout.
+    this.sessionRevision += 1;
     return from(this.accounts.getActiveAccountId()).pipe(
       tap(() => {}),
       switchMap((activeId) => {
@@ -305,6 +310,8 @@ export class AuthService {
     if (!snap.activeAccountMeta || !snap.activeAccountId) {
       return from([snap]);
     }
+    const accountId = snap.activeAccountId;
+    const revision = this.sessionRevision;
 
     const force = options?.force === true;
     const now = Date.now();
@@ -321,8 +328,9 @@ export class AuthService {
 
     return from(this.accounts.getPassword(snap.activeAccountId)).pipe(
       switchMap((password) => {
+        if (!this.isCurrentSession(accountId, revision)) return of(this.snapshot());
         if (!password) {
-          return from(this.invalidateActiveSession(false)).pipe(
+          return from(this.invalidateActiveSession(accountId, revision, false)).pipe(
             map(() => this.snapshot())
           );
         }
@@ -335,8 +343,9 @@ export class AuthService {
           )
           .pipe(
             switchMap((res) => {
+              if (!this.isCurrentSession(accountId, revision)) return of(this.snapshot());
               if (!res.success || !res.profile) {
-                return from(this.invalidateActiveSession(true)).pipe(
+                return from(this.invalidateActiveSession(accountId, revision, true)).pipe(
                   map(() => this.snapshot())
                 );
               }
@@ -345,8 +354,9 @@ export class AuthService {
                 this.accounts.cacheProfile(snap.activeAccountId!, res.profile)
               ).pipe(
                 map(() => {
+                  if (!this.isCurrentSession(accountId, revision)) return this.snapshot();
                   const next: AuthState = {
-                    ...snap,
+                    ...this.snapshot(),
                     isLoggedIn: true,
                     profile: res.profile,
                   };
@@ -355,7 +365,7 @@ export class AuthService {
                 })
               );
             }),
-            catchError(() => of(snap))
+            catchError(() => of(this.snapshot()))
           );
       })
     );
@@ -383,20 +393,26 @@ export class AuthService {
     this.state$.next(next);
   }
 
+  private isCurrentSession(accountId: string, revision: number): boolean {
+    return this.sessionRevision === revision && this.snapshot().activeAccountId === accountId;
+  }
+
   private async invalidateActiveSession(
+    accountId: string,
+    revision: number,
     removeStoredAccount: boolean
   ): Promise<void> {
-    const snap = this.snapshot();
-    if (snap.activeAccountId) {
-      if (removeStoredAccount) {
-        await this.accounts.removeAccount(snap.activeAccountId);
-      } else {
-        await this.accounts.clearCachedProfile(snap.activeAccountId);
-        await this.accounts.setActiveAccountId(null);
-      }
+    if (!this.isCurrentSession(accountId, revision)) return;
+    if (removeStoredAccount) {
+      // Account removal must not independently clear active storage after a
+      // newer switch/login has started while its cleanup was awaiting I/O.
+      await this.accounts.removeAccount(accountId, { clearActive: false });
     } else {
-      await this.accounts.setActiveAccountId(null);
+      await this.accounts.clearCachedProfile(accountId);
     }
+    if (!this.isCurrentSession(accountId, revision)) return;
+    await this.accounts.setActiveAccountId(null);
+    if (!this.isCurrentSession(accountId, revision)) return;
 
     this.state$.next({
       isLoggedIn: false,

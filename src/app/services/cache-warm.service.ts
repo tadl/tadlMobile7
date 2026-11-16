@@ -5,10 +5,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { AuthService } from './auth.service';
 import { AccountStoreService } from './account-store.service';
 import { ListsService } from './lists.service';
-import {
-  AccountPreferences,
-  AccountPreferencesService,
-} from './account-preferences.service';
+import { AccountPreferencesService } from './account-preferences.service';
 import { AppCacheService } from './app-cache.service';
 import { Globals } from '../globals';
 import { AspenUserList } from './lists.service';
@@ -32,7 +29,8 @@ export class CacheWarmService {
   warmForActiveAccount(): void {
     const snap = this.auth.snapshot();
     const accountId = (snap?.activeAccountId ?? '').toString().trim();
-    if (!accountId) return;
+    const username = (snap?.activeAccountMeta?.username ?? '').toString().trim();
+    if (!accountId || !username) return;
 
     const now = Date.now();
     if (
@@ -47,14 +45,18 @@ export class CacheWarmService {
     // Keep account warm-up cheap: profile gives us counts/badges without pulling
     // the full holds/checkouts/fines/lists payloads up front.
     void this.safeRun(async () => {
-      await this.accounts.prewarmActivePassword();
-      const warmed = await this.warmFromBundledEndpoint();
+      const password = await this.accounts.getPassword(accountId);
+      if (!password) return;
+      const warmed = await this.warmFromBundledEndpoint(accountId, username, password);
       if (warmed) return;
 
+      const accountStillActive = this.auth.snapshot().activeAccountId === accountId;
       await Promise.all([
-        this.settle(lastValueFrom(this.auth.refreshActiveProfile())),
-        this.settle(lastValueFrom(this.lists.fetchUserLists())),
-        this.settle(this.warmPreferencesForActiveAccount()),
+        ...(accountStillActive ? [
+          this.settle(lastValueFrom(this.auth.refreshActiveProfile())),
+          this.settle(lastValueFrom(this.lists.fetchUserLists())),
+        ] : []),
+        this.settle(this.warmPreferencesForAccount(accountId, username, password)),
         this.settle(lastValueFrom(this.locations.getLocations())),
       ]);
     });
@@ -76,33 +78,13 @@ export class CacheWarmService {
     }
   }
 
-  private async warmPreferencesForActiveAccount(): Promise<void> {
-    const snap = this.auth.snapshot();
-    const accountId = (snap?.activeAccountId ?? '').toString().trim();
-    const username = (snap?.activeAccountMeta?.username ?? '')
-      .toString()
-      .trim();
-    if (!accountId || !username) return;
-
-    const password = await this.accounts.getPassword(accountId);
-    if (!password) return;
-
+  private async warmPreferencesForAccount(accountId: string, username: string, password: string): Promise<void> {
     await lastValueFrom(
       this.preferences.fetchForAccount(accountId, username, password)
     );
   }
 
-  private async warmFromBundledEndpoint(): Promise<boolean> {
-    const snap = this.auth.snapshot();
-    const accountId = (snap?.activeAccountId ?? '').toString().trim();
-    const username = (snap?.activeAccountMeta?.username ?? '')
-      .toString()
-      .trim();
-    if (!accountId || !username) return false;
-
-    const password = await this.accounts.getPassword(accountId);
-    if (!password) return false;
-
+  private async warmFromBundledEndpoint(accountId: string, username: string, password: string): Promise<boolean> {
     const body = new URLSearchParams();
     body.set('username', username);
     body.set('password', password);
@@ -130,7 +112,9 @@ export class CacheWarmService {
     const profile = raw?.userapi?.result?.profile;
     if (profile && typeof profile === 'object') {
       await this.accounts.cacheProfile(accountId, profile);
-      this.auth.applyActiveProfile(profile);
+      if (this.auth.snapshot().activeAccountId === accountId) {
+        this.auth.applyActiveProfile(profile);
+      }
     }
 
     const listResult = raw?.listapi?.result;
@@ -140,17 +124,14 @@ export class CacheWarmService {
       await this.cache.write(`lists:user:${accountId}`, lists);
     }
 
-    const token = (raw?.preferences?.user?.token ?? '').toString().trim();
-    if (token) {
-      await this.preferences.persistTokenForAccount(accountId, token);
-    }
-
-    const prefsRaw = raw?.preferences?.preferences;
-    if (prefsRaw && typeof prefsRaw === 'object') {
-      await this.preferences.persistPreferencesForAccount(
-        accountId,
-        prefsRaw as AccountPreferences
-      );
+    const payload = this.preferences.parsePayload(raw?.preferences);
+    if (payload) {
+      await Promise.allSettled([
+        this.preferences.persistTokenForAccount(accountId, payload.token),
+        this.preferences.persistPreferencesForAccount(accountId, payload.preferences),
+      ]);
+    } else {
+      await this.settle(this.warmPreferencesForAccount(accountId, username, password));
     }
 
     const locationsRaw = raw?.locations;

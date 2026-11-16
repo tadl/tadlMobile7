@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { lastValueFrom } from 'rxjs';
 
 import { AuthService } from './auth.service';
+import { AccountStoreService } from './account-store.service';
 import { HoldsService } from './holds.service';
 import { ItemService } from './item.service';
 import { AccountPreferencesService } from './account-preferences.service';
@@ -27,6 +28,7 @@ export interface HoldableEntryContext {
 @Injectable({ providedIn: 'root' })
 export class HoldSupportService {
   private auth = inject(AuthService);
+  private accounts = inject(AccountStoreService);
   private holds = inject(HoldsService);
   private items = inject(ItemService);
   private accountPreferences = inject(AccountPreferencesService);
@@ -67,20 +69,29 @@ export class HoldSupportService {
   }
 
   async defaultPickupBranchCode(): Promise<string | null> {
-    const activeId = (this.auth.snapshot()?.activeAccountId ?? '')
-      .toString()
-      .trim();
-    if (!activeId) return null;
+    const snapshot = this.auth.snapshot();
+    const activeId = (snapshot?.activeAccountId ?? '').toString().trim();
+    if (!snapshot?.isLoggedIn || !activeId) return null;
+
+    const isCurrentAccount = () => {
+      const current = this.auth.snapshot();
+      return current?.isLoggedIn && current.activeAccountId === activeId;
+    };
 
     try {
-      const prefs = await this.accountPreferences.getCachedPreferences(
-        activeId
-      );
-      const legacyCode = (prefs?.pickup_library ?? '').toString().trim();
-      if (!legacyCode) return null;
-      const loc =
-        this.globals.pickupLocationFromLegacyPreferencesCode(legacyCode);
-      return loc?.code ?? null;
+      const cached = await this.accountPreferences.getCachedPreferences(activeId).catch(() => null);
+      if (!isCurrentAccount()) return null;
+      const cachedLocation = this.globals.pickupLocationFromLegacyPreferencesCode(cached?.pickup_library ?? '');
+      if (cachedLocation) return cachedLocation.code;
+
+      // Login warm-up is asynchronous; a missing cache does not mean no saved default exists.
+      const username = (snapshot.activeAccountMeta?.username ?? '').trim();
+      if (!username) return null;
+      const password = await this.accounts.getPassword(activeId);
+      if (!isCurrentAccount() || !password) return null;
+      const payload = await lastValueFrom(this.accountPreferences.fetchForAccount(activeId, username, password));
+      if (!isCurrentAccount()) return null;
+      return this.globals.pickupLocationFromLegacyPreferencesCode(payload.preferences.pickup_library)?.code ?? null;
     } catch {
       return null;
     }

@@ -6,7 +6,7 @@ import {
   ActionSheetController,
   type ActionSheetButton,
 } from '@ionic/angular/lazy';
-import { finalize } from 'rxjs';
+import { finalize, Subscription } from 'rxjs';
 
 import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
@@ -32,6 +32,8 @@ export class HoldsPage {
   private modal = inject(ModalController);
   private actionSheet = inject(ActionSheetController);
   private formatFamily = inject(FormatFamilyService);
+  private refreshSubscription?: Subscription;
+  private displayedAccountId: string | null = null;
 
   loading = false;
   hydratedFromCache = false;
@@ -47,8 +49,13 @@ export class HoldsPage {
     await this.loadCacheThenRefresh();
   }
 
+  ionViewDidLeave() {
+    this.refreshSubscription?.unsubscribe();
+  }
+
   async loadCacheThenRefresh() {
     const snap = this.auth.snapshot();
+    this.prepareAccount(snap.activeAccountId);
     if (!snap.isLoggedIn || !snap.activeAccountId) {
       this.ilsReady = [];
       this.ilsNotReady = [];
@@ -57,6 +64,7 @@ export class HoldsPage {
 
     try {
       const cached = await this.holds.getCachedHolds(snap.activeAccountId);
+      if (this.auth.snapshot().activeAccountId !== snap.activeAccountId) return;
       if (cached?.holds?.length) {
         this.hydratedFromCache = true;
         this.partitionIlsHolds(cached.holds);
@@ -64,6 +72,7 @@ export class HoldsPage {
         this.hydratedFromCache = false;
       }
     } catch {
+      if (this.auth.snapshot().activeAccountId !== snap.activeAccountId) return;
       this.hydratedFromCache = false;
     }
 
@@ -72,12 +81,13 @@ export class HoldsPage {
   }
 
   refresh(ev?: any, opts?: { suppressErrorToast?: boolean }) {
+    const snap = this.auth.snapshot();
+    this.prepareAccount(snap.activeAccountId);
     if (this.loading) {
       ev?.target?.complete?.();
       return;
     }
 
-    const snap = this.auth.snapshot();
     if (!snap.isLoggedIn || !snap.activeAccountId) {
       ev?.target?.complete?.();
       return;
@@ -89,7 +99,7 @@ export class HoldsPage {
       ? this.holds.fetchFreshActiveHolds(true)
       : this.holds.fetchActiveHolds();
 
-    holds$
+    this.refreshSubscription = holds$
       .pipe(
         finalize(() => {
           this.loading = false;
@@ -98,6 +108,7 @@ export class HoldsPage {
       )
       .subscribe({
         next: async (allHolds) => {
+          if (this.auth.snapshot().activeAccountId !== snap.activeAccountId) return;
           const ilsOnly = (allHolds ?? []).filter(
             (h) => h?.type === 'ils' || h?.source === 'ils'
           );
@@ -111,11 +122,22 @@ export class HoldsPage {
           }
         },
         error: () => {
+          if (this.auth.snapshot().activeAccountId !== snap.activeAccountId) return;
           if (!opts?.suppressErrorToast) {
             this.toast.presentToast('Could not refresh holds.');
           }
         },
       });
+  }
+
+  private prepareAccount(accountId: string | null) {
+    if (this.displayedAccountId === accountId) return;
+    this.refreshSubscription?.unsubscribe();
+    this.displayedAccountId = accountId;
+    this.ilsReady = [];
+    this.ilsNotReady = [];
+    this.hydratedFromCache = false;
+    this.holdActionBusyKeys.clear();
   }
 
   private partitionIlsHolds(holds: AspenHold[]) {
@@ -283,6 +305,7 @@ export class HoldsPage {
   }
 
   async openHold(h: AspenHold) {
+    const accountId = this.auth.snapshot().activeAccountId;
     if (this.isMelcatHold(h)) {
       await this.openMelcatManager('hold', h);
       return;
@@ -318,6 +341,7 @@ export class HoldsPage {
 
     // IMPORTANT: react to changes from the modal
     m.onDidDismiss().then((res) => {
+      if (this.auth.snapshot().activeAccountId !== accountId) return;
       const data = res?.data;
       if (data?.refreshHolds) {
         const groupedWorkId = (data?.groupedWorkId ?? '').toString().trim();
@@ -403,6 +427,7 @@ export class HoldsPage {
   }
 
   private toggleHoldFrozen(h: AspenHold) {
+    const accountId = this.auth.snapshot().activeAccountId;
     if (this.isHoldActionBusy(h)) return;
     if (this.holdIsReady(h)) return;
     if (!this.holdIsFrozen(h) && !this.holdCanFreeze(h)) return;
@@ -416,6 +441,10 @@ export class HoldsPage {
     const op$ = wasFrozen ? this.holds.thawHold(h) : this.holds.freezeHold(h);
     op$.subscribe({
       next: (res) => {
+        if (this.auth.snapshot().activeAccountId !== accountId) {
+          this.holdActionBusyKeys.delete(key);
+          return;
+        }
         if (!res?.success) {
           this.holdActionBusyKeys.delete(key);
           this.toast.presentToast(
@@ -432,8 +461,13 @@ export class HoldsPage {
           targetFrozen ? `Hold frozen: ${title}` : `Hold thawed: ${title}`
         );
       },
-      error: () =>
-        this.reconcileHoldToggleAfterUnknownError(h, targetFrozen, key),
+      error: () => {
+        if (this.auth.snapshot().activeAccountId !== accountId) {
+          this.holdActionBusyKeys.delete(key);
+          return;
+        }
+        this.reconcileHoldToggleAfterUnknownError(h, targetFrozen, key);
+      },
     });
   }
 
@@ -442,8 +476,10 @@ export class HoldsPage {
     targetFrozen: boolean,
     key: string
   ) {
+    const accountId = this.auth.snapshot().activeAccountId;
     this.holds.verifyHoldFrozenStateAfterDelay(h, targetFrozen).subscribe({
       next: (verified) => {
+        if (this.auth.snapshot().activeAccountId !== accountId) return;
         if (verified) {
           this.applyHoldFrozenState(verified, targetFrozen);
           const title = this.holdTitle(verified);
@@ -458,6 +494,7 @@ export class HoldsPage {
         );
       },
       error: () => {
+        if (this.auth.snapshot().activeAccountId !== accountId) return;
         this.toast.presentToast(
           targetFrozen ? 'Could not freeze hold.' : 'Could not thaw hold.'
         );
@@ -511,6 +548,7 @@ export class HoldsPage {
     holdId: number,
     newLocation: string
   ) {
+    const accountId = this.auth.snapshot().activeAccountId;
     if (this.isHoldActionBusy(h)) return;
 
     const key = this.holdActionKey(h);
@@ -523,6 +561,7 @@ export class HoldsPage {
       .pipe(finalize(() => this.holdActionBusyKeys.delete(key)))
       .subscribe({
         next: (res) => {
+          if (this.auth.snapshot().activeAccountId !== accountId) return;
           if (!res?.success) {
             this.toast.presentToast(
               res?.message || 'Could not change pickup location.'
@@ -552,12 +591,15 @@ export class HoldsPage {
           );
           void this.persistLocalHolds();
         },
-        error: () =>
-          this.toast.presentToast('Could not change pickup location.'),
+        error: () => {
+          if (this.auth.snapshot().activeAccountId !== accountId) return;
+          this.toast.presentToast('Could not change pickup location.');
+        },
       });
   }
 
   private cancelHoldNow(h: AspenHold) {
+    const accountId = this.auth.snapshot().activeAccountId;
     if (this.isHoldActionBusy(h)) return;
 
     const key = this.holdActionKey(h);
@@ -569,6 +611,7 @@ export class HoldsPage {
       .pipe(finalize(() => this.holdActionBusyKeys.delete(key)))
       .subscribe({
         next: async (res) => {
+          if (this.auth.snapshot().activeAccountId !== accountId) return;
           if (!res?.success) {
             this.toast.presentToast(res?.message || 'Could not cancel hold.');
             return;
@@ -588,7 +631,10 @@ export class HoldsPage {
             await this.persistLocalHolds();
           }
         },
-        error: () => this.toast.presentToast('Could not cancel hold.'),
+        error: () => {
+          if (this.auth.snapshot().activeAccountId !== accountId) return;
+          this.toast.presentToast('Could not cancel hold.');
+        },
       });
   }
 

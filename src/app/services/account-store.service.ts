@@ -71,7 +71,7 @@ export class AccountStoreService {
     return normalized.find(a => a.id === acct.id) ?? acct;
   }
 
-  async removeAccount(accountId: string): Promise<void> {
+  async removeAccount(accountId: string, options?: { clearActive?: boolean }): Promise<void> {
     const accounts = await this.listAccounts();
     const next = accounts.filter(a => a.id !== accountId);
     await Preferences.set({ key: this.accountsIndexKey, value: JSON.stringify(next) });
@@ -80,9 +80,11 @@ export class AccountStoreService {
     await this.deletePassword(accountId);
 
     // clear active if needed
-    const active = await this.getActiveAccountId();
-    if (active === accountId) {
-      await this.setActiveAccountId(null);
+    if (options?.clearActive !== false) {
+      const active = await this.getActiveAccountId();
+      if (active === accountId) {
+        await this.setActiveAccountId(null);
+      }
     }
 
     // clear cached profile

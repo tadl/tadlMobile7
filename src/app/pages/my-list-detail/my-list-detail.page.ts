@@ -9,7 +9,7 @@ import {
   AlertController,
   type ActionSheetButton,
 } from '@ionic/angular/lazy';
-import { finalize } from 'rxjs';
+import { finalize, Subscription } from 'rxjs';
 import { lastValueFrom } from 'rxjs';
 
 import { Globals } from '../../globals';
@@ -50,6 +50,9 @@ export class MyListDetailPage {
   private holds = inject(HoldsService);
   private formatFamily = inject(FormatFamilyService);
   private holdSupport = inject(HoldSupportService);
+  private titlesSubscription?: Subscription;
+  private moreSubscription?: Subscription;
+  private displayedAccountId: string | null = null;
 
   loading = false;
   loadingMore = false;
@@ -67,14 +70,51 @@ export class MyListDetailPage {
   mutatingList = false;
 
   ionViewWillEnter() {
-    this.listId = (this.route.snapshot.paramMap.get('id') ?? '').trim();
+    const listId = (this.route.snapshot.paramMap.get('id') ?? '').trim();
+    if (this.listId !== listId) {
+      this.cancelReadRequests();
+      this.titles = [];
+      this.listTitle = 'List';
+      this.listDescription = '';
+      this.canEditList = false;
+    }
+    this.listId = listId;
+    this.prepareAccount();
     const hint = (this.route.snapshot.queryParamMap.get('title') ?? '').trim();
     if (hint) this.listTitle = hint;
     void this.refreshOwnership();
     this.refresh();
   }
 
+  ionViewDidLeave() {
+    this.cancelReadRequests();
+  }
+
+  private cancelReadRequests() {
+    this.titlesSubscription?.unsubscribe();
+    this.moreSubscription?.unsubscribe();
+  }
+
+  private prepareAccount(): string | null {
+    const accountId = this.auth.snapshot().activeAccountId;
+    if (this.displayedAccountId !== accountId) {
+      this.cancelReadRequests();
+      this.titles = [];
+      this.canEditList = false;
+      this.actionRecordId = '';
+      this.listTitle = 'List';
+      this.listDescription = '';
+      this.page = 1;
+      this.totalPages = 1;
+      this.infiniteDisabled = true;
+      this.displayedAccountId = accountId;
+    }
+    return accountId;
+  }
+
   refresh(ev?: any) {
+    const accountId = this.prepareAccount();
+    const listId = this.listId;
     if (this.loading || this.loadingMore) {
       ev?.target?.complete?.();
       return;
@@ -89,8 +129,8 @@ export class MyListDetailPage {
     this.totalPages = 1;
     this.infiniteDisabled = true;
     this.loading = true;
-    this.listsService
-      .fetchListTitles(this.listId, this.page, this.pageSize)
+    this.titlesSubscription = this.listsService
+      .fetchListTitles(listId, this.page, this.pageSize)
       .pipe(
         finalize(() => {
           this.loading = false;
@@ -99,6 +139,7 @@ export class MyListDetailPage {
       )
       .subscribe({
         next: (res) => {
+          if (this.auth.snapshot().activeAccountId !== accountId || this.listId !== listId) return;
           if (!res?.success) {
             this.titles = [];
             this.toast.presentToast(
@@ -121,6 +162,7 @@ export class MyListDetailPage {
           this.infiniteDisabled = !(this.page < this.totalPages);
         },
         error: () => {
+          if (this.auth.snapshot().activeAccountId !== accountId || this.listId !== listId) return;
           this.titles = [];
           this.infiniteDisabled = true;
           this.toast.presentToast('Could not load this list.');
@@ -129,6 +171,8 @@ export class MyListDetailPage {
   }
 
   loadMore(ev: any) {
+    const accountId = this.prepareAccount();
+    const listId = this.listId;
     if (this.loading || this.loadingMore || this.infiniteDisabled) {
       ev?.target?.complete?.();
       return;
@@ -146,8 +190,8 @@ export class MyListDetailPage {
 
     const nextPage = this.page + 1;
     this.loadingMore = true;
-    this.listsService
-      .fetchListTitles(this.listId, nextPage, this.pageSize)
+    this.moreSubscription = this.listsService
+      .fetchListTitles(listId, nextPage, this.pageSize)
       .pipe(
         finalize(() => {
           this.loadingMore = false;
@@ -156,6 +200,7 @@ export class MyListDetailPage {
       )
       .subscribe({
         next: (res) => {
+          if (this.auth.snapshot().activeAccountId !== accountId || this.listId !== listId) return;
           if (!res?.success) {
             this.toast.presentToast(
               res?.message || 'Could not load more list titles.'
@@ -187,8 +232,10 @@ export class MyListDetailPage {
             Number(res?.page_total ?? this.totalPages) || this.totalPages;
           this.infiniteDisabled = !(this.page < this.totalPages);
         },
-        error: () =>
-          this.toast.presentToast('Could not load more list titles.'),
+        error: () => {
+          if (this.auth.snapshot().activeAccountId !== accountId || this.listId !== listId) return;
+          this.toast.presentToast('Could not load more list titles.');
+        },
       });
   }
 
@@ -402,19 +449,23 @@ export class MyListDetailPage {
     pickupBranch: string,
     selectedFormatLabel?: string
   ): void {
+    const accountId = this.auth.snapshot().activeAccountId;
     const groupedKey = this.recordIdForEntry(t);
-    if (!groupedKey || this.rowActionBusyFor(t)) return;
+    if (!accountId || !groupedKey || this.rowActionBusyFor(t)) return;
 
     this.actionRecordId = groupedKey;
     this.holds
       .placeHold(recordId, pickupBranch, null)
       .pipe(
         finalize(() => {
-          this.actionRecordId = '';
+          if (this.auth.snapshot().activeAccountId === accountId && this.actionRecordId === groupedKey) {
+            this.actionRecordId = '';
+          }
         })
       )
       .subscribe({
         next: (res) => {
+          if (this.auth.snapshot().activeAccountId !== accountId) return;
           if (!res?.success) {
             this.toast.presentToast(res?.message || 'Could not place hold.');
             return;
@@ -451,7 +502,10 @@ export class MyListDetailPage {
             }
           );
         },
-        error: () => this.toast.presentToast('Could not place hold.'),
+        error: () => {
+          if (this.auth.snapshot().activeAccountId !== accountId) return;
+          this.toast.presentToast('Could not place hold.');
+        },
       });
   }
 
@@ -733,20 +787,24 @@ export class MyListDetailPage {
   }
 
   private async refreshOwnership(): Promise<void> {
-    if (!this.listId) {
-      this.canEditList = false;
+    const accountId = this.auth.snapshot().activeAccountId;
+    const listId = this.listId;
+    this.canEditList = false;
+    if (!listId || !accountId) {
       return;
     }
 
     try {
       const userLists = await lastValueFrom(this.listsService.fetchUserLists());
+      if (this.auth.snapshot().activeAccountId !== accountId || this.listId !== listId) return;
       const ownedIds = new Set(
         (userLists ?? [])
           .map((x) => (x?.id ?? '').toString().trim())
           .filter((x) => !!x)
       );
-      this.canEditList = ownedIds.has(this.listId);
+      this.canEditList = ownedIds.has(listId);
     } catch {
+      if (this.auth.snapshot().activeAccountId !== accountId || this.listId !== listId) return;
       this.canEditList = false;
     }
   }

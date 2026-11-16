@@ -56,6 +56,24 @@ export class AccountPreferencesService {
     return this.cache.read<string>(this.tokenCacheKey(id));
   }
 
+  parsePayload(raw: unknown): PreferencesPayload | null {
+    const isRecord = (value: unknown): value is Record<string, unknown> =>
+      typeof value === 'object' && value !== null && !Array.isArray(value);
+    if (!isRecord(raw)) return null;
+    const root = raw['result'] ?? raw;
+    if (!isRecord(root) || root['success'] === false || root['ok'] === false || root['error']) return null;
+    const messages = root['messages'];
+    if (Array.isArray(messages) && messages.some(message => isRecord(message) && message['error'])) return null;
+    const preferences = root['preferences'];
+    if (!isRecord(preferences) || !Object.prototype.hasOwnProperty.call(preferences, 'pickup_library')) return null;
+    const pickup = preferences['pickup_library'];
+    if (pickup !== null && typeof pickup !== 'string' &&
+      !(typeof pickup === 'number' && Number.isSafeInteger(pickup) && pickup >= 0)) return null;
+    const user = root['user'];
+    const token = isRecord(user) && typeof user['token'] === 'string' ? user['token'].trim() : '';
+    return { token, preferences: this.normalizePreferences(preferences), raw };
+  }
+
   fetchByCredentials(
     username: string,
     password: string
@@ -66,15 +84,9 @@ export class AccountPreferencesService {
 
     return this.http.get<any>(this.preferencesFetchUrl(), { params }).pipe(
       map((raw) => {
-        const root = raw?.result ?? raw ?? {};
-        const user = root?.user ?? {};
-        const preferences = this.normalizePreferences(root?.preferences ?? {});
-
-        return {
-          token: (user?.token ?? '').toString().trim(),
-          preferences,
-          raw,
-        } satisfies PreferencesPayload;
+        const payload = this.parsePayload(raw);
+        if (!payload) throw new Error('Could not load account preferences.');
+        return payload;
       })
     );
   }
@@ -88,7 +100,7 @@ export class AccountPreferencesService {
     if (!id) return this.fetchByCredentials(username, password);
 
     return this.fetchByCredentials(username, password).pipe(
-      tap((res) => this.persistAccountCache(id, res))
+      switchMap(res => from(this.persistAccountCache(id, res)).pipe(map(() => res)))
     );
   }
 
@@ -265,13 +277,17 @@ export class AccountPreferencesService {
     const id = (accountId ?? '').trim();
     if (!id) return;
 
+    const writes: Promise<void>[] = [];
     const token = (payload?.token ?? '').toString().trim();
     if (token) {
-      await this.cache.write(this.tokenCacheKey(id), token);
+      writes.push(this.cache.write(this.tokenCacheKey(id), token));
     }
     if (this.looksLikeValidPreferences(payload?.preferences)) {
-      await this.cache.write(this.preferencesCacheKey(id), payload.preferences);
+      writes.push(this.cache.write(this.preferencesCacheKey(id), payload.preferences));
     }
+    // Complete warmup only after both writes settle; fresh server data remains
+    // usable even when optional local storage is unavailable.
+    await Promise.allSettled(writes);
   }
 
   private looksLikeValidPreferences(

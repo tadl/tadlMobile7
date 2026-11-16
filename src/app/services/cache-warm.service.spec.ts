@@ -17,9 +17,12 @@ describe('CacheWarm first account hydration', () => {
   let auth: jasmine.SpyObj<AuthService>;
   let accounts: jasmine.SpyObj<AccountStoreService>;
   let lists: jasmine.SpyObj<ListsService>;
-  let preferences: jasmine.SpyObj<AccountPreferencesService>;
+  let preferences: AccountPreferencesService;
+  let persistToken: jasmine.Spy<AccountPreferencesService['persistTokenForAccount']>;
+  let persistPreferences: jasmine.Spy<AccountPreferencesService['persistPreferencesForAccount']>;
   let cache: jasmine.SpyObj<AppCacheService>;
   let locations: jasmine.SpyObj<LocationsService>;
+  let activeSnapshot: AuthState;
 
   const snapshot: AuthState = {
     isLoggedIn: true, activeAccountId: 'synthetic-account',
@@ -36,21 +39,15 @@ describe('CacheWarm first account hydration', () => {
   };
 
   beforeEach(() => {
+    activeSnapshot = snapshot;
     auth = jasmine.createSpyObj<AuthService>('AuthService', ['snapshot', 'applyActiveProfile', 'refreshActiveProfile']);
-    auth.snapshot.and.returnValue(snapshot);
+    auth.snapshot.and.callFake(() => activeSnapshot);
     auth.refreshActiveProfile.and.returnValue(of(snapshot));
-    accounts = jasmine.createSpyObj<AccountStoreService>('AccountStoreService', ['prewarmActivePassword', 'getPassword', 'cacheProfile']);
-    accounts.prewarmActivePassword.and.resolveTo();
+    accounts = jasmine.createSpyObj<AccountStoreService>('AccountStoreService', ['getPassword', 'cacheProfile']);
     accounts.getPassword.and.resolveTo('synthetic-password');
     accounts.cacheProfile.and.resolveTo();
     lists = jasmine.createSpyObj<ListsService>('ListsService', ['fetchUserLists']);
     lists.fetchUserLists.and.returnValue(of(userLists));
-    preferences = jasmine.createSpyObj<AccountPreferencesService>('AccountPreferencesService', [
-      'persistTokenForAccount', 'persistPreferencesForAccount', 'fetchForAccount',
-    ]);
-    preferences.persistTokenForAccount.and.resolveTo();
-    preferences.persistPreferencesForAccount.and.resolveTo();
-    preferences.fetchForAccount.and.returnValue(of({ token: 'synthetic-token', preferences: prefs, raw: {} }));
     cache = jasmine.createSpyObj<AppCacheService>('AppCacheService', ['write']);
     cache.write.and.resolveTo();
     locations = jasmine.createSpyObj<LocationsService>('LocationsService', ['hydrateLocations', 'getLocations']);
@@ -62,12 +59,15 @@ describe('CacheWarm first account hydration', () => {
       { provide: AuthService, useValue: auth },
       { provide: AccountStoreService, useValue: accounts },
       { provide: ListsService, useValue: lists },
-      { provide: AccountPreferencesService, useValue: preferences },
       { provide: AppCacheService, useValue: cache },
       { provide: LocationsService, useValue: locations },
     ] });
     http = TestBed.inject(HttpTestingController);
     service = TestBed.inject(CacheWarmService);
+    preferences = TestBed.inject(AccountPreferencesService);
+    persistToken = spyOn(preferences, 'persistTokenForAccount').and.resolveTo();
+    persistPreferences = spyOn(preferences, 'persistPreferencesForAccount').and.resolveTo();
+    spyOn(preferences, 'fetchForAccount').and.returnValue(of({ token: 'synthetic-token', preferences: prefs, raw: {} }));
   });
 
   afterEach(() => http.verify());
@@ -102,6 +102,121 @@ describe('CacheWarm first account hydration', () => {
     expect(preferences.persistPreferencesForAccount).toHaveBeenCalledOnceWith('synthetic-account', prefs);
     expect(lists.fetchUserLists).not.toHaveBeenCalled();
     expect(auth.refreshActiveProfile).not.toHaveBeenCalled();
+    expect(preferences.fetchForAccount).not.toHaveBeenCalled();
+  }));
+
+  for (const { label, section } of [
+    { label: 'missing section', section: undefined },
+    { label: 'failed section', section: { success: false, user: { token: 'synthetic-invalid-token' }, preferences: prefs } },
+    { label: 'upstream error', section: { error: 'Synthetic upstream failure', preferences: prefs } },
+    { label: 'empty preferences', section: { preferences: {} } },
+    { label: 'array preferences', section: { preferences: [] } },
+    { label: 'malformed pickup', section: { preferences: { ...prefs, pickup_library: {} } } },
+    { label: 'wrapped failure', section: { result: { success: false, preferences: prefs } } },
+  ]) {
+    it(`retries incomplete bundled preferences for the captured account: ${label}`, fakeAsync(() => {
+      warmRequest().flush({
+        ok: true,
+        userapi: { result: { success: true, profile } },
+        listapi: { result: { success: true, lists: userLists } },
+        preferences: section,
+      });
+      flushMicrotasks();
+      expect(preferences.persistPreferencesForAccount).not.toHaveBeenCalled();
+      expect(preferences.persistTokenForAccount).not.toHaveBeenCalled();
+      expect(preferences.fetchForAccount).toHaveBeenCalledOnceWith('synthetic-account', 'synthetic-user', 'synthetic-password');
+      expect(auth.applyActiveProfile).toHaveBeenCalledOnceWith(profile);
+      expect(cache.write).toHaveBeenCalledOnceWith('lists:user:synthetic-account', userLists);
+      expect(lists.fetchUserLists).not.toHaveBeenCalled();
+      expect(auth.refreshActiveProfile).not.toHaveBeenCalled();
+    }));
+  }
+
+  for (const wrapped of [false, true]) {
+    for (const pickup of ['501', 501, '', null]) {
+      it(`normalizes a valid ${wrapped ? 'wrapped' : 'raw'} preference bundle with pickup ${JSON.stringify(pickup)}`, fakeAsync(() => {
+        const section = { user: { token: 'synthetic-token' }, preferences: { ...prefs, pickup_library: pickup } };
+        warmRequest().flush({ ok: true, preferences: wrapped ? { result: section } : section });
+        flushMicrotasks();
+        expect(preferences.persistPreferencesForAccount).toHaveBeenCalledOnceWith(
+          'synthetic-account', { ...prefs, pickup_library: pickup === null ? '' : String(pickup) }
+        );
+        expect(preferences.fetchForAccount).not.toHaveBeenCalled();
+      }));
+    }
+  }
+
+  it('waits for bundled token and preference persistence before completing hydration', fakeAsync(() => {
+    let finishToken: () => void = () => { throw new Error('Token persistence not started'); };
+    let finishPreferences: () => void = () => { throw new Error('Preference persistence not started'); };
+    persistToken.and.returnValue(new Promise<void>(resolve => { finishToken = resolve; }));
+    persistPreferences.and.returnValue(new Promise<void>(resolve => { finishPreferences = resolve; }));
+    warmRequest().flush({ ok: true, preferences: { user: { token: 'synthetic-token' }, preferences: prefs }, locations: [] });
+    flushMicrotasks();
+    expect(preferences.persistTokenForAccount).toHaveBeenCalledTimes(1);
+    expect(preferences.persistPreferencesForAccount).toHaveBeenCalledTimes(1);
+    expect(locations.hydrateLocations).not.toHaveBeenCalled();
+    finishToken();
+    flushMicrotasks();
+    expect(locations.hydrateLocations).not.toHaveBeenCalled();
+    finishPreferences();
+    flushMicrotasks();
+    expect(locations.hydrateLocations).toHaveBeenCalledOnceWith([]);
+    expect(preferences.fetchForAccount).not.toHaveBeenCalled();
+  }));
+
+  function switchAccount() {
+    activeSnapshot = {
+      ...snapshot, activeAccountId: 'synthetic-second-account',
+      activeAccountMeta: { id: 'synthetic-second-account', username: 'synthetic-second-user', label: 'Another example patron' },
+    };
+  }
+
+  it('keeps a delayed bundle and preference fallback tied to the original account after switching', fakeAsync(() => {
+    const request = warmRequest();
+    switchAccount();
+    request.flush({ ok: true, userapi: { result: { success: true, profile } } });
+    flushMicrotasks();
+    expect(accounts.cacheProfile).toHaveBeenCalledOnceWith('synthetic-account', profile);
+    expect(auth.applyActiveProfile).not.toHaveBeenCalled();
+    expect(preferences.fetchForAccount).toHaveBeenCalledOnceWith('synthetic-account', 'synthetic-user', 'synthetic-password');
+  }));
+
+  it('checks the active account again after profile cache persistence finishes', fakeAsync(() => {
+    let finishProfile: () => void = () => { throw new Error('Profile persistence not started'); };
+    accounts.cacheProfile.and.returnValue(new Promise<void>(resolve => { finishProfile = resolve; }));
+    warmRequest().flush({ ok: true, userapi: { result: { success: true, profile } }, preferences: { preferences: prefs } });
+    flushMicrotasks();
+    switchAccount();
+    finishProfile();
+    flushMicrotasks();
+    expect(auth.applyActiveProfile).not.toHaveBeenCalled();
+    expect(preferences.persistPreferencesForAccount).toHaveBeenCalledOnceWith('synthetic-account', prefs);
+  }));
+
+  it('keeps a failed bundle fallback on the original account without refreshing the new active account', fakeAsync(() => {
+    const request = warmRequest();
+    switchAccount();
+    request.flush('Unavailable', { status: 503, statusText: 'Unavailable' });
+    flushMicrotasks();
+    expect(preferences.fetchForAccount).toHaveBeenCalledOnceWith('synthetic-account', 'synthetic-user', 'synthetic-password');
+    expect(auth.refreshActiveProfile).not.toHaveBeenCalled();
+    expect(lists.fetchUserLists).not.toHaveBeenCalled();
+  }));
+
+  it('captures credentials before an account switch while their secure-storage read is pending', fakeAsync(() => {
+    let finishPassword: (password: string) => void = () => { throw new Error('Password read not started'); };
+    accounts.getPassword.and.returnValue(new Promise<string>(resolve => { finishPassword = resolve; }));
+    service.warmForActiveAccount();
+    switchAccount();
+    finishPassword('synthetic-password');
+    flushMicrotasks();
+    const request = http.expectOne('https://example.org/API/CacheWarm');
+    expect(new URLSearchParams(request.request.body).get('username')).toBe('synthetic-user');
+    expect(accounts.getPassword).toHaveBeenCalledOnceWith('synthetic-account');
+    request.flush({ ok: true, preferences: { preferences: prefs } });
+    flushMicrotasks();
+    expect(preferences.persistPreferencesForAccount).toHaveBeenCalledOnceWith('synthetic-account', prefs);
   }));
 
   for (const listapi of [

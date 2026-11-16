@@ -87,7 +87,7 @@ export class CheckoutsService {
   private preferences = inject(AccountPreferencesService);
 
   private sessionId: string | null = null;
-  private activeFetch$: Observable<AspenCheckout[]> | null = null;
+  private readonly activeFetches = new Map<string, Observable<AspenCheckout[]>>();
 
   /**
    * POST /API/UserAPI?method=getPatronCheckedOutItems
@@ -104,16 +104,17 @@ export class CheckoutsService {
       filter((v): v is AspenCheckout[] => Array.isArray(v))
     );
 
-    const network$ =
-      this.activeFetch$ ??
-      this.fetchCheckoutsNetwork(snap, cacheKey).pipe(
+    const accountId = snap.activeAccountId;
+    let network$ = this.activeFetches.get(accountId);
+    if (!network$) {
+      network$ = this.fetchCheckoutsNetwork(snap, cacheKey).pipe(
         finalize(() => {
-          this.activeFetch$ = null;
+          this.activeFetches.delete(accountId);
         }),
         shareReplay({ bufferSize: 1, refCount: true })
       );
-
-    this.activeFetch$ = network$;
+      this.activeFetches.set(accountId, network$);
+    }
 
     return concat(cached$, network$);
   }
@@ -211,12 +212,10 @@ export class CheckoutsService {
   }
 
   private checkoutsFromResponse(r: any): AspenCheckout[] {
-    if (!r?.success) {
-      throw new Error(r?.message || 'Could not refresh checkouts.');
+    if (r?.success !== true || !Array.isArray(r?.checkedOutItems)) {
+      throw new Error(typeof r?.message === 'string' ? r.message : 'Could not refresh checkouts.');
     }
-    const list = Array.isArray(r?.checkedOutItems)
-      ? (r.checkedOutItems as AspenCheckout[])
-      : [];
+    const list = r.checkedOutItems as AspenCheckout[];
     return list
       .filter((c) => c?.type === 'ils' || c?.source === 'ils')
       .map((checkout) => this.normalizeCheckout(checkout));
@@ -312,8 +311,7 @@ export class CheckoutsService {
                   map((raw) => raw?.result ?? raw),
                   tap((r) => this.persistReturnedHelperToken(snap, r)),
                   map((r: any) => {
-                    const success =
-                      r?.success !== undefined ? !!r.success : true;
+                    const success = r?.success === true;
                     return {
                       success,
                       title: typeof r?.title === 'string' ? r.title : undefined,

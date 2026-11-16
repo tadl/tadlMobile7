@@ -1,7 +1,7 @@
 import { Component, inject } from '@angular/core';
 
 import { IonicModule } from '@ionic/angular/lazy';
-import { finalize } from 'rxjs';
+import { finalize, Subscription } from 'rxjs';
 
 import { Globals } from '../../globals';
 import { AuthService } from '../../services/auth.service';
@@ -20,6 +20,8 @@ export class FinesPage {
   private auth = inject(AuthService);
   private finesService = inject(FinesService);
   private toast = inject(ToastService);
+  private refreshSubscription?: Subscription;
+  private displayedAccountId: string | null = null;
 
   loading = false;
   fines: AspenFine[] = [];
@@ -29,14 +31,25 @@ export class FinesPage {
     this.refresh();
   }
 
+  ionViewDidLeave() {
+    this.refreshSubscription?.unsubscribe();
+  }
+
   refresh(ev?: any) {
+    const snap = this.auth.snapshot();
+    const accountId = snap.activeAccountId;
+    if (this.displayedAccountId !== accountId) {
+      this.refreshSubscription?.unsubscribe();
+      this.fines = [];
+      this.totalOwed = 0;
+      this.displayedAccountId = accountId;
+    }
     if (this.loading) {
       ev?.target?.complete?.();
       return;
     }
 
-    const snap = this.auth.snapshot();
-    if (!snap.isLoggedIn) {
+    if (!snap.isLoggedIn || !accountId) {
       this.fines = [];
       this.totalOwed = 0;
       ev?.target?.complete?.();
@@ -44,7 +57,7 @@ export class FinesPage {
     }
 
     this.loading = true;
-    this.finesService
+    this.refreshSubscription = this.finesService
       .fetchPatronFines()
       .pipe(
         finalize(() => {
@@ -54,6 +67,7 @@ export class FinesPage {
       )
       .subscribe({
         next: (res) => {
+          if (this.auth.snapshot().activeAccountId !== accountId) return;
           if (!res?.success) {
             this.fines = [];
             this.totalOwed = 0;
@@ -73,6 +87,7 @@ export class FinesPage {
           this.totalOwed = Number(res.totalOwed ?? 0) || 0;
         },
         error: () => {
+          if (this.auth.snapshot().activeAccountId !== accountId) return;
           this.fines = [];
           this.totalOwed = 0;
           this.toast.presentToast('Could not load fines.');

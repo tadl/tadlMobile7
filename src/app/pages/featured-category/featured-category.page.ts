@@ -628,6 +628,7 @@ export class FeaturedCategoryPage {
     pickupBranch: string,
     selectedFormatLabel?: string
   ): void {
+    const accountId = this.auth.snapshot().activeAccountId;
     const key = (hit?.key ?? '').toString().trim();
     if (!key) return;
     if (this.rowActionBusyForKey(key)) return;
@@ -638,6 +639,7 @@ export class FeaturedCategoryPage {
       .pipe(finalize(() => this.setRowBusy(key, false)))
       .subscribe({
         next: (res) => {
+          if (this.auth.snapshot().activeAccountId !== accountId) return;
           if (!res?.success) {
             this.toast.presentToast(res?.message || 'Could not place hold.');
             return;
@@ -672,7 +674,10 @@ export class FeaturedCategoryPage {
             }
           );
         },
-        error: () => this.toast.presentToast('Could not place hold.'),
+        error: () => {
+          if (this.auth.snapshot().activeAccountId !== accountId) return;
+          this.toast.presentToast('Could not place hold.');
+        },
       });
   }
 

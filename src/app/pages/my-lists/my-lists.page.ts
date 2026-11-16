@@ -6,12 +6,13 @@ import {
   AlertController,
 } from '@ionic/angular/lazy';
 import { Router } from '@angular/router';
-import { finalize } from 'rxjs';
+import { finalize, Subscription } from 'rxjs';
 
 import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
 import { ListsService, type AspenUserList } from '../../services/lists.service';
 import { ListLookupService } from '../../services/list-lookup.service';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
   standalone: true,
@@ -28,6 +29,9 @@ export class MyListsPage {
   private actionSheetCtrl = inject(ActionSheetController);
   private alertCtrl = inject(AlertController);
   private listLookup = inject(ListLookupService);
+  private auth = inject(AuthService);
+  private refreshSubscription?: Subscription;
+  private displayedAccountId: string | null = null;
 
   loading = false;
   mutating = false;
@@ -37,14 +41,28 @@ export class MyListsPage {
     this.refresh();
   }
 
+  ionViewDidLeave() {
+    this.refreshSubscription?.unsubscribe();
+  }
+
   refresh(ev?: any) {
+    const accountId = this.auth.snapshot().activeAccountId;
+    if (this.displayedAccountId !== accountId) {
+      this.refreshSubscription?.unsubscribe();
+      this.lists = [];
+      this.displayedAccountId = accountId;
+    }
+    if (!accountId) {
+      ev?.target?.complete?.();
+      return;
+    }
     if (this.loading) {
       ev?.target?.complete?.();
       return;
     }
 
     this.loading = true;
-    this.listsService
+    this.refreshSubscription = this.listsService
       .fetchUserLists()
       .pipe(
         finalize(() => {
@@ -54,6 +72,7 @@ export class MyListsPage {
       )
       .subscribe({
         next: (lists) => {
+          if (this.auth.snapshot().activeAccountId !== accountId) return;
           this.lists = (lists ?? []).slice().sort((a, b) => {
             const ta =
               new Date((a?.dateUpdated ?? '').toString()).getTime() || 0;
@@ -64,6 +83,7 @@ export class MyListsPage {
           this.listLookup.replaceLists(this.lists);
         },
         error: () => {
+          if (this.auth.snapshot().activeAccountId !== accountId) return;
           this.toast.presentToast('Could not load your lists.');
         },
       });

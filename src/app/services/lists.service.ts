@@ -74,7 +74,7 @@ export class ListsService {
   private cache = inject(AppCacheService);
   private discoveryUrls = inject(DiscoveryUrlService);
 
-  private userListsFetch$: Observable<AspenUserList[]> | null = null;
+  private userListsFetches = new Map<string, Observable<AspenUserList[]>>();
 
   fetchUserLists(): Observable<AspenUserList[]> {
     const snap = this.auth.snapshot();
@@ -85,9 +85,9 @@ export class ListsService {
       filter((v): v is AspenUserList[] => Array.isArray(v))
     );
 
-    const network$ =
-      this.userListsFetch$ ??
-      this.callListApi('getUserLists').pipe(
+    let network$ = this.userListsFetches.get(accountId);
+    if (!network$) {
+      const request$: Observable<AspenUserList[]> = this.callListApi('getUserLists').pipe(
         map((r: any) => {
           if (!r?.success || !Array.isArray(r?.lists)) {
             throw new Error(typeof r?.message === 'string' ? r.message : 'Could not refresh reading lists.');
@@ -102,12 +102,15 @@ export class ListsService {
           if (accountId) this.cache.write(cacheKey, lists).catch(() => {});
         }),
         finalize(() => {
-          this.userListsFetch$ = null;
+          if (this.userListsFetches.get(accountId) === request$) {
+            this.userListsFetches.delete(accountId);
+          }
         }),
         shareReplay({ bufferSize: 1, refCount: true })
       );
-
-    this.userListsFetch$ = network$;
+      this.userListsFetches.set(accountId, request$);
+      network$ = request$;
+    }
 
     return concat(cached$, network$);
   }

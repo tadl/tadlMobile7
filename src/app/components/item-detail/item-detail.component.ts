@@ -27,7 +27,7 @@ import type { AspenCheckout } from '../../services/checkouts.service';
 import { ListsService, type AspenUserList } from '../../services/lists.service';
 import { AuthService } from '../../services/auth.service';
 import { CopyDetailsPopoverComponent } from '../copy-details-popover/copy-details-popover.component';
-import { AccountPreferencesService } from '../../services/account-preferences.service';
+import { HoldSupportService } from '../../services/hold-support.service';
 import { ListLookupService } from '../../services/list-lookup.service';
 import { DiscoveryUrlService } from '../../services/discovery-url.service';
 import { SwitchUserModalComponent } from '../switch-user-modal/switch-user-modal.component';
@@ -86,7 +86,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   private checkouts = inject(CheckoutsService);
   private lists = inject(ListsService);
   private listLookup = inject(ListLookupService);
-  private accountPreferences = inject(AccountPreferencesService);
+  private holdSupport = inject(HoldSupportService);
   private discoveryUrls = inject(DiscoveryUrlService);
   private router = inject(Router);
   private modalCtrl = inject(ModalController);
@@ -120,6 +120,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   private readonly descriptionPreviewChars = 320;
   descriptionExpanded = false;
   private authStateSub?: Subscription;
+  private circulationAccountId: string | null = null;
   private listsHydrated = false;
   private listsAccountId: string | null = null;
 
@@ -145,6 +146,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   private checkoutRefreshBusy = false;
 
   ngOnInit() {
+    this.circulationAccountId = this.auth.snapshot().activeAccountId;
     // If opened from Holds/Checkouts pages, we already have the object in hit.raw
     this.hold = this.extractHoldFromHit(this.hit);
     this.holdsForItem = this.hold ? [this.hold] : [];
@@ -155,6 +157,14 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
       const accountId = state?.isLoggedIn
         ? (state?.activeAccountId ?? '').toString().trim() || null
         : null;
+      if (this.circulationAccountId !== accountId) {
+        this.circulationAccountId = accountId;
+        this.hold = null;
+        this.holdsForItem = [];
+        this.checkout = null;
+        this.needsHoldsRefresh = false;
+        this.needsCheckoutsRefresh = false;
+      }
       if (!accountId) {
         this.availableLists = [];
         this.listsHydrated = false;
@@ -797,6 +807,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   }
 
   renewCheckout() {
+    const accountId = this.auth.snapshot().activeAccountId;
     if (!this.checkout || this.checkoutActionBusy) return;
 
     if (!this.checkoutCanRenew()) {
@@ -811,12 +822,14 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
       .renewCheckout(checkout)
       .pipe(
         switchMap((res) => {
+          if (this.auth.snapshot().activeAccountId !== accountId) return of(null);
           if (!res?.success) return of(res);
 
           this.needsCheckoutsRefresh = true;
           // renewItem returns a message, not the updated due date or renewal count.
           return this.checkouts.fetchFreshActiveCheckouts(true).pipe(
             map((list) => {
+              if (this.auth.snapshot().activeAccountId !== accountId) return null;
               this.checkout = list.find((candidate) =>
                 checkout.itemId != null
                   ? candidate.itemId === checkout.itemId
@@ -827,6 +840,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
               return res;
             }),
             catchError(() => {
+              if (this.auth.snapshot().activeAccountId !== accountId) return of(null);
               this.toast.presentToast(
                 'Renewed, but could not refresh the due date. Close details and pull to refresh.'
               );
@@ -838,6 +852,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
       )
       .subscribe({
         next: (res) => {
+          if (this.auth.snapshot().activeAccountId !== accountId) return;
           if (!res) return;
           if (!res?.success) {
             this.toast.presentToast(res?.message || 'Could not renew.');
@@ -846,7 +861,10 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
 
           this.toast.presentToast(`Renewed: ${this.itemDisplayTitle()}`);
         },
-        error: () => this.toast.presentToast('Could not renew.'),
+        error: () => {
+          if (this.auth.snapshot().activeAccountId !== accountId) return;
+          this.toast.presentToast('Could not renew.');
+        },
       });
   }
 
@@ -1016,6 +1034,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   }
 
   freezeHold() {
+    const accountId = this.auth.snapshot().activeAccountId;
     if (!this.hold || this.holdActionBusy) return;
     if (this.holdIsReady()) return;
     if (!this.holdCanFreeze(this.hold)) return;
@@ -1024,6 +1043,10 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     this.holdActionBusy = true;
     this.holds.freezeHold(this.hold).subscribe({
       next: (res) => {
+        if (this.auth.snapshot().activeAccountId !== accountId) {
+          this.holdActionBusy = false;
+          return;
+        }
         if (!res?.success) {
           this.holdActionBusy = false;
           this.toast.presentToast('Could not freeze hold.');
@@ -1044,11 +1067,18 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
           `Hold frozen: ${this.holdToastTitle(this.hold)}`
         );
       },
-      error: () => this.reconcileHoldMutationAfterUnknownError(this.hold, true),
+      error: () => {
+        if (this.auth.snapshot().activeAccountId !== accountId) {
+          this.holdActionBusy = false;
+          return;
+        }
+        this.reconcileHoldMutationAfterUnknownError(this.hold, true);
+      },
     });
   }
 
   thawHold() {
+    const accountId = this.auth.snapshot().activeAccountId;
     if (!this.hold || this.holdActionBusy) return;
     if (this.holdIsReady()) return;
     if (!this.holdHasManageableIdentity(this.hold)) return;
@@ -1056,6 +1086,10 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     this.holdActionBusy = true;
     this.holds.thawHold(this.hold).subscribe({
       next: (res) => {
+        if (this.auth.snapshot().activeAccountId !== accountId) {
+          this.holdActionBusy = false;
+          return;
+        }
         if (!res?.success) {
           this.holdActionBusy = false;
           this.toast.presentToast('Could not thaw hold.');
@@ -1076,8 +1110,13 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
           `Hold thawed: ${this.holdToastTitle(this.hold)}`
         );
       },
-      error: () =>
-        this.reconcileHoldMutationAfterUnknownError(this.hold, false),
+      error: () => {
+        if (this.auth.snapshot().activeAccountId !== accountId) {
+          this.holdActionBusy = false;
+          return;
+        }
+        this.reconcileHoldMutationAfterUnknownError(this.hold, false);
+      },
     });
   }
 
@@ -1085,6 +1124,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     hold: AspenHold | null,
     targetFrozen: boolean
   ) {
+    const accountId = this.auth.snapshot().activeAccountId;
     if (!hold) {
       this.holdActionBusy = false;
       this.toast.presentToast(
@@ -1095,6 +1135,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
 
     this.holds.verifyHoldFrozenStateAfterDelay(hold, targetFrozen).subscribe({
       next: (verified) => {
+        if (this.auth.snapshot().activeAccountId !== accountId) return;
         if (verified) {
           this.needsHoldsRefresh = true;
           this.hold = verified;
@@ -1117,6 +1158,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
         );
       },
       error: () => {
+        if (this.auth.snapshot().activeAccountId !== accountId) return;
         this.toast.presentToast(
           targetFrozen ? 'Could not freeze hold.' : 'Could not thaw hold.'
         );
@@ -1146,6 +1188,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   }
 
   private cancelHoldNow() {
+    const accountId = this.auth.snapshot().activeAccountId;
     if (!this.hold || this.holdActionBusy) return;
     if (!this.holdHasManageableIdentity(this.hold)) return;
 
@@ -1162,6 +1205,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
       .pipe(finalize(() => (this.holdActionBusy = false)))
       .subscribe({
         next: (res) => {
+          if (this.auth.snapshot().activeAccountId !== accountId) return;
           if (!res?.success) {
             this.toast.presentToast(res?.message || 'Could not cancel hold.');
             return;
@@ -1192,7 +1236,10 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
           });
           this.hold = this.holdsForItem[0] ?? null;
         },
-        error: () => this.toast.presentToast('Could not cancel hold.'),
+        error: () => {
+          if (this.auth.snapshot().activeAccountId !== accountId) return;
+          this.toast.presentToast('Could not cancel hold.');
+        },
       });
   }
 
@@ -1234,6 +1281,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   }
 
   private changePickupLocationNow(holdId: number, newLocation: string) {
+    const accountId = this.auth.snapshot().activeAccountId;
     if (!this.hold || this.holdActionBusy) return;
 
     const parsed = this.parseAspenNewLocation(newLocation);
@@ -1244,6 +1292,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
       .pipe(finalize(() => (this.holdActionBusy = false)))
       .subscribe({
         next: (res) => {
+          if (this.auth.snapshot().activeAccountId !== accountId) return;
           if (!res?.success) {
             this.toast.presentToast(
               res?.message || 'Could not change pickup location.'
@@ -1278,8 +1327,10 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
               : `Pickup location updated: ${title}`
           );
         },
-        error: () =>
-          this.toast.presentToast('Could not change pickup location.'),
+        error: () => {
+          if (this.auth.snapshot().activeAccountId !== accountId) return;
+          this.toast.presentToast('Could not change pickup location.');
+        },
       });
   }
 
@@ -1769,7 +1820,9 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     );
     if (!loggedIn) return;
 
-    const defaultPickupBranch = await this.defaultPickupBranchCode();
+    const accountId = this.auth.snapshot().activeAccountId;
+    const defaultPickupBranch = await this.holdSupport.defaultPickupBranchCode();
+    if (this.auth.snapshot().activeAccountId !== accountId) return;
     if (defaultPickupBranch) {
       this.placeHoldNow(recordId, defaultPickupBranch);
       return;
@@ -1793,6 +1846,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   }
 
   private placeHoldNow(recordId: string, pickupBranch: string) {
+    const accountId = this.auth.snapshot().activeAccountId;
     if (this.holdActionBusy) return;
 
     this.holdActionBusy = true;
@@ -1801,6 +1855,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
       .pipe(finalize(() => (this.holdActionBusy = false)))
       .subscribe({
         next: (res) => {
+          if (this.auth.snapshot().activeAccountId !== accountId) return;
           if (!res?.success) {
             this.toast.presentToast(res?.message || 'Could not place hold.');
             return;
@@ -1816,6 +1871,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
           void this.refreshHoldForThisItemFromFreshFetch();
         },
         error: (err) => {
+          if (this.auth.snapshot().activeAccountId !== accountId) return;
           const msg = (err?.message ?? '').toString().trim();
           if (msg === 'not_logged_in' || msg === 'missing_password') {
             void this.retryPlaceHoldAfterLogin(recordId, pickupBranch);
@@ -1835,27 +1891,6 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     );
     if (!ok) return;
     this.placeHoldNow(recordId, pickupBranch);
-  }
-
-  private async defaultPickupBranchCode(): Promise<string | null> {
-    const activeId = (this.auth.snapshot()?.activeAccountId ?? '')
-      .toString()
-      .trim();
-    if (!activeId) return null;
-
-    try {
-      const prefs = await this.accountPreferences.getCachedPreferences(
-        activeId
-      );
-      const legacyCode = (prefs?.pickup_library ?? '').toString().trim();
-      if (!legacyCode) return null;
-
-      const loc =
-        this.globals.pickupLocationFromLegacyPreferencesCode(legacyCode);
-      return loc?.code ?? null;
-    } catch {
-      return null;
-    }
   }
 
   private async ensureLoggedInForInteractiveAction(
@@ -2167,6 +2202,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   }
 
   private refreshHoldForThisItem(force = false) {
+    const accountId = this.auth.snapshot().activeAccountId;
     const key = (this.hit?.key ?? '').toString().trim();
     if (!key) return;
 
@@ -2187,6 +2223,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
       .pipe(finalize(() => (this.holdRefreshBusy = false)))
       .subscribe({
         next: (list) => {
+          if (this.auth.snapshot().activeAccountId !== accountId) return;
           const matches = (list ?? []).filter(
             (h) => String((h as any)?.groupedWorkId ?? '').trim() === key
           );
@@ -2210,12 +2247,14 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   }
 
   private async refreshHoldForThisItemFromFreshFetch(): Promise<boolean> {
+    const accountId = this.auth.snapshot().activeAccountId;
     const key = (this.hit?.key ?? '').toString().trim();
     if (!key || this.holdRefreshBusy) return false;
 
     this.holdRefreshBusy = true;
     try {
       const list = await lastValueFrom(this.holds.fetchFreshActiveHolds());
+      if (this.auth.snapshot().activeAccountId !== accountId) return false;
       const matches = (list ?? []).filter(
         (h) => String((h as any)?.groupedWorkId ?? '').trim() === key
       );
@@ -2246,6 +2285,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   }
 
   private refreshCheckoutForThisItem(force = false) {
+    const accountId = this.auth.snapshot().activeAccountId;
     const key = (this.hit?.key ?? '').toString().trim();
     if (!key) return;
 
@@ -2264,6 +2304,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
       .pipe(finalize(() => (this.checkoutRefreshBusy = false)))
       .subscribe({
         next: (list) => {
+          if (this.auth.snapshot().activeAccountId !== accountId) return;
           const found =
             (list ?? []).find(
               (c) => String((c as any)?.groupedWorkId ?? '').trim() === key

@@ -8,7 +8,7 @@ import {
   type ActionSheetButton,
 } from '@ionic/angular/lazy';
 import { Router } from '@angular/router';
-import { Subscription, forkJoin, of } from 'rxjs';
+import { Subscription, of } from 'rxjs';
 import { catchError, finalize, map, switchMap } from 'rxjs/operators';
 import { lastValueFrom } from 'rxjs';
 
@@ -124,7 +124,8 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   private providerStatusesByFormat: Record<string, FormatProviderStatus[]> = {};
   private providerActionsByFormat: Record<string, FormatProviderAction[]> = {};
   private loadedWorkId: string | null = null;
-  private requestedHoldings = new Set<string>();
+  private holdingsRequestsByFormat: Record<string, { id: string; subscription?: Subscription }> = {};
+  private holdingsRefreshFailures = new Set<string>();
   private requestedVariations = new Set<string>();
   private requestedRecords = new Set<string>();
   private editionRecordsByFormat: Record<
@@ -232,6 +233,9 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   }
 
   close() {
+    this.destroyed = true;
+    this.workSub?.unsubscribe();
+    this.metadataSubscriptions.unsubscribe();
     this.copyDetailsModalOpen = false;
     this.modalCtrl.dismiss(this.dismissPayload());
     this.globals.modal_open = false;
@@ -1458,6 +1462,13 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     return `${count} ${count === 1 ? 'copy' : 'copies'}`;
   }
 
+  formatHoldingsRefreshNote(formatLabel: string): string {
+    if (!this.holdingsRefreshFailures.has(formatLabel)) return '';
+    return Object.prototype.hasOwnProperty.call(this.holdingsCountByFormat, formatLabel)
+      ? 'Could not refresh copy details. Showing saved details.'
+      : 'Copy details are unavailable.';
+  }
+
   formatShelfDetails(formatLabel: string): FormatShelfDetail[] {
     const k = (formatLabel ?? '').toString();
     return this.holdingsDetailsByFormat[k] ?? [];
@@ -1941,104 +1952,66 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   }
 
   private loadHoldingsCountsForWork(work: AspenGroupedWork | null) {
-    if (!work?.formats) return;
+    if (!work?.formats || this.destroyed) return;
     const workId = (work.id ?? '').toString().trim();
     if (!workId) return;
 
-    const requests: Array<{ formatKey: string; ilsId: string }> = [];
+    for (const [formatKey, format] of Object.entries(work.formats)) {
+      const ilsId = (format.actions ?? [])
+        .map((action) => this.items.extractIlsIdFromOnclick(action?.onclick))
+        .find((id): id is string => !!id);
+      if (!ilsId) continue;
+      const previousRequest = this.holdingsRequestsByFormat[formatKey];
+      if (previousRequest?.id === ilsId) continue;
+      previousRequest?.subscription?.unsubscribe();
+      delete this.holdingsCountByFormat[formatKey];
+      delete this.holdingsDetailsByFormat[formatKey];
+      this.holdingsRefreshFailures.delete(formatKey);
 
-    for (const [formatKey, fmt] of Object.entries(work.formats)) {
-      const actions = (fmt as any)?.actions ?? [];
-      let ilsId: string | null = null;
+      const request: { id: string; subscription?: Subscription } = { id: ilsId };
+      this.holdingsRequestsByFormat[formatKey] = request;
+      const isCurrent = () =>
+        !this.destroyed &&
+        this.loadedWorkId === workId &&
+        !!this.work?.formats?.[formatKey] &&
+        this.holdingsRequestsByFormat[formatKey] === request;
 
-      for (const a of actions) {
-        const onclick = (a as any)?.onclick as string | undefined;
-        const extracted = this.items.extractIlsIdFromOnclick(onclick);
-        if (extracted) {
-          ilsId = extracted;
-          break;
-        }
-      }
-
-      if (ilsId) {
-        const requestKey = `${workId}:${formatKey}:${ilsId}`;
-        if (this.requestedHoldings.has(requestKey)) continue;
-        this.requestedHoldings.add(requestKey);
-        requests.push({ formatKey, ilsId });
-      }
-    }
-
-    if (!requests.length) return;
-
-    const calls = requests.map((r) =>
-      this.items
-        .getIlsItemAvailability(r.ilsId)
-        .pipe(catchError(() => of(null)))
-    );
-
-    forkJoin(calls).subscribe({
-      next: (results) => {
-        const byFormat: Record<string, number> = {};
-        const detailsByFormat: Record<string, FormatShelfDetail[]> = {};
-
-        for (let i = 0; i < results.length; i++) {
-          const res: any = results[i];
-          const fmtKey = requests[i].formatKey;
-
+      request.subscription = this.items.getIlsItemAvailability(ilsId).subscribe({
+        next: (result) => {
+          if (!isCurrent() || result.id !== ilsId) return;
           let total = 0;
           const details: FormatShelfDetail[] = [];
-          const holdings = res?.holdings;
-          if (holdings && typeof holdings === 'object') {
-            for (const k of Object.keys(holdings)) {
-              const arr = holdings[k];
-              if (!Array.isArray(arr)) continue;
-              total += arr.length;
-
-              for (const raw of arr) {
-                const location = (
-                  raw?.libraryDisplayName ??
-                  raw?.location ??
-                  ''
-                )
-                  .toString()
-                  .trim();
-                const callNumber = (raw?.callnumber ?? '').toString().trim();
-                const status = (
-                  raw?.statusFull ??
-                  raw?.statusfull ??
-                  raw?.status ??
-                  ''
-                )
-                  .toString()
-                  .trim();
-                const availabilityRaw = raw?.availability;
-                const availability =
-                  availabilityRaw === true
-                    ? true
-                    : availabilityRaw === false
-                    ? false
-                    : null;
-                if (!location && !callNumber && !status) continue;
-                details.push({ location, callNumber, status, availability });
-              }
+          for (const copies of Object.values(result.holdings)) {
+            total += copies.length;
+            for (const copy of copies) {
+              const location = (copy.libraryDisplayName ?? copy.location ?? '').trim();
+              const callNumber = (copy.callnumber ?? '').trim();
+              const status = (copy.statusFull ?? copy.statusfull ?? copy.status ?? '').trim();
+              if (!location && !callNumber && !status) continue;
+              details.push({
+                location,
+                callNumber,
+                status,
+                availability: copy.availability ?? null,
+              });
             }
           }
-
-          byFormat[fmtKey] = total;
-          detailsByFormat[fmtKey] = this.dedupeShelfDetails(details);
-        }
-
-        this.holdingsCountByFormat = {
-          ...this.holdingsCountByFormat,
-          ...byFormat,
-        };
-        this.holdingsDetailsByFormat = {
-          ...this.holdingsDetailsByFormat,
-          ...detailsByFormat,
-        };
-      },
-      error: () => {},
-    });
+          this.holdingsRefreshFailures.delete(formatKey);
+          this.holdingsCountByFormat = {
+            ...this.holdingsCountByFormat,
+            [formatKey]: total,
+          };
+          this.holdingsDetailsByFormat = {
+            ...this.holdingsDetailsByFormat,
+            [formatKey]: this.dedupeShelfDetails(details),
+          };
+        },
+        error: () => {
+          if (isCurrent()) this.holdingsRefreshFailures.add(formatKey);
+        },
+      });
+      this.metadataSubscriptions.add(request.subscription);
+    }
   }
 
   private loadFormatDetailsForWork(work: AspenGroupedWork | null) {
@@ -2319,7 +2292,8 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     this.loadedWorkId = workId;
     this.metadataSubscriptions.unsubscribe();
     this.metadataSubscriptions = new Subscription();
-    this.requestedHoldings.clear();
+    this.holdingsRequestsByFormat = {};
+    this.holdingsRefreshFailures.clear();
     this.requestedVariations.clear();
     this.requestedRecords.clear();
     this.editionRecordsByFormat = {};

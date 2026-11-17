@@ -143,6 +143,8 @@
                   </ion-note>
                   }
                 </div>
+                } @if (formatHoldingsRefreshNote('' + kv.key); as note) {
+                <ion-note class="format-sub" role="status">{{ note }}</ion-note>
                 } @if (hasProviderStatuses(('' + kv.key))) {
                 <div class="provider-status-list">
                   @for (ps of providerStatusesForFormat(('' + kv.key)); track

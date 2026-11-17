@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Subject, of } from 'rxjs';
+import { ModalController } from '@ionic/angular/lazy';
 
 import { APP_TEST_PROVIDERS } from '../../../testing/app-test-providers';
 import { Globals } from '../../globals';
@@ -13,19 +14,21 @@ import {
   type AspenFormatRecordsResult,
   type AspenFormatVariationsResult,
   type AspenGroupedWork,
+  type AspenItemAvailabilityResult,
 } from '../../services/item.service';
 import { ListLookupService } from '../../services/list-lookup.service';
 import { ListsService } from '../../services/lists.service';
 import { ToastService } from '../../services/toast.service';
 import { ItemDetailComponent } from './item-detail.component';
 
-describe('ItemDetailComponent edition details', () => {
+describe('ItemDetailComponent format details', () => {
   let fixture: ComponentFixture<ItemDetailComponent>;
   let component: ItemDetailComponent;
   let items: jasmine.SpyObj<ItemService>;
   let workUpdates: Subject<AspenGroupedWork>;
   let variations: Map<string, Subject<AspenFormatVariationsResult>>;
   let records: Map<string, Subject<AspenFormatRecordsResult>>;
+  let holdings: Map<string, Subject<AspenItemAvailabilityResult>>;
 
   const workId = 'synthetic-work-eng';
   const anonymous = {
@@ -39,10 +42,12 @@ describe('ItemDetailComponent edition details', () => {
     workUpdates = new Subject();
     variations = new Map();
     records = new Map();
+    holdings = new Map();
     items = jasmine.createSpyObj<ItemService>('ItemService', [
       'getGroupedWork',
       'getFormatVariations',
       'getFormatRecords',
+      'getIlsItemAvailability',
       'extractIlsIdFromOnclick',
     ]);
     items.getGroupedWork.and.returnValue(workUpdates);
@@ -55,6 +60,11 @@ describe('ItemDetailComponent edition details', () => {
     items.getFormatRecords.and.callFake((id, format, source) => {
       const updates = new Subject<AspenFormatRecordsResult>();
       records.set(`${id}|${format}|${source}`, updates);
+      return updates;
+    });
+    items.getIlsItemAvailability.and.callFake((id) => {
+      const updates = new Subject<AspenItemAvailabilityResult>();
+      holdings.set(id, updates);
       return updates;
     });
 
@@ -295,6 +305,100 @@ describe('ItemDetailComponent edition details', () => {
     expect(workUpdates.observed).toBeFalse();
     expect(records.get(`${nextId}|Book|ils`)!.observed).toBeFalse();
   });
+
+  it('shows cached copy details before refresh completes and preserves them after refresh fails', () => {
+    workUpdates.next(workWithHoldings([['Book', '901001']]));
+    const updates = holdings.get('901001')!;
+    updates.next(availability('901001', 'Saved Main Library'));
+    render();
+
+    expect(component.formatHoldingsCount('Book')).toBe(1);
+    expect(formatRow('Book').textContent).toContain('Saved Main Library');
+    expect(component.formatHoldingsRefreshNote('Book')).toBe('');
+
+    updates.error(new Error('Synthetic refresh failure'));
+    render();
+    expect(component.formatHoldingsCount('Book')).toBe(1);
+    expect(formatRow('Book').textContent).toContain('Saved Main Library');
+    expect(formatRow('Book').textContent).toContain('Showing saved details.');
+  });
+
+  it('replaces saved copy details when a successful refresh has zero copies', () => {
+    workUpdates.next(workWithHoldings([['Book', '901001']]));
+    const updates = holdings.get('901001')!;
+    updates.next(availability('901001', 'Saved Main Library'));
+    updates.next({ id: '901001', holdings: {} });
+    render();
+
+    expect(component.formatHoldingsCount('Book')).toBe(0);
+    expect(component.formatShelfDetails('Book')).toEqual([]);
+    expect(formatRow('Book').textContent).not.toContain('Saved Main Library');
+    expect(component.formatHoldingsRefreshNote('Book')).toBe('');
+  });
+
+  it('loads format holdings independently and distinguishes unavailable details from zero copies', () => {
+    workUpdates.next(workWithHoldings([['Book', '901001'], ['Audio CD', '901002']]));
+    holdings.get('901001')!.next(availability('901001', 'Example Main Library'));
+    holdings.get('901002')!.error(new Error('Synthetic audio lookup failure'));
+    render();
+
+    expect(formatRow('Book').textContent).toContain('Example Main Library');
+    expect(component.formatHoldingsCount('Book')).toBe(1);
+    expect(component.formatHoldingsRefreshNote('Book')).toBe('');
+    expect(formatRow('Audio CD').textContent).toContain('Copy details are unavailable.');
+    expect(formatRow('Audio CD').textContent).not.toContain('0 copies');
+  });
+
+  it('cancels old-work holdings and ignores stale response IDs and results after destruction', () => {
+    workUpdates.next(workWithHoldings([['Book', '901001']]));
+    const previous = holdings.get('901001')!;
+    workUpdates.next(workWithHoldings([['Book', '901002']], 'synthetic-next-work-eng'));
+    expect(previous.observed).toBeFalse();
+    previous.next(availability('901001', 'Previous Work Library'));
+    holdings.get('901002')!.next(availability('901001', 'Mismatched Response Library'));
+    expect(component.formatShelfDetails('Book')).toEqual([]);
+
+    holdings.get('901002')!.next(availability('901002', 'Current Work Library'));
+    render();
+    expect(formatRow('Book').textContent).toContain('Current Work Library');
+    expect(formatRow('Book').textContent).not.toContain('Previous Work Library');
+    fixture.destroy();
+    expect(holdings.get('901002')!.observed).toBeFalse();
+    holdings.get('901002')!.next({ id: '901002', holdings: {} });
+    expect(component.formatHoldingsCount('Book')).toBe(1);
+  });
+
+  it('stops pending work and holdings requests when the details modal closes', () => {
+    const dismiss = spyOn(fixture.debugElement.injector.get(ModalController), 'dismiss').and.resolveTo(true);
+    workUpdates.next(workWithHoldings([['Book', '901001']]));
+    const updates = holdings.get('901001')!;
+    component.close();
+
+    expect(dismiss).toHaveBeenCalled();
+    expect(updates.observed).toBeFalse();
+    expect(workUpdates.observed).toBeFalse();
+    updates.next(availability('901001', 'Late Library'));
+    expect(component.formatShelfDetails('Book')).toEqual([]);
+  });
+
+  function workWithHoldings(formats: Array<[string, string]>, id = workId): AspenGroupedWork {
+    items.extractIlsIdFromOnclick.and.callFake((onclick) => onclick ?? null);
+    const result = work(formats.map(([format]) => format), id);
+    for (const [format, ilsId] of formats) {
+      result.formats![format].actions = [{ title: 'Place Hold', onclick: ilsId }];
+    }
+    return result;
+  }
+
+  function availability(id: string, location: string): AspenItemAvailabilityResult {
+    return {
+      id,
+      holdings: { Example_Main: [{
+        id: `ils:${id}`, location, callnumber: 'SYNTHETIC FICTION',
+        status: 'On Shelf', availability: true,
+      }] },
+    };
+  }
 
   function work(formats: string[], id = workId): AspenGroupedWork {
     return {

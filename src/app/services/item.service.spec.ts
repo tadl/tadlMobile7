@@ -155,6 +155,106 @@ describe('ItemService Aspen API contracts', () => {
     }));
   }
 
+  it('emits saved holdings before a failed refresh without overwriting the cache', fakeAsync(() => {
+    const saved: AspenItemAvailabilityResult = {
+      id: '901001',
+      holdings: { Example_Main: [{ location: 'Example Main', status: 'On Shelf' }] },
+    };
+    cache.read.and.resolveTo(saved);
+    const received: AspenItemAvailabilityResult[] = [];
+    let failure: unknown;
+    service.getIlsItemAvailability('901001').subscribe({
+      next: (value) => received.push(value),
+      error: (error: unknown) => failure = error,
+    });
+    flushMicrotasks();
+    expect(received).toEqual([saved]);
+
+    http.expectOne(req => req.params.get('method') === 'getItemAvailability')
+      .error(new ProgressEvent('error'));
+    flushMicrotasks();
+    expect(received).toEqual([saved]);
+    expect(failure).toBeDefined();
+    expect(cache.write).not.toHaveBeenCalled();
+  }));
+
+  it('ignores malformed or mismatched holdings caches and still requests current data', fakeAsync(() => {
+    const invalidCaches: unknown[] = [
+      { id: 'other-record', holdings: {} },
+      { id: '901001' },
+      { id: '901001', holdings: 'invalid' },
+      { id: '901001', holdings: [{}] },
+      { id: '901001', holdings: { Example_Main: {} } },
+      { id: '901001', holdings: { Example_Main: [null] } },
+      { id: '901001', holdings: { Example_Main: [{ location: { unexpected: true } }] } },
+      { id: '901001', holdings: { Example_Main: [{ location: 'Example Main', availability: {} }] } },
+    ];
+    for (const invalidCache of invalidCaches) {
+      cache.read.and.resolveTo(invalidCache);
+      const received: AspenItemAvailabilityResult[] = [];
+      service.getIlsItemAvailability('901001').subscribe(value => received.push(value));
+      flushMicrotasks();
+      expect(received).toEqual([]);
+
+      http.expectOne(req => req.params.get('method') === 'getItemAvailability')
+        .flush({ result: { id: '901001', holdings: [] } });
+      flushMicrotasks();
+      expect(received).toEqual([{ id: '901001', holdings: {} }]);
+    }
+  }));
+
+  it('treats invalid live holdings as a refresh failure and retains the saved result', fakeAsync(() => {
+    const saved: AspenItemAvailabilityResult = {
+      id: '901001', holdings: { Example_Main: [{ location: 'Example Main' }] },
+    };
+    cache.read.and.resolveTo(saved);
+    for (const invalid of [
+      { id: '901001', success: false, holdings: {} },
+      { id: '901002', holdings: {} },
+      { id: '901001', holdings: { Example_Main: [null] } },
+    ]) {
+      const received: AspenItemAvailabilityResult[] = [];
+      let failure: Error | undefined;
+      service.getIlsItemAvailability('901001').subscribe({
+        next: (value) => received.push(value),
+        error: (error: Error) => failure = error,
+      });
+      flushMicrotasks();
+      http.expectOne(req => req.params.get('method') === 'getItemAvailability').flush(invalid);
+      flushMicrotasks();
+      expect(received).toEqual([saved]);
+      expect(failure?.message).toBe('invalid_item_availability');
+    }
+    expect(cache.write).not.toHaveBeenCalled();
+  }));
+
+  it('normalizes valid scalar holdings fields and caches a successful zero-copy refresh', fakeAsync(() => {
+    const received: AspenItemAvailabilityResult[] = [];
+    service.getIlsItemAvailability('901001').subscribe(value => received.push(value));
+    flushMicrotasks();
+    http.expectOne(req => req.params.get('method') === 'getItemAvailability').flush({
+      id: 901001, holdings: { Example_Main: [{
+        location: ' Example Main ', availability: 1, sectionId: '7', number: 0,
+        dueDate: null, status: 'On Shelf',
+      }] },
+    });
+    flushMicrotasks();
+    expect(received).toEqual([{
+      id: '901001', holdings: { Example_Main: [{
+        location: 'Example Main', availability: true, sectionId: 7, number: 0,
+        status: 'On Shelf',
+      }] },
+    }]);
+
+    service.getIlsItemAvailability('901001').subscribe(value => received.push(value));
+    flushMicrotasks();
+    http.expectOne(req => req.params.get('method') === 'getItemAvailability')
+      .flush({ id: '901001', holdings: {} });
+    flushMicrotasks();
+    expect(received[1]).toEqual({ id: '901001', holdings: {} });
+    expect(cache.write).toHaveBeenCalledWith('item:availability:901001', received[1]);
+  }));
+
   it('normalizes numeric publication years, array metadata and missing physical details', fakeAsync(() => {
     let result: AspenFormatRecordsResult | undefined;
     service.getFormatRecords(workId, 'eAudiobook', 'hoopla').subscribe(value => result = value);

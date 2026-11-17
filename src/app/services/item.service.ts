@@ -165,17 +165,22 @@ export class ItemService {
 
     const cacheKey = `item:availability:${numeric}`;
     const cached$ = from(
-      this.cache.read<AspenItemAvailabilityResult>(cacheKey)
+      this.cache.read<unknown>(cacheKey)
     ).pipe(
+      map((raw) => this.normalizeItemAvailability(raw, numeric)),
       filter(
-        (v): v is AspenItemAvailabilityResult => !!v && typeof v === 'object'
+        (value): value is AspenItemAvailabilityResult => value !== null
       )
     );
 
     const network$ = this.http
-      .get<any>(`${this.globals.aspen_api_base}/ItemAPI`, { params })
+      .get<unknown>(`${this.globals.aspen_api_base}/ItemAPI`, { params })
       .pipe(
-        map((raw) => (raw?.result ?? raw) as AspenItemAvailabilityResult),
+        map((raw) => {
+          const availability = this.normalizeItemAvailability(raw, numeric);
+          if (!availability) throw new Error('invalid_item_availability');
+          return availability;
+        }),
         tap((availability) => {
           this.cache.write(cacheKey, availability).catch(() => {});
         })
@@ -406,6 +411,69 @@ export class ItemService {
     }
 
     return { success, id, format, source, records };
+  }
+
+  private normalizeItemAvailability(
+    raw: unknown,
+    id: string
+  ): AspenItemAvailabilityResult | null {
+    const envelope = this.recordObject(raw);
+    const input = this.recordObject(envelope['result'] ?? raw);
+    const responseId = input['id'];
+    if (
+      !['string', 'number'].includes(typeof responseId) ||
+      String(responseId).trim() !== id ||
+      input['success'] === false ||
+      input['error'] !== undefined
+    ) return null;
+
+    const rawHoldings = input['holdings'];
+    if (!rawHoldings || typeof rawHoldings !== 'object') return null;
+    // Aspen serializes no copies as an empty PHP array.
+    if (Array.isArray(rawHoldings) && rawHoldings.length) return null;
+
+    const groups: Array<[string, AspenHoldingItem[]]> = [];
+    for (const [group, rows] of Object.entries(rawHoldings)) {
+      if (!Array.isArray(rows)) return null;
+      const items: AspenHoldingItem[] = [];
+      for (const rawItem of rows) {
+        const fields = this.recordObject(rawItem);
+        const item: AspenHoldingItem = {};
+        const textFields = [
+          'location', 'callnumber', 'status', 'dueDate', 'statusFull',
+          'statusfull', 'id', 'libraryDisplayName', 'section', 'lastCheckinDate',
+        ] as const;
+        for (const field of textFields) {
+          const value = fields[field];
+          if (value === null || value === undefined) continue;
+          if (
+            typeof value !== 'string' &&
+            !(typeof value === 'number' && Number.isFinite(value))
+          ) return null;
+          item[field] = String(value).trim();
+        }
+        if (!Object.values(item).some((value) => !!value)) return null;
+        for (const field of ['holdable', 'number', 'sectionId'] as const) {
+          const value = fields[field];
+          if (value === null || value === undefined || value === '') continue;
+          if (
+            !['string', 'number'].includes(typeof value) ||
+            !Number.isFinite(Number(value))
+          ) return null;
+          item[field] = Number(value);
+        }
+        const available = fields['availability'];
+        if (available !== null && available !== undefined) {
+          if (typeof available === 'boolean') item.availability = available;
+          else if (available === 0 || available === 1) item.availability = available === 1;
+          else return null;
+        }
+        items.push(item);
+      }
+      groups.push([group, items]);
+    }
+
+    return { id, holdings: Object.fromEntries(groups) };
   }
 
   private recordObject(value: unknown): Record<string, unknown> {

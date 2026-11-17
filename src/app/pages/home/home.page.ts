@@ -1,4 +1,4 @@
-import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnDestroy, inject, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { IonicModule, ModalController } from '@ionic/angular/lazy';
 import { RouterModule } from '@angular/router';
@@ -6,6 +6,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Capacitor } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
+import { Subscription } from 'rxjs';
 import { Globals } from '../../globals';
 import { AuthState, AuthService } from '../../services/auth.service';
 import { PatronService } from '../../services/patron.service';
@@ -32,7 +33,7 @@ type HomeClosureNotice = {
   changeDetection: ChangeDetectionStrategy.Eager,
   imports: [CommonModule, IonicModule, RouterModule, FormsModule],
 })
-export class HomePage {
+export class HomePage implements OnDestroy {
   globals = inject(Globals);
   auth = inject(AuthService);
   patron = inject(PatronService);
@@ -44,9 +45,14 @@ export class HomePage {
 
   homeQuery = '';
   closureNotice: HomeClosureNotice | null = null;
+  private closureNoticeRequest?: Subscription;
 
   ionViewDidEnter() {
     this.loadClosureNotice();
+  }
+
+  ngOnDestroy() {
+    this.closureNoticeRequest?.unsubscribe();
   }
 
   isDarkMode(): boolean {
@@ -154,15 +160,15 @@ export class HomePage {
   }
 
   private loadClosureNotice() {
-    this.locationsService.getLocations().subscribe({
+    this.closureNoticeRequest?.unsubscribe();
+    this.closureNoticeRequest = this.locationsService.getLocations().subscribe({
       next: (locations) => {
         this.closureNotice = this.buildClosureNotice(
           Array.isArray(locations) ? locations : []
         );
       },
-      error: () => {
-        this.closureNotice = null;
-      },
+      // A failed refresh must not erase an already loaded closure notice.
+      error: () => {},
     });
   }
 

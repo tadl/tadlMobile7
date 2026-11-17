@@ -8,7 +8,7 @@ import {
 } from '@angular/core';
 import { IonicModule } from '@ionic/angular/lazy';
 import { ModalController } from '@ionic/angular/lazy';
-import { Subject, takeUntil } from 'rxjs';
+import { Subscription, finalize } from 'rxjs';
 
 import { Globals } from '../../globals';
 import {
@@ -46,7 +46,10 @@ export class EventsPage implements OnInit, OnDestroy {
 
   events: MobileEvent[] = [];
 
-  private destroyed$ = new Subject<void>();
+  private activeRequest?: Subscription;
+  private requestRevision = 0;
+  private loadedVenue: VenueSelection | null = null;
+  private destroyed = false;
 
   readonly placeholderImage = 'assets/placeholder.png';
   readonly showVenueFilter = APP_PROFILE.events.venueFilter;
@@ -56,8 +59,9 @@ export class EventsPage implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    this.destroyed$.next();
-    this.destroyed$.complete();
+    this.destroyed = true;
+    this.requestRevision += 1;
+    this.activeRequest?.unsubscribe();
   }
 
   refresh(event: CustomEvent): void {
@@ -128,14 +132,26 @@ export class EventsPage implements OnInit, OnDestroy {
     venue: VenueSelection,
     refresher?: HTMLIonRefresherElement
   ): void {
-    this.loading = true;
+    if (this.destroyed) return;
+    const revision = ++this.requestRevision;
+    this.activeRequest?.unsubscribe();
+    if (this.loadedVenue !== venue) {
+      this.events = [];
+      this.loadedVenue = null;
+    }
+    this.loading = this.loadedVenue !== venue;
     this.error = null;
+    const isCurrent = () => !this.destroyed && this.requestRevision === revision;
 
-    this.eventsService
+    this.activeRequest = this.eventsService
       .getEvents(venue)
-      .pipe(takeUntil(this.destroyed$))
+      .pipe(finalize(() => {
+        if (isCurrent()) this.loading = false;
+        refresher?.complete();
+      }))
       .subscribe({
         next: (res) => {
+          if (!isCurrent()) return;
           const apiVenues = (res.all_venues || []) as VenueOption[];
 
           // Ensure only ONE "all" option in the UI.
@@ -166,14 +182,15 @@ export class EventsPage implements OnInit, OnDestroy {
             return da - db;
           });
 
+          this.loadedVenue = venue;
           this.loading = false;
-          refresher?.complete();
         },
-        error: (err) => {
-          console.error(err);
-          this.error = 'Could not load events. Please try again.';
+        error: () => {
+          if (!isCurrent()) return;
+          this.error = this.loadedVenue === venue && this.events.length
+            ? 'Could not refresh events. Showing saved events.'
+            : 'Could not load events. Please try again.';
           this.loading = false;
-          refresher?.complete();
         },
       });
   }

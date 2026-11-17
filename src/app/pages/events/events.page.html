@@ -36,7 +36,7 @@
     <ion-refresher-content></ion-refresher-content>
   </ion-refresher>
 
-  @if (!loading && !error) {
+  @if (!loading && (!error || events.length > 0)) {
   <ion-list>
     @for (ev of events; track trackByUrl($index, ev)) {
     <ion-item button (click)="openEvent(ev)" detail="true">
@@ -56,7 +56,7 @@
     }
   </ion-list>
   } @if (!loading && error) {
-  <div class="state">
+  <div class="state" role="status">
     <p>{{ error }}</p>
     <ion-button expand="block" (click)="onVenueChange(selectedVenueCode)">
       Retry

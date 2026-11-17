@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 
 import { Router } from '@angular/router';
 import { ActivatedRoute } from '@angular/router';
@@ -29,6 +29,12 @@ import {
   HoldTargetOption,
 } from '../../services/hold-support.service';
 
+interface ListMutationContext {
+  accountId: string;
+  listId: string;
+  revision: number;
+}
+
 @Component({
   standalone: true,
   selector: 'app-my-list-detail',
@@ -36,7 +42,7 @@ import {
   styleUrls: ['./my-list-detail.page.scss'],
   imports: [IonicModule],
 })
-export class MyListDetailPage {
+export class MyListDetailPage implements OnInit, OnDestroy {
   globals = inject(Globals);
   private route = inject(ActivatedRoute);
   private listsService = inject(ListsService);
@@ -53,6 +59,8 @@ export class MyListDetailPage {
   private titlesSubscription?: Subscription;
   private moreSubscription?: Subscription;
   private displayedAccountId: string | null = null;
+  private viewRevision = 0;
+  private authSubscription?: Subscription;
 
   loading = false;
   loadingMore = false;
@@ -69,7 +77,25 @@ export class MyListDetailPage {
   canEditList = false;
   mutatingList = false;
 
+  ngOnInit() {
+    let accountId = this.auth.snapshot().activeAccountId;
+    this.authSubscription = this.auth.authState().subscribe(state => {
+      const nextAccountId = state.isLoggedIn ? state.activeAccountId : null;
+      if (accountId === nextAccountId) return;
+      accountId = nextAccountId;
+      this.prepareAccount();
+    });
+  }
+
+  ngOnDestroy() {
+    this.authSubscription?.unsubscribe();
+    this.ionViewDidLeave();
+  }
+
   ionViewWillEnter() {
+    this.viewRevision += 1;
+    this.mutatingList = false;
+    this.removingRecordId = '';
     const listId = (this.route.snapshot.paramMap.get('id') ?? '').trim();
     if (this.listId !== listId) {
       this.cancelReadRequests();
@@ -87,7 +113,23 @@ export class MyListDetailPage {
   }
 
   ionViewDidLeave() {
+    this.viewRevision += 1;
+    this.mutatingList = false;
+    this.removingRecordId = '';
     this.cancelReadRequests();
+  }
+
+  private mutationContext(): ListMutationContext | null {
+    const snapshot = this.auth.snapshot();
+    return snapshot.isLoggedIn && snapshot.activeAccountId
+      ? { accountId: snapshot.activeAccountId, listId: this.listId, revision: this.viewRevision }
+      : null;
+  }
+
+  private isCurrentMutation(context: ListMutationContext | null): context is ListMutationContext {
+    const snapshot = this.auth.snapshot();
+    return !!context && snapshot.isLoggedIn && snapshot.activeAccountId === context.accountId &&
+      this.listId === context.listId && this.viewRevision === context.revision;
   }
 
   private cancelReadRequests() {
@@ -98,6 +140,9 @@ export class MyListDetailPage {
   private prepareAccount(): string | null {
     const accountId = this.auth.snapshot().activeAccountId;
     if (this.displayedAccountId !== accountId) {
+      this.viewRevision += 1;
+      this.mutatingList = false;
+      this.removingRecordId = '';
       this.cancelReadRequests();
       this.titles = [];
       this.canEditList = false;
@@ -307,11 +352,14 @@ export class MyListDetailPage {
 
   async openTitleActions(t: AspenListTitle, ev?: Event) {
     ev?.stopPropagation();
+    const context = this.mutationContext();
+    if (!context) return;
 
     const buttons: ActionSheetButton[] = [];
     if (this.auth.snapshot()?.isLoggedIn && this.canPlaceHoldFromTitle(t)) {
       const groupedKey = this.recordIdForEntry(t);
       const hasCachedHold = await this.hasCachedHoldForGroupedKey(groupedKey);
+      if (!this.isCurrentMutation(context)) return;
       if (hasCachedHold) {
         buttons.push({
           text: 'On hold',
@@ -321,19 +369,19 @@ export class MyListDetailPage {
       } else {
         buttons.push({
           text: 'Place Hold',
-          handler: () => this.placeHoldFromTitle(t),
+          handler: () => { if (this.isCurrentMutation(context)) void this.placeHoldFromTitle(t); },
         });
       }
     }
     buttons.push({
       text: 'Open Details',
-      handler: () => this.openTitle(t),
+      handler: () => { if (this.isCurrentMutation(context)) void this.openTitle(t); },
     });
     if (this.canEditList) {
       buttons.push({
         text: 'Remove from List',
         role: 'destructive',
-        handler: () => this.confirmRemoveFromList(t),
+        handler: () => { if (this.isCurrentMutation(context)) void this.confirmRemoveFromList(t); },
       });
     }
     buttons.push({ text: 'Close', role: 'cancel' });
@@ -343,6 +391,7 @@ export class MyListDetailPage {
       buttons,
     });
 
+    if (!this.isCurrentMutation(context)) { sheet.remove(); return; }
     await sheet.present();
   }
 
@@ -575,6 +624,8 @@ export class MyListDetailPage {
   }
 
   private async confirmRemoveFromList(t: AspenListTitle) {
+    const context = this.mutationContext();
+    if (!context) return;
     if (!this.canEditList) {
       this.toast.presentToast('You can only edit lists that you own.');
       return;
@@ -588,7 +639,7 @@ export class MyListDetailPage {
         {
           text: 'Remove',
           role: 'destructive',
-          handler: () => this.removeFromListNow(t),
+          handler: () => this.removeFromListNow(t, context),
         },
         {
           text: 'Close',
@@ -597,6 +648,7 @@ export class MyListDetailPage {
       ],
     });
 
+    if (!this.isCurrentMutation(context)) { confirmSheet.remove(); return; }
     await confirmSheet.present();
   }
 
@@ -604,7 +656,8 @@ export class MyListDetailPage {
     return this.removeBusyFor(t);
   }
 
-  private removeFromListNow(t: AspenListTitle) {
+  private removeFromListNow(t: AspenListTitle, context = this.mutationContext()) {
+    if (!this.isCurrentMutation(context)) return;
     if (!this.canEditList) {
       this.toast.presentToast('You can only edit lists that you own.');
       return;
@@ -623,14 +676,17 @@ export class MyListDetailPage {
 
     this.removingRecordId = recordId;
     this.listsService
-      .removeTitlesFromList(this.listId, [recordId])
+      .removeTitlesFromList(context.listId, [recordId])
       .pipe(
         finalize(() => {
-          this.removingRecordId = '';
+          if (this.isCurrentMutation(context) && this.removingRecordId === recordId) {
+            this.removingRecordId = '';
+          }
         })
       )
       .subscribe({
         next: (res) => {
+          if (!this.isCurrentMutation(context)) return;
           if (!res?.success) {
             this.toast.presentToast(
               res?.message || 'Could not remove title from list.'
@@ -641,11 +697,12 @@ export class MyListDetailPage {
           this.titles = this.titles.filter(
             (x) => this.recordIdForEntry(x) !== recordId
           );
-          this.listLookup.removeMembership(recordId, this.listId);
+          this.listLookup.removeMembership(recordId, context.listId);
           this.toast.presentToast(res?.message || 'Removed from list.');
         },
-        error: () =>
-          this.toast.presentToast('Could not remove title from list.'),
+        error: () => {
+          if (this.isCurrentMutation(context)) this.toast.presentToast('Could not remove title from list.');
+        },
       });
   }
 
@@ -655,6 +712,8 @@ export class MyListDetailPage {
   }
 
   async editListMeta() {
+    const context = this.mutationContext();
+    if (!context) return;
     if (!this.canEditList || this.mutatingList || !this.listId) return;
 
     const alert = await this.alertCtrl.create({
@@ -691,23 +750,27 @@ export class MyListDetailPage {
           text: 'Save',
           role: 'confirm',
           handler: (v) => {
+            if (!this.isCurrentMutation(context)) return true;
             const title = (v?.title ?? '').toString().trim();
             const description = (v?.description ?? '').toString().trim();
             if (!title) {
               this.toast.presentToast('List name is required.');
               return false;
             }
-            this.saveListMeta(title, description);
+            this.saveListMeta(title, description, context);
             return true;
           },
         },
       ],
     });
 
+    if (!this.isCurrentMutation(context)) { alert.remove(); return; }
     await alert.present();
   }
 
   async confirmDeleteList() {
+    const context = this.mutationContext();
+    if (!context) return;
     if (!this.canEditList || this.mutatingList || !this.listId) return;
 
     const count = this.titles.length;
@@ -724,27 +787,29 @@ export class MyListDetailPage {
         {
           text: 'Delete List',
           role: 'destructive',
-          handler: () => this.deleteListNow(),
+          handler: () => this.deleteListNow(context),
         },
       ],
     });
 
+    if (!this.isCurrentMutation(context)) { alert.remove(); return; }
     await alert.present();
   }
 
-  private saveListMeta(title: string, description: string) {
-    if (!this.listId || this.mutatingList) return;
+  private saveListMeta(title: string, description: string, context = this.mutationContext()) {
+    if (!this.isCurrentMutation(context) || !context.listId || this.mutatingList) return;
 
     this.mutatingList = true;
     this.listsService
-      .editList(this.listId, { title, description })
+      .editList(context.listId, { title, description })
       .pipe(
         finalize(() => {
-          this.mutatingList = false;
+          if (this.isCurrentMutation(context)) this.mutatingList = false;
         })
       )
       .subscribe({
         next: (res) => {
+          if (!this.isCurrentMutation(context)) return;
           if (!res?.success) {
             this.toast.presentToast(res?.message || 'Could not update list.');
             return;
@@ -752,27 +817,28 @@ export class MyListDetailPage {
 
           this.listTitle = title;
           this.listDescription = description;
-          this.listLookup.renameList(this.listId, title);
+          this.listLookup.renameList(context.listId, title);
           this.toast.presentToast(res?.message || 'List updated.');
         },
-        error: () => this.toast.presentToast('Could not update list.'),
+        error: () => { if (this.isCurrentMutation(context)) this.toast.presentToast('Could not update list.'); },
       });
   }
 
-  private deleteListNow() {
-    if (!this.listId || this.mutatingList) return;
+  private deleteListNow(context = this.mutationContext()) {
+    if (!this.isCurrentMutation(context) || !context.listId || this.mutatingList) return;
 
-    const listId = this.listId;
+    const listId = context.listId;
     this.mutatingList = true;
     this.listsService
       .deleteList(listId)
       .pipe(
         finalize(() => {
-          this.mutatingList = false;
+          if (this.isCurrentMutation(context)) this.mutatingList = false;
         })
       )
       .subscribe({
         next: (res) => {
+          if (!this.isCurrentMutation(context)) return;
           if (!res?.success) {
             this.toast.presentToast(res?.message || 'Could not delete list.');
             return;
@@ -782,7 +848,7 @@ export class MyListDetailPage {
           this.toast.presentToast(res?.message || 'List deleted.');
           this.router.navigate(['/my-lists']);
         },
-        error: () => this.toast.presentToast('Could not delete list.'),
+        error: () => { if (this.isCurrentMutation(context)) this.toast.presentToast('Could not delete list.'); },
       });
   }
 

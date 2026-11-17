@@ -638,6 +638,7 @@ export class SearchPage implements OnInit, OnDestroy {
     }
 
     this.filters = next;
+    this.closeFiltersSheet();
     this.runSearch(true);
   }
 

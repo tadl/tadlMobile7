@@ -281,13 +281,18 @@
           group.options; track trackFacetOption($index, option)) {
           <ion-item>
             <ion-checkbox
-              slot="start"
+              class="facet-option"
+              labelPlacement="end"
+              justify="start"
               [attr.aria-label]="group.label + ': ' + option.display"
               [checked]="isFacetSelected(option.filter)"
               (ionChange)="onFacetToggled(group, option, $event.detail.checked)"
-            ></ion-checkbox>
-            <ion-label class="ion-text-wrap">{{ option.display }}</ion-label>
-            <ion-note slot="end">{{ option.count }}</ion-note>
+            >
+              <span class="facet-option-content">
+                <span>{{ option.display }}</span>
+                <ion-note>{{ option.count }}</ion-note>
+              </span>
+            </ion-checkbox>
           </ion-item>
           } }
         </ion-item-group>

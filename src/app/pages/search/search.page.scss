@@ -109,6 +109,27 @@
   font-weight: 600;
 }
 
+.facet-option {
+  width: 100%;
+}
+
+.facet-option::part(label) {
+  flex: 1;
+  min-width: 0;
+  white-space: normal;
+}
+
+.facet-option-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.facet-option-content ion-note {
+  flex: 0 0 auto;
+}
+
 .filters-summary {
   margin-top: 8px;
 }

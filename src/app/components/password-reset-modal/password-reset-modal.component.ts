@@ -28,7 +28,7 @@ export class PasswordResetModalComponent {
 
   async close() {
     await this.modalCtrl.dismiss();
-    this.globals.modal_open = false;
+    await this.globals.refreshModalState();
   }
 
   submit() {

@@ -149,9 +149,11 @@ export class AppComponent implements OnInit {
           });
         });
 
-        fromEvent(document, 'didDismiss').subscribe(() => {
-          this.globals.modal_open = false;
-        });
+        for (const event of ['ionModalDidPresent', 'ionModalDidDismiss']) {
+          fromEvent(document, event).subscribe(() => {
+            void this.globals.refreshModalState();
+          });
+        }
 
         this.whenInitialNavigationReady();
       } catch (err) {
@@ -357,7 +359,7 @@ export class AppComponent implements OnInit {
 
         await topOverlay.dismiss();
       }
-      this.globals.modal_open = false;
+      await this.globals.refreshModalState();
     } catch {
       // Ignore modal-dismiss errors and continue deep-link routing.
     }

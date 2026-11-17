@@ -373,17 +373,24 @@ export class Globals {
     return this.menuController.toggle(menu);
   }
 
-  async close_modal() {
-    await this.modalController.dismiss('Wrapped up!');
-    this.modal_open = false;
+  async refreshModalState(): Promise<void> {
+    this.modal_open = !!(await this.modalController.getTop());
+  }
+
+  async close_modal(): Promise<boolean> {
+    const modal = await this.modalController.getTop();
+    if (!modal) {
+      this.modal_open = false;
+      return false;
+    }
+    await modal.dismiss('Wrapped up!');
+    await this.refreshModalState();
+    return true;
   }
 
   async go_back() {
-    if (this.modal_open) {
-      await this.close_modal();
-    } else {
-      window.history.back();
-    }
+    if (await this.close_modal()) return;
+    window.history.back();
   }
 
   loading_show() {
@@ -507,10 +514,7 @@ export class Globals {
   }
 
   async confirm_exit() {
-    if (this.modal_open) {
-      await this.close_modal();
-      return;
-    }
+    if (await this.close_modal()) return;
 
     const alert = await this.alertController.create({
       header: 'Exit the app?',

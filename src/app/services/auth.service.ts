@@ -6,10 +6,12 @@ import {
   from,
   switchMap,
   map,
-  tap,
   throwError,
   catchError,
   of,
+  EMPTY,
+  defer,
+  filter,
 } from 'rxjs';
 
 import {
@@ -34,6 +36,7 @@ export class AuthService {
   private lastProfileRefreshAt = 0;
   private lastProfileRefreshAccountId: string | null = null;
   private sessionRevision = 0;
+  private sessionStorageTail: Promise<void> = Promise.resolve();
 
   private state$ = new BehaviorSubject<AuthState>({
     isLoggedIn: false,
@@ -109,9 +112,12 @@ export class AuthService {
       profile: nextProfile,
     });
 
-    this.accounts
-      .cacheProfile(snap.activeAccountId, nextProfile)
-      .catch(() => {});
+    const revision = this.sessionRevision;
+    void this.queueSessionStorage(async () => {
+      if (this.isCurrentSession(snap.activeAccountId!, revision)) {
+        await this.accounts.cacheProfile(snap.activeAccountId!, nextProfile);
+      }
+    }).catch(() => {});
   }
 
   /**
@@ -120,186 +126,154 @@ export class AuthService {
    * - cached profile (fast UI)
    */
   restore(): Observable<AuthState> {
-    return from(this.accounts.getActiveAccountId()).pipe(
-      switchMap((activeId) => {
-        if (!activeId) {
-          const next: AuthState = {
-            isLoggedIn: false,
-            activeAccountId: null,
-            activeAccountMeta: null,
-            profile: null,
-          };
-          this.state$.next(next);
-          return from([next]);
-        }
+    const revision = this.sessionRevision;
+    return this.sessionResult(revision, () => this.queueSessionStorage(async () => {
+      if (!this.isCurrentIntent(revision)) return null;
+      const activeId = await this.accounts.getActiveAccountId();
+      if (!this.isCurrentIntent(revision)) return null;
+      if (!activeId) return this.publishLoggedOut();
 
-        return from(
-          Promise.all([
-            this.accounts.getActiveAccountMeta(),
-            this.accounts.getCachedProfile(activeId),
-          ])
-        ).pipe(
-          map(([meta, cachedProfile]) => {
-            const next: AuthState = {
-              isLoggedIn: !!meta && !!cachedProfile,
-              activeAccountId: activeId,
-              activeAccountMeta: meta,
-              profile: cachedProfile,
-            };
-            this.state$.next(next);
-            return next;
-          })
-        );
-      })
-    );
+      const [meta, cachedProfile] = await Promise.all([
+        this.accounts.getActiveAccountMeta(),
+        this.accounts.getCachedProfile(activeId),
+      ]);
+      if (!this.isCurrentIntent(revision)) return null;
+      const next: AuthState = {
+        isLoggedIn: !!meta && !!cachedProfile,
+        activeAccountId: activeId,
+        activeAccountMeta: meta,
+        profile: cachedProfile,
+      };
+      this.state$.next(next);
+      return next;
+    }));
   }
 
-  /**
-   * Login with raw creds (from form).
-   * - validates via getPatronProfile
-   * - stores account meta + password
-   * - sets active account
-   * - caches profile
-   */
+  /** Validate credentials, then commit only the latest session intent. */
   login(username: string, password: string): Observable<AuthState> {
     const u = (username ?? '').trim();
     const p = (password ?? '').trim();
-    if (!u || !p) {
-      return throwError(() => new Error('missing_credentials'));
-    }
-    this.sessionRevision += 1;
+    if (!u || !p) return throwError(() => new Error('missing_credentials'));
+    const revision = ++this.sessionRevision;
 
-    return this.patron.getPatronProfile(u, p).pipe(
+    return defer(() => this.isCurrentIntent(revision)
+      ? this.patron.getPatronProfile(u, p) : EMPTY).pipe(
       switchMap((res) => {
-        if (!res.success || !res.profile) {
-          return throwError(() => new Error('invalid_login'));
-        }
-
-        const label = this.patron.displayNameFromProfile(res.profile);
-
-        return from(
-          this.accounts.upsertAccountMeta({ username: u, label })
-        ).pipe(
-          switchMap((meta) =>
-            from(this.accounts.setPassword(meta.id, p)).pipe(
-              switchMap(() => from(this.accounts.setActiveAccountId(meta.id))),
-              switchMap(() =>
-                from(this.accounts.cacheProfile(meta.id, res.profile))
-              ),
-              map(() => {
-                const next: AuthState = {
-                  isLoggedIn: true,
-                  activeAccountId: meta.id,
-                  activeAccountMeta: meta,
-                  profile: res.profile,
-                };
-                this.state$.next(next);
-                return next;
-              })
-            )
-          )
-        );
-      })
+        if (!this.isCurrentIntent(revision)) return EMPTY;
+        if (!res.success || !res.profile) return throwError(() => new Error('invalid_login'));
+        return this.activateAccount(revision, {
+          username: u, label: this.patron.displayNameFromProfile(res.profile),
+        }, res.profile, p);
+      }),
+      catchError(error => this.isCurrentIntent(revision) ? throwError(() => error) : EMPTY),
     );
   }
 
-  /**
-   * Switch to a stored account (by id).
-   * - reads password from secure storage
-   * - re-validates by calling getPatronProfile
-   * - sets active + caches fresh profile
-   */
+  /** Revalidate a saved account without allowing an older switch to win. */
   switchAccount(accountId: string): Observable<AuthState> {
-    this.sessionRevision += 1;
-    return from(this.accounts.listAccounts()).pipe(
-      map((list) => list.find((a) => a.id === accountId) ?? null),
-      switchMap((meta) => {
+    const revision = ++this.sessionRevision;
+    return defer(() => from(this.queueSessionStorage(async () => {
+      if (!this.isCurrentIntent(revision)) return null;
+      return this.accounts.listAccounts();
+    }))).pipe(
+      switchMap((list) => {
+        if (!this.isCurrentIntent(revision)) return EMPTY;
+        const meta = list?.find(account => account.id === accountId);
         if (!meta) return throwError(() => new Error('account_not_found'));
-
         return from(this.accounts.getPassword(meta.id)).pipe(
           switchMap((password) => {
-            if (!password)
-              return throwError(() => new Error('missing_password'));
-            return this.patron
-              .getPatronProfile(meta.username, password, meta.id)
-              .pipe(
-                switchMap((res) => {
-                  if (!res.success || !res.profile)
-                    return throwError(() => new Error('invalid_login'));
-
-                  // label might change; keep it updated
-                  const label = this.patron.displayNameFromProfile(res.profile);
-
-                  return from(
-                    this.accounts.upsertAccountMeta({
-                      id: meta.id,
-                      username: meta.username,
-                      label,
-                    })
-                  ).pipe(
-                    switchMap((updatedMeta) =>
-                      from(
-                        this.accounts.setActiveAccountId(updatedMeta.id)
-                      ).pipe(
-                        switchMap(() =>
-                          from(
-                            this.accounts.cacheProfile(
-                              updatedMeta.id,
-                              res.profile
-                            )
-                          )
-                        ),
-                        map(() => {
-                          const next: AuthState = {
-                            isLoggedIn: true,
-                            activeAccountId: updatedMeta.id,
-                            activeAccountMeta: updatedMeta,
-                            profile: res.profile,
-                          };
-                          this.state$.next(next);
-                          return next;
-                        })
-                      )
-                    )
-                  );
-                })
-              );
-          })
+            if (!this.isCurrentIntent(revision)) return EMPTY;
+            if (!password) return throwError(() => new Error('missing_password'));
+            return this.patron.getPatronProfile(meta.username, password, meta.id).pipe(
+              switchMap((res) => {
+                if (!this.isCurrentIntent(revision)) return EMPTY;
+                if (!res.success || !res.profile) return throwError(() => new Error('invalid_login'));
+                return this.activateAccount(revision, {
+                  id: meta.id, username: meta.username,
+                  label: this.patron.displayNameFromProfile(res.profile),
+                }, res.profile);
+              }),
+            );
+          }),
         );
-      })
+      }),
+      catchError(error => this.isCurrentIntent(revision) ? throwError(() => error) : EMPTY),
     );
   }
 
-  /**
-   * Logout:
-   * - clears active account id
-   * - keeps stored accounts + passwords by default (matches your current app)
-   */
-  logout(): Observable<AuthState> {
-    // Invalidate pending refreshes immediately, before storage finishes logout.
-    this.sessionRevision += 1;
-    return from(this.accounts.getActiveAccountId()).pipe(
-      tap(() => {}),
-      switchMap((activeId) => {
-        if (activeId) {
-          // keep password; clear cached profile
-          return from(this.accounts.clearCachedProfile(activeId)).pipe(
-            switchMap(() => from(this.accounts.setActiveAccountId(null)))
-          );
+  /** Clear the active session, retaining saved accounts and passwords. */
+  logout(options?: { removeStoredAccount?: boolean }): Observable<AuthState> {
+    const revision = ++this.sessionRevision;
+    return this.sessionResult(revision, () => this.queueSessionStorage(async () => {
+      if (!this.isCurrentIntent(revision)) return null;
+      const activeId = await this.accounts.getActiveAccountId();
+      if (!this.isCurrentIntent(revision)) return null;
+      if (activeId) {
+        if (options?.removeStoredAccount) {
+          await this.accounts.removeAccount(activeId, { clearActive: false });
+        } else {
+          await this.accounts.clearCachedProfile(activeId);
         }
-        return from(this.accounts.setActiveAccountId(null));
-      }),
-      map(() => {
-        const next: AuthState = {
-          isLoggedIn: false,
-          activeAccountId: null,
-          activeAccountMeta: null,
-          profile: null,
-        };
-        this.state$.next(next);
-        return next;
-      })
+      }
+      if (!this.isCurrentIntent(revision)) return null;
+      await this.accounts.setActiveAccountId(null);
+      return this.isCurrentIntent(revision) ? this.publishLoggedOut() : null;
+    }));
+  }
+
+  private activateAccount(
+    revision: number,
+    identity: Omit<StoredAccountMeta, 'id'> & { id?: string },
+    profile: any,
+    password?: string,
+  ): Observable<AuthState> {
+    return this.sessionResult(revision, () => this.queueSessionStorage(async () => {
+      if (!this.isCurrentIntent(revision)) return null;
+      const meta = await this.accounts.upsertAccountMeta(identity);
+      if (!this.isCurrentIntent(revision)) return null;
+      if (password !== undefined) await this.accounts.setPassword(meta.id, password);
+      if (!this.isCurrentIntent(revision)) return null;
+      await this.accounts.cacheProfile(meta.id, profile);
+      if (!this.isCurrentIntent(revision)) return null;
+      await this.accounts.setActiveAccountId(meta.id);
+      if (!this.isCurrentIntent(revision)) return null;
+      const next: AuthState = {
+        isLoggedIn: true, activeAccountId: meta.id,
+        activeAccountMeta: meta, profile,
+      };
+      this.state$.next(next);
+      return next;
+    }));
+  }
+
+  private sessionResult(
+    revision: number,
+    operation: () => Promise<AuthState | null>,
+  ): Observable<AuthState> {
+    return defer(() => from(operation())).pipe(
+      filter((state): state is AuthState => state !== null && this.isCurrentIntent(revision)),
+      catchError(error => this.isCurrentIntent(revision) ? throwError(() => error) : EMPTY),
     );
+  }
+
+  private queueSessionStorage<T>(operation: () => Promise<T>): Promise<T> {
+    // An already-started storage write cannot be cancelled. Order later commits
+    // after it so stale writes cannot become the final persisted session.
+    const result = this.sessionStorageTail.then(operation);
+    this.sessionStorageTail = result.then(() => {}, () => {});
+    return result;
+  }
+
+  private isCurrentIntent(revision: number): boolean {
+    return this.sessionRevision === revision;
+  }
+
+  private publishLoggedOut(): AuthState {
+    const next: AuthState = {
+      isLoggedIn: false, activeAccountId: null, activeAccountMeta: null, profile: null,
+    };
+    this.state$.next(next);
+    return next;
   }
 
   /**
@@ -350,20 +324,16 @@ export class AuthService {
                 );
               }
 
-              return from(
-                this.accounts.cacheProfile(snap.activeAccountId!, res.profile)
-              ).pipe(
-                map(() => {
-                  if (!this.isCurrentSession(accountId, revision)) return this.snapshot();
-                  const next: AuthState = {
-                    ...this.snapshot(),
-                    isLoggedIn: true,
-                    profile: res.profile,
-                  };
-                  this.state$.next(next);
-                  return next;
-                })
-              );
+              return from(this.queueSessionStorage(async () => {
+                if (!this.isCurrentSession(accountId, revision)) return this.snapshot();
+                await this.accounts.cacheProfile(accountId, res.profile);
+                if (!this.isCurrentSession(accountId, revision)) return this.snapshot();
+                const next: AuthState = {
+                  ...this.snapshot(), isLoggedIn: true, profile: res.profile,
+                };
+                this.state$.next(next);
+                return next;
+              }));
             }),
             catchError(() => of(this.snapshot()))
           );
@@ -375,22 +345,21 @@ export class AuthService {
     const nextUsername = (username ?? '').trim();
     const snap = this.snapshot();
     const active = snap.activeAccountMeta;
+    const revision = this.sessionRevision;
     if (!nextUsername || !active || !snap.activeAccountId) return;
 
-    const updatedMeta = await this.accounts.upsertAccountMeta({
-      id: active.id,
-      username: nextUsername,
-      label: active.label,
+    await this.queueSessionStorage(async () => {
+      if (!this.isCurrentSession(active.id, revision)) return;
+      const updatedMeta = await this.accounts.upsertAccountMeta({
+        id: active.id, username: nextUsername, label: active.label,
+      });
+      if (!this.isCurrentSession(active.id, revision)) return;
+      const current = this.snapshot();
+      this.state$.next({
+        ...current, activeAccountMeta: updatedMeta,
+        profile: current.profile ? { ...current.profile, username: nextUsername } : current.profile,
+      });
     });
-
-    const next: AuthState = {
-      ...snap,
-      activeAccountMeta: updatedMeta,
-      profile: snap.profile
-        ? { ...snap.profile, username: nextUsername }
-        : snap.profile,
-    };
-    this.state$.next(next);
   }
 
   private isCurrentSession(accountId: string, revision: number): boolean {
@@ -402,23 +371,17 @@ export class AuthService {
     revision: number,
     removeStoredAccount: boolean
   ): Promise<void> {
-    if (!this.isCurrentSession(accountId, revision)) return;
-    if (removeStoredAccount) {
-      // Account removal must not independently clear active storage after a
-      // newer switch/login has started while its cleanup was awaiting I/O.
-      await this.accounts.removeAccount(accountId, { clearActive: false });
-    } else {
-      await this.accounts.clearCachedProfile(accountId);
-    }
-    if (!this.isCurrentSession(accountId, revision)) return;
-    await this.accounts.setActiveAccountId(null);
-    if (!this.isCurrentSession(accountId, revision)) return;
-
-    this.state$.next({
-      isLoggedIn: false,
-      activeAccountId: null,
-      activeAccountMeta: null,
-      profile: null,
+    await this.queueSessionStorage(async () => {
+      if (!this.isCurrentSession(accountId, revision)) return;
+      if (removeStoredAccount) {
+        await this.accounts.removeAccount(accountId, { clearActive: false });
+      } else {
+        await this.accounts.clearCachedProfile(accountId);
+      }
+      if (!this.isCurrentSession(accountId, revision)) return;
+      await this.accounts.setActiveAccountId(null);
+      if (!this.isCurrentSession(accountId, revision)) return;
+      this.publishLoggedOut();
     });
   }
 }

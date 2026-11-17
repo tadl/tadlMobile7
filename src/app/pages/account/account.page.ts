@@ -168,9 +168,6 @@ export class AccountPage implements OnInit {
   }
 
   async showLogoutActions() {
-    const snap = this.auth.snapshot();
-    const activeId = snap.activeAccountId;
-
     const sheet = await this.actionSheet.create({
       header: 'Logout',
       buttons: [
@@ -190,14 +187,8 @@ export class AccountPage implements OnInit {
           text: 'Logout and remove saved account',
           role: 'destructive',
           handler: () => {
-            // Logout first; then remove the account+password
-            this.auth.logout().subscribe({
-              next: async () => {
-                try {
-                  if (activeId) await this.accounts.removeAccount(activeId);
-                } catch {
-                  // ignore, but we can warn later if you want
-                }
+            this.auth.logout({ removeStoredAccount: true }).subscribe({
+              next: () => {
                 this.toast.presentToast(
                   'Logged out and removed saved account.'
                 );

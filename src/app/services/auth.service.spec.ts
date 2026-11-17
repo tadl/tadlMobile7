@@ -8,8 +8,9 @@ import { PatronService, type AspenPatronProfileResponse } from './patron.service
 
 function deferred<T>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
-  const promise = new Promise<T>(complete => { resolve = complete; });
-  return { promise, resolve };
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((complete, fail) => { resolve = complete; reject = fail; });
+  return { promise, resolve, reject };
 }
 
 describe('AuthService profile refresh account isolation', () => {
@@ -30,14 +31,15 @@ describe('AuthService profile refresh account isolation', () => {
     accounts = jasmine.createSpyObj<AccountStoreService>('AccountStoreService', [
       'getActiveAccountId', 'getActiveAccountMeta', 'getCachedProfile', 'listAccounts',
       'getPassword', 'upsertAccountMeta', 'setActiveAccountId', 'cacheProfile',
-      'clearCachedProfile', 'removeAccount',
+      'clearCachedProfile', 'removeAccount', 'setPassword',
     ]);
     accounts.getActiveAccountId.and.callFake(() => Promise.resolve(storedActive));
     accounts.getActiveAccountMeta.and.resolveTo(accountA);
     accounts.getCachedProfile.and.resolveTo(profileA);
     accounts.listAccounts.and.resolveTo([accountA, accountB]);
     accounts.getPassword.and.resolveTo('synthetic-password');
-    accounts.upsertAccountMeta.and.callFake(meta => Promise.resolve({ ...meta, id: meta.id || accountA.id }));
+    accounts.upsertAccountMeta.and.callFake(meta => Promise.resolve({ ...meta, id: meta.id || (meta.username === accountB.username ? accountB.id : accountA.id) }));
+    accounts.setPassword.and.resolveTo();
     accounts.setActiveAccountId.and.callFake(id => {
       storedActive = id;
       return Promise.resolve();
@@ -128,7 +130,8 @@ describe('AuthService profile refresh account isolation', () => {
     service.refreshActiveProfile().subscribe();
     flushMicrotasks();
     refresh.next({ success: true, profile: updatedA });
-    switchToB();
+    flushMicrotasks();
+    service.switchAccount(accountB.id).subscribe();
     saved.resolve();
     flushMicrotasks();
     expect(service.snapshot().activeAccountId).toBe(accountB.id);
@@ -156,8 +159,9 @@ describe('AuthService profile refresh account isolation', () => {
     service.refreshActiveProfile().subscribe();
     flushMicrotasks();
     refresh.next({ success: false });
+    flushMicrotasks();
     expect(accounts.removeAccount).toHaveBeenCalledOnceWith(accountA.id, { clearActive: false });
-    switchToB();
+    service.switchAccount(accountB.id).subscribe();
     removed.resolve();
     flushMicrotasks();
     expect(service.snapshot().activeAccountId).toBe(accountB.id);
@@ -172,7 +176,7 @@ describe('AuthService profile refresh account isolation', () => {
     service.refreshActiveProfile().subscribe();
     flushMicrotasks();
     expect(accounts.clearCachedProfile).toHaveBeenCalledOnceWith(accountA.id);
-    switchToB();
+    service.switchAccount(accountB.id).subscribe();
     cleared.resolve();
     flushMicrotasks();
     expect(service.snapshot().activeAccountId).toBe(accountB.id);
@@ -202,9 +206,9 @@ describe('AuthService profile refresh account isolation', () => {
     refresh.next({ success: false });
     await passwordRemovalStarted.promise;
     expect(actualStore.deletePassword).toHaveBeenCalledOnceWith(accountA.id);
-    await firstValueFrom(service.switchAccount(accountB.id));
+    const switched = firstValueFrom(service.switchAccount(accountB.id));
     removedPassword.resolve();
-    await refreshed;
+    await Promise.all([refreshed, switched]);
 
     expect(readActive).not.toHaveBeenCalled();
     expect(clearActive).not.toHaveBeenCalled();
@@ -223,4 +227,138 @@ describe('AuthService profile refresh account isolation', () => {
     await actualStore.removeAccount(accountA.id);
     expect(clearActive).toHaveBeenCalledOnceWith(null);
   });
+
+  for (const staleFailure of [false, true]) {
+    it(`keeps the latest stored-account switch after an older ${staleFailure ? 'error' : 'response'}`, fakeAsync(() => {
+      const accountC = { id: 'synthetic-c', username: 'charlie-example', label: 'Example C' };
+      const pendingB = new Subject<AspenPatronProfileResponse>();
+      const pendingC = new Subject<AspenPatronProfileResponse>();
+      accounts.listAccounts.and.resolveTo([accountA, accountB, accountC]);
+      patron.getPatronProfile.and.callFake(username => username === accountB.username ? pendingB : pendingC);
+      const staleNext = jasmine.createSpy();
+      const staleError = jasmine.createSpy();
+      service.switchAccount(accountB.id).subscribe({ next: staleNext, error: staleError });
+      flushMicrotasks();
+      service.switchAccount(accountC.id).subscribe();
+      flushMicrotasks();
+      pendingC.next({ success: true, profile: { firstname: 'Example C' } });
+      pendingC.complete();
+      flushMicrotasks();
+      if (staleFailure) pendingB.error(new Error('Synthetic stale error'));
+      else { pendingB.next({ success: true, profile: profileB }); pendingB.complete(); }
+      flushMicrotasks();
+      expect(service.snapshot().activeAccountId).toBe(accountC.id);
+      expect(storedActive).toBe(accountC.id);
+      expect(staleNext).not.toHaveBeenCalled();
+      expect(staleError).not.toHaveBeenCalled();
+      expect(accounts.upsertAccountMeta).not.toHaveBeenCalledWith(jasmine.objectContaining({ id: accountB.id }));
+    }));
+  }
+
+  it('does not authenticate an older switch after its password load finishes', fakeAsync(() => {
+    const password = deferred<string | null>();
+    accounts.getPassword.and.callFake(id => id === accountB.id ? password.promise : Promise.resolve('synthetic-password'));
+    service.switchAccount(accountB.id).subscribe();
+    flushMicrotasks();
+    service.logout().subscribe();
+    flushMicrotasks();
+    password.resolve('synthetic-password');
+    flushMicrotasks();
+    expect(patron.getPatronProfile).not.toHaveBeenCalled();
+    expect(service.snapshot().isLoggedIn).toBeFalse();
+    expect(storedActive).toBeNull();
+  }));
+
+  for (const stage of ['metadata', 'password', 'profile', 'active']) {
+    it(`orders a newer login after an already-started ${stage} write`, fakeAsync(() => {
+      const write = deferred<void>();
+      let started = false;
+      if (stage === 'metadata') accounts.upsertAccountMeta.and.callFake(async meta => {
+        if (meta.username === accountA.username) { started = true; await write.promise; }
+        return { ...meta, id: meta.username === accountA.username ? accountA.id : accountB.id };
+      });
+      if (stage === 'password') accounts.setPassword.and.callFake(async id => {
+        if (id === accountA.id) { started = true; await write.promise; }
+      });
+      if (stage === 'profile') accounts.cacheProfile.and.callFake(async id => {
+        if (id === accountA.id) { started = true; await write.promise; }
+      });
+      if (stage === 'active') accounts.setActiveAccountId.and.callFake(async id => {
+        if (id === accountA.id) { started = true; await write.promise; }
+        storedActive = id;
+      });
+      const oldNext = jasmine.createSpy();
+      service.login(accountA.username, 'synthetic-old-password').subscribe(oldNext);
+      refresh.next({ success: true, profile: profileA });
+      flushMicrotasks();
+      expect(started).toBeTrue();
+      service.login(accountB.username, 'synthetic-new-password').subscribe();
+      flushMicrotasks();
+      write.resolve();
+      flushMicrotasks();
+      expect(service.snapshot().activeAccountId).toBe(accountB.id);
+      expect(service.snapshot().profile).toEqual(profileB);
+      expect(storedActive).toBe(accountB.id);
+      expect(oldNext).not.toHaveBeenCalled();
+      expect(accounts.setPassword).toHaveBeenCalledWith(accountB.id, 'synthetic-new-password');
+    }));
+  }
+
+  it('lets logout win over a login response and suppresses its stale error', fakeAsync(() => {
+    const error = jasmine.createSpy();
+    service.login(accountA.username, 'synthetic-password').subscribe({ error });
+    service.logout().subscribe();
+    flushMicrotasks();
+    refresh.error(new Error('Synthetic stale login error'));
+    expect(service.snapshot().isLoggedIn).toBeFalse();
+    expect(storedActive).toBeNull();
+    expect(accounts.setPassword).not.toHaveBeenCalled();
+    expect(error).not.toHaveBeenCalled();
+  }));
+
+  it('recovers the storage queue after a stale login storage failure', fakeAsync(() => {
+    const saved = deferred<void>();
+    accounts.cacheProfile.and.callFake(id => id === accountA.id ? saved.promise : Promise.resolve());
+    const staleError = jasmine.createSpy();
+    service.login(accountA.username, 'synthetic-password').subscribe({ error: staleError });
+    refresh.next({ success: true, profile: profileA });
+    flushMicrotasks();
+    service.login(accountB.username, 'synthetic-password').subscribe();
+    saved.reject(new Error('Synthetic stale storage error'));
+    flushMicrotasks();
+    expect(service.snapshot().activeAccountId).toBe(accountB.id);
+    expect(storedActive).toBe(accountB.id);
+    expect(staleError).not.toHaveBeenCalled();
+  }));
+
+  it('finishes explicit removal before saving a newer login to the same account', fakeAsync(() => {
+    const removed = deferred<void>();
+    accounts.removeAccount.and.returnValue(removed.promise);
+    service.logout({ removeStoredAccount: true }).subscribe();
+    flushMicrotasks();
+    expect(accounts.removeAccount).toHaveBeenCalledOnceWith(accountA.id, { clearActive: false });
+    service.login(accountA.username, 'synthetic-new-password').subscribe();
+    refresh.next({ success: true, profile: profileA });
+    removed.resolve();
+    flushMicrotasks();
+    expect(service.snapshot().activeAccountId).toBe(accountA.id);
+    expect(storedActive).toBe(accountA.id);
+    expect(accounts.setPassword).toHaveBeenCalledOnceWith(accountA.id, 'synthetic-new-password');
+    expect(accounts.setActiveAccountId).not.toHaveBeenCalledWith(null);
+  }));
+
+  it('does not restore a cached session after a newer logout starts', fakeAsync(() => {
+    const active = deferred<string | null>();
+    accounts.getActiveAccountId.and.returnValues(active.promise, Promise.resolve(accountA.id));
+    const restored = jasmine.createSpy();
+    service.restore().subscribe(restored);
+    flushMicrotasks();
+    service.logout().subscribe();
+    active.resolve(accountA.id);
+    flushMicrotasks();
+    expect(restored).not.toHaveBeenCalled();
+    expect(service.snapshot().isLoggedIn).toBeFalse();
+    expect(storedActive).toBeNull();
+  }));
+
 });

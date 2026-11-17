@@ -205,19 +205,32 @@ export class AuthService {
   logout(options?: { removeStoredAccount?: boolean }): Observable<AuthState> {
     const revision = ++this.sessionRevision;
     return this.sessionResult(revision, () => this.queueSessionStorage(async () => {
-      if (!this.isCurrentIntent(revision)) return null;
-      const activeId = await this.accounts.getActiveAccountId();
-      if (!this.isCurrentIntent(revision)) return null;
-      if (activeId) {
-        if (options?.removeStoredAccount) {
-          await this.accounts.removeAccount(activeId, { clearActive: false });
-        } else {
-          await this.accounts.clearCachedProfile(activeId);
+      let persistenceStarted = false;
+      let completed = false;
+      try {
+        if (!this.isCurrentIntent(revision)) return null;
+        const activeId = await this.accounts.getActiveAccountId();
+        if (!this.isCurrentIntent(revision)) return null;
+        if (activeId) {
+          persistenceStarted = true;
+          if (options?.removeStoredAccount) {
+            // Removing credentials cannot be rolled back by a newer failed login.
+            // Publish logout before starting that irreversible local cleanup.
+            this.publishLoggedOut();
+            await this.accounts.removeAccount(activeId, { clearActive: false });
+          } else {
+            await this.accounts.clearCachedProfile(activeId);
+          }
         }
+        if (!this.isCurrentIntent(revision)) return null;
+        persistenceStarted = true;
+        await this.accounts.setActiveAccountId(null);
+        if (!this.isCurrentIntent(revision)) return null;
+        completed = true;
+        return this.publishLoggedOut();
+      } finally {
+        if (persistenceStarted && !completed) await this.reconcilePublishedSession();
       }
-      if (!this.isCurrentIntent(revision)) return null;
-      await this.accounts.setActiveAccountId(null);
-      return this.isCurrentIntent(revision) ? this.publishLoggedOut() : null;
     }));
   }
 
@@ -228,22 +241,48 @@ export class AuthService {
     password?: string,
   ): Observable<AuthState> {
     return this.sessionResult(revision, () => this.queueSessionStorage(async () => {
-      if (!this.isCurrentIntent(revision)) return null;
-      const meta = await this.accounts.upsertAccountMeta(identity);
-      if (!this.isCurrentIntent(revision)) return null;
-      if (password !== undefined) await this.accounts.setPassword(meta.id, password);
-      if (!this.isCurrentIntent(revision)) return null;
-      await this.accounts.cacheProfile(meta.id, profile);
-      if (!this.isCurrentIntent(revision)) return null;
-      await this.accounts.setActiveAccountId(meta.id);
-      if (!this.isCurrentIntent(revision)) return null;
-      const next: AuthState = {
-        isLoggedIn: true, activeAccountId: meta.id,
-        activeAccountMeta: meta, profile,
-      };
-      this.state$.next(next);
-      return next;
+      let persistenceStarted = false;
+      let completed = false;
+      try {
+        if (!this.isCurrentIntent(revision)) return null;
+        const meta = await this.accounts.upsertAccountMeta(identity);
+        if (!this.isCurrentIntent(revision)) return null;
+        if (password !== undefined) await this.accounts.setPassword(meta.id, password);
+        if (!this.isCurrentIntent(revision)) return null;
+        // Mark before awaiting: storage may reject after applying its side effect.
+        persistenceStarted = true;
+        await this.accounts.cacheProfile(meta.id, profile);
+        if (!this.isCurrentIntent(revision)) return null;
+        await this.accounts.setActiveAccountId(meta.id);
+        if (!this.isCurrentIntent(revision)) return null;
+        const next: AuthState = {
+          isLoggedIn: true, activeAccountId: meta.id,
+          activeAccountMeta: meta, profile,
+        };
+        this.state$.next(next);
+        completed = true;
+        return next;
+      } finally {
+        if (persistenceStarted && !completed) await this.reconcilePublishedSession();
+      }
     }));
+  }
+
+  private async reconcilePublishedSession(): Promise<void> {
+    // A newer intent may fail validation and never queue a replacement write.
+    // Reconcile inside the queue so a stale write cannot survive a relaunch.
+    const published = this.snapshot();
+    try {
+      if (published.activeAccountId) {
+        if (published.profile) {
+          await this.accounts.cacheProfile(published.activeAccountId, published.profile);
+        } else {
+          await this.accounts.clearCachedProfile(published.activeAccountId);
+        }
+      }
+    } finally {
+      await this.accounts.setActiveAccountId(published.activeAccountId);
+    }
   }
 
   private sessionResult(
@@ -326,13 +365,19 @@ export class AuthService {
 
               return from(this.queueSessionStorage(async () => {
                 if (!this.isCurrentSession(accountId, revision)) return this.snapshot();
-                await this.accounts.cacheProfile(accountId, res.profile);
-                if (!this.isCurrentSession(accountId, revision)) return this.snapshot();
-                const next: AuthState = {
-                  ...this.snapshot(), isLoggedIn: true, profile: res.profile,
-                };
-                this.state$.next(next);
-                return next;
+                let completed = false;
+                try {
+                  await this.accounts.cacheProfile(accountId, res.profile);
+                  if (!this.isCurrentSession(accountId, revision)) return this.snapshot();
+                  const next: AuthState = {
+                    ...this.snapshot(), isLoggedIn: true, profile: res.profile,
+                  };
+                  this.state$.next(next);
+                  completed = true;
+                  return next;
+                } finally {
+                  if (!completed) await this.reconcilePublishedSession();
+                }
               }));
             }),
             catchError(() => of(this.snapshot()))
@@ -373,15 +418,22 @@ export class AuthService {
   ): Promise<void> {
     await this.queueSessionStorage(async () => {
       if (!this.isCurrentSession(accountId, revision)) return;
-      if (removeStoredAccount) {
-        await this.accounts.removeAccount(accountId, { clearActive: false });
-      } else {
-        await this.accounts.clearCachedProfile(accountId);
+      let completed = false;
+      try {
+        if (removeStoredAccount) {
+          this.publishLoggedOut();
+          await this.accounts.removeAccount(accountId, { clearActive: false });
+        } else {
+          await this.accounts.clearCachedProfile(accountId);
+        }
+        if (!this.isCurrentIntent(revision)) return;
+        await this.accounts.setActiveAccountId(null);
+        if (!this.isCurrentIntent(revision)) return;
+        this.publishLoggedOut();
+        completed = true;
+      } finally {
+        if (!completed) await this.reconcilePublishedSession();
       }
-      if (!this.isCurrentSession(accountId, revision)) return;
-      await this.accounts.setActiveAccountId(null);
-      if (!this.isCurrentSession(accountId, revision)) return;
-      this.publishLoggedOut();
     });
   }
 }

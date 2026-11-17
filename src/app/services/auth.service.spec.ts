@@ -166,7 +166,6 @@ describe('AuthService profile refresh account isolation', () => {
     flushMicrotasks();
     expect(service.snapshot().activeAccountId).toBe(accountB.id);
     expect(storedActive).toBe(accountB.id);
-    expect(accounts.setActiveAccountId).not.toHaveBeenCalledWith(null);
   }));
 
   it('does not clear the new active account after an old missing-password cache cleanup', fakeAsync(() => {
@@ -337,6 +336,7 @@ describe('AuthService profile refresh account isolation', () => {
     service.logout({ removeStoredAccount: true }).subscribe();
     flushMicrotasks();
     expect(accounts.removeAccount).toHaveBeenCalledOnceWith(accountA.id, { clearActive: false });
+    expect(service.snapshot().isLoggedIn).toBeFalse();
     service.login(accountA.username, 'synthetic-new-password').subscribe();
     refresh.next({ success: true, profile: profileA });
     removed.resolve();
@@ -344,7 +344,6 @@ describe('AuthService profile refresh account isolation', () => {
     expect(service.snapshot().activeAccountId).toBe(accountA.id);
     expect(storedActive).toBe(accountA.id);
     expect(accounts.setPassword).toHaveBeenCalledOnceWith(accountA.id, 'synthetic-new-password');
-    expect(accounts.setActiveAccountId).not.toHaveBeenCalledWith(null);
   }));
 
   it('does not restore a cached session after a newer logout starts', fakeAsync(() => {
@@ -359,6 +358,157 @@ describe('AuthService profile refresh account isolation', () => {
     expect(restored).not.toHaveBeenCalled();
     expect(service.snapshot().isLoggedIn).toBeFalse();
     expect(storedActive).toBeNull();
+  }));
+
+  for (const rejectsAfterWrite of [false, true]) {
+    it(`reconciles a stale active-ID write${rejectsAfterWrite ? ' that rejects after its side effect' : ''} when newer credentials fail`, fakeAsync(() => {
+      const write = deferred<void>();
+      accounts.setActiveAccountId.and.callFake(async id => {
+        if (id === accountB.id) {
+          await write.promise;
+          storedActive = id;
+          if (rejectsAfterWrite) throw new Error('Synthetic side-effect failure');
+        } else storedActive = id;
+      });
+      patron.getPatronProfile.and.callFake(username => of(username === accountB.username
+        ? { success: true, profile: profileB } : { success: false }));
+      const staleNext = jasmine.createSpy();
+      const staleError = jasmine.createSpy();
+      service.login(accountB.username, 'synthetic-password').subscribe({ next: staleNext, error: staleError });
+      flushMicrotasks();
+      expect(accounts.setActiveAccountId).toHaveBeenCalledWith(accountB.id);
+      const newerError = jasmine.createSpy();
+      service.login(accountA.username, 'synthetic-invalid-password').subscribe({ error: newerError });
+      flushMicrotasks();
+      expect(newerError).toHaveBeenCalledOnceWith(jasmine.objectContaining({ message: 'invalid_login' }));
+      write.resolve();
+      flushMicrotasks();
+      expect(service.snapshot().activeAccountId).toBe(accountA.id);
+      expect(service.snapshot().profile).toEqual(profileA);
+      expect(storedActive).toBe(accountA.id);
+      expect(accounts.cacheProfile).toHaveBeenCalledWith(accountA.id, profileA);
+      expect(staleNext).not.toHaveBeenCalled();
+      expect(staleError).not.toHaveBeenCalled();
+    }));
+  }
+
+  it('restores a stale same-account profile write after newer authentication fails', fakeAsync(() => {
+    const write = deferred<void>();
+    let persistedProfile: unknown = profileA;
+    accounts.cacheProfile.and.callFake(async (_id, profile) => {
+      if (profile === updatedA) await write.promise;
+      persistedProfile = profile;
+    });
+    service.login(accountA.username, 'synthetic-password').subscribe();
+    refresh.next({ success: true, profile: updatedA });
+    flushMicrotasks();
+    patron.getPatronProfile.and.returnValue(of({ success: false }));
+    service.login(accountB.username, 'synthetic-invalid-password').subscribe({ error: () => {} });
+    write.resolve();
+    flushMicrotasks();
+    expect(service.snapshot().profile).toEqual(profileA);
+    expect(persistedProfile).toEqual(profileA);
+    expect(storedActive).toBe(accountA.id);
+  }));
+
+  for (const stage of ['profile clear', 'active clear']) {
+    it(`restores the published session after a stale logout ${stage} and failed newer login`, fakeAsync(() => {
+      const write = deferred<void>();
+      let persistedProfile: unknown = profileA;
+      accounts.cacheProfile.and.callFake(async (_id, profile) => { persistedProfile = profile; });
+      accounts.clearCachedProfile.and.callFake(async () => {
+        if (stage === 'profile clear') await write.promise;
+        persistedProfile = null;
+      });
+      accounts.setActiveAccountId.and.callFake(async id => {
+        if (stage === 'active clear' && id === null) await write.promise;
+        storedActive = id;
+      });
+      const staleNext = jasmine.createSpy();
+      service.logout().subscribe(staleNext);
+      flushMicrotasks();
+      patron.getPatronProfile.and.returnValue(of({ success: false }));
+      service.login(accountB.username, 'synthetic-invalid-password').subscribe({ error: () => {} });
+      flushMicrotasks();
+      write.resolve();
+      flushMicrotasks();
+      expect(service.snapshot().activeAccountId).toBe(accountA.id);
+      expect(service.snapshot().profile).toEqual(profileA);
+      expect(storedActive).toBe(accountA.id);
+      expect(persistedProfile).toEqual(profileA);
+      expect(staleNext).not.toHaveBeenCalled();
+    }));
+  }
+
+  it('keeps explicit removal logged out when the newer login fails without recreating credentials', fakeAsync(() => {
+    const removed = deferred<void>();
+    accounts.removeAccount.and.returnValue(removed.promise);
+    service.logout({ removeStoredAccount: true }).subscribe();
+    flushMicrotasks();
+    expect(service.snapshot().isLoggedIn).toBeFalse();
+    patron.getPatronProfile.and.returnValue(of({ success: false }));
+    service.login(accountB.username, 'synthetic-invalid-password').subscribe({ error: () => {} });
+    removed.resolve();
+    flushMicrotasks();
+    expect(service.snapshot().activeAccountId).toBeNull();
+    expect(storedActive).toBeNull();
+    expect(accounts.upsertAccountMeta).not.toHaveBeenCalled();
+    expect(accounts.setPassword).not.toHaveBeenCalled();
+    expect(accounts.cacheProfile).not.toHaveBeenCalled();
+  }));
+
+  for (const operation of ['login', 'logout']) {
+    it(`reconciles a current ${operation} active write that rejects after applying its side effect`, fakeAsync(() => {
+      let rejected = false;
+      accounts.setActiveAccountId.and.callFake(async id => {
+        storedActive = id;
+        if (!rejected) {
+          rejected = true;
+          throw new Error('Synthetic active write failure');
+        }
+      });
+      const error = jasmine.createSpy();
+      if (operation === 'login') service.login(accountB.username, 'synthetic-password').subscribe({ error });
+      else service.logout().subscribe({ error });
+      flushMicrotasks();
+      expect(error).toHaveBeenCalledOnceWith(jasmine.objectContaining({ message: 'Synthetic active write failure' }));
+      expect(service.snapshot().activeAccountId).toBe(accountA.id);
+      expect(service.snapshot().profile).toEqual(profileA);
+      expect(storedActive).toBe(accountA.id);
+      expect(accounts.cacheProfile).toHaveBeenCalledWith(accountA.id, profileA);
+    }));
+  }
+
+  it('restores a current rejected same-account profile write before reporting the error', fakeAsync(() => {
+    let persistedProfile: unknown = profileA;
+    accounts.cacheProfile.and.callFake(async (_id, profile) => {
+      persistedProfile = profile;
+      if (profile === updatedA) throw new Error('Synthetic profile write failure');
+    });
+    const error = jasmine.createSpy();
+    service.login(accountA.username, 'synthetic-password').subscribe({ error });
+    refresh.next({ success: true, profile: updatedA });
+    flushMicrotasks();
+    expect(error).toHaveBeenCalledOnceWith(jasmine.objectContaining({ message: 'Synthetic profile write failure' }));
+    expect(persistedProfile).toEqual(profileA);
+    expect(service.snapshot().profile).toEqual(profileA);
+    expect(storedActive).toBe(accountA.id);
+  }));
+
+
+  it('reports failed explicit removal while preserving the published logout', fakeAsync(() => {
+    accounts.removeAccount.and.rejectWith(new Error('Synthetic credential cleanup failure'));
+    const next = jasmine.createSpy();
+    const error = jasmine.createSpy();
+    service.logout({ removeStoredAccount: true }).subscribe({ next, error });
+    flushMicrotasks();
+    expect(service.snapshot().isLoggedIn).toBeFalse();
+    expect(service.snapshot().activeAccountId).toBeNull();
+    expect(storedActive).toBeNull();
+    expect(next).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalledOnceWith(jasmine.objectContaining({ message: 'Synthetic credential cleanup failure' }));
+    expect(accounts.upsertAccountMeta).not.toHaveBeenCalled();
+    expect(accounts.setPassword).not.toHaveBeenCalled();
   }));
 
 });

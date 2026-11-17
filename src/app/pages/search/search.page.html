@@ -71,6 +71,8 @@
         <ion-label>Search by</ion-label>
         <ion-select
           [(ngModel)]="searchIndex"
+          (ionChange)="onSearchOptionsChanged()"
+          aria-label="Search by"
           interface="popover"
           [interfaceOptions]="selectInterfaceOptions"
         >
@@ -85,6 +87,8 @@
         <ion-label>Sort</ion-label>
         <ion-select
           [(ngModel)]="sort"
+          (ionChange)="onSearchOptionsChanged()"
+          aria-label="Sort search results"
           interface="popover"
           [interfaceOptions]="selectInterfaceOptions"
         >
@@ -131,10 +135,23 @@
 
   <ion-refresher
     slot="fixed"
-    (ionRefresh)="runSearch(true); $event.target.complete()"
+    (ionRefresh)="refreshSearch($event)"
   >
     <ion-refresher-content></ion-refresher-content>
   </ion-refresher>
+
+  @if (searchLoading && !loadingMore) {
+  <div class="search-status" role="status">
+    <ion-spinner name="bubbles" aria-hidden="true"></ion-spinner>
+    <span>Loading search results…</span>
+  </div>
+  }
+  @if (searchError && !loadMoreFailed) {
+  <div class="search-error" role="alert">
+    <p>{{ searchError }}</p>
+    <ion-button size="small" (click)="retrySearch()">Retry</ion-button>
+  </div>
+  }
 
   @if (hits.length > 0) {
   <ion-list>
@@ -191,11 +208,23 @@
     </div>
     } }
   </ion-list>
-  } @if (!globals.api_loading && lastExecutedQuery && lastExecutedQuery ===
-  lookfor.trim() && hits.length === 0) {
-  <ion-item>
+  } @if (showNoResults) {
+  <ion-item class="search-empty" role="status">
     <ion-label>No results.</ion-label>
   </ion-item>
+  }
+
+  @if (searchLoading && loadingMore) {
+  <div class="search-status" role="status">
+    <ion-spinner name="bubbles" aria-hidden="true"></ion-spinner>
+    <span>Loading more results…</span>
+  </div>
+  }
+  @if (searchError && loadMoreFailed) {
+  <div class="search-error" role="alert">
+    <p>{{ searchError }}</p>
+    <ion-button size="small" (click)="retrySearch()">Retry</ion-button>
+  </div>
   }
 
   <ion-infinite-scroll
@@ -240,6 +269,7 @@
             lines="full"
             (click)="toggleFacetGroup(group.key)"
             class="facet-group-header"
+            [attr.aria-expanded]="!isFacetGroupCollapsed(group.key)"
           >
             <ion-label>{{ group.label }}</ion-label>
             <ion-icon
@@ -252,6 +282,7 @@
           <ion-item>
             <ion-checkbox
               slot="start"
+              [attr.aria-label]="group.label + ': ' + option.display"
               [checked]="isFacetSelected(option.filter)"
               (ionChange)="onFacetToggled(group, option, $event.detail.checked)"
             ></ion-checkbox>

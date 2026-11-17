@@ -10,8 +10,7 @@ import {
 } from '@ionic/angular/lazy';
 import { ActivatedRoute, ParamMap } from '@angular/router';
 import { Router } from '@angular/router';
-import { finalize } from 'rxjs';
-import { Subscription } from 'rxjs';
+import { Subscription, finalize, timeout } from 'rxjs';
 import { Capacitor } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
 
@@ -22,6 +21,7 @@ import {
   AspenSearchHit,
   AspenSearchIndex,
   AspenSearchSort,
+  AspenSearchResult,
 } from '../../services/search.service';
 import { ItemDetailComponent } from '../../components/item-detail/item-detail.component';
 import { FormatFamilyService } from '../../services/format-family.service';
@@ -57,6 +57,13 @@ interface SearchSortOption {
   label: string;
 }
 
+interface SearchCriteria {
+  lookfor: string;
+  searchIndex: AspenSearchIndex;
+  sort: AspenSearchSort;
+  filters: string[];
+}
+
 @Component({
   standalone: true,
   selector: 'app-search',
@@ -83,6 +90,9 @@ export class SearchPage implements OnInit, OnDestroy {
   lookfor = '';
   hits: AspenSearchHit[] = [];
   lastExecutedQuery = '';
+  searchLoading = false;
+  loadingMore = false;
+  searchError: string | null = null;
 
   // advanced controls (start simple)
   showAdvanced = false;
@@ -120,7 +130,12 @@ export class SearchPage implements OnInit, OnDestroy {
   private lastAppliedRouteCoreState = '';
   private lastHandledDeepLinkToken = '';
   private pendingExternalFilters: string[] = [];
-  private pendingMappedFilterSearch = false;
+  private searchSub?: Subscription;
+  private searchRequestId = 0;
+  private activeCriteria: SearchCriteria | null = null;
+  private successfulCriteriaKey = '';
+  private failedPage: number | null = null;
+  private destroyed = false;
 
   ngOnInit() {
     this.queryParamSub = this.route.queryParamMap.subscribe((qp) => {
@@ -129,6 +144,8 @@ export class SearchPage implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    this.destroyed = true;
+    this.cancelPendingSearch();
     this.queryParamSub?.unsubscribe();
     this.queryParamSub = null;
   }
@@ -250,6 +267,8 @@ export class SearchPage implements OnInit, OnDestroy {
 
     if (deepLinkTriggered) {
       this.pendingExternalFilters = nextExternalFilters;
+    } else if (queryChanged) {
+      this.pendingExternalFilters = [];
     }
 
     if (!hasSearchCriteria) {
@@ -310,6 +329,13 @@ export class SearchPage implements OnInit, OnDestroy {
   }
 
   clearSearch(syncUrl = true) {
+    this.cancelPendingSearch();
+    this.lookfor = '';
+    this.activeCriteria = null;
+    this.successfulCriteriaKey = '';
+    this.searchError = null;
+    this.failedPage = null;
+    this.pendingExternalFilters = [];
     this.lastExecutedQuery = '';
     this.hits = [];
     this.page = 1;
@@ -318,7 +344,11 @@ export class SearchPage implements OnInit, OnDestroy {
     if (syncUrl) this.syncSearchUrl('');
   }
 
-  runSearch(reset: boolean) {
+  runSearch(reset: boolean, complete?: () => void) {
+    if (this.destroyed) {
+      complete?.();
+      return;
+    }
     const q = (this.lookfor ?? '').trim();
     this.filters = this.filters.filter(
       (f) => this.filterField(f) !== 'sort_by'
@@ -329,153 +359,176 @@ export class SearchPage implements OnInit, OnDestroy {
       !!q || this.filters.length > 0 || this.pendingExternalFilters.length > 0;
 
     if (!hasSearchCriteria) {
-      this.lastExecutedQuery = '';
-      this.hits = [];
-      this.page = 1;
-      this.totalPages = 1;
-      this.infiniteDisabled = true;
+      this.clearSearch();
       this.facetGroups = [];
       this.collapsedFacetGroups = {};
       this.facetDisplayByFilter.clear();
-      this.syncSearchUrl('');
+      complete?.();
       return;
     }
 
     this.syncSearchUrl(q);
     this.lastExecutedQuery = q;
 
-    // If reset, start over.
+    const criteria = this.currentSearchCriteria();
     if (reset) {
       this.page = 1;
       this.totalPages = 1;
-      this.hits = [];
+      if (this.criteriaKey(criteria) !== this.successfulCriteriaKey) {
+        this.hits = [];
+        this.successfulCriteriaKey = '';
+      }
       this.infiniteDisabled = true;
     }
 
-    // prevent overlapping requests
-    if (this.globals.api_loading) return;
-
-    this.globals.api_loading = true;
-
-    this.searchService
-      .getAppSearchResults({
-        lookfor: q,
-        page: this.page,
-        pageSize: this.pageSize,
-        searchIndex: this.searchIndex,
-        source: 'local',
-        sort: sortValue,
-        includeSortList: true,
-        filters: this.filters,
-      })
-      .pipe(
-        finalize(() => {
-          this.globals.api_loading = false;
-          if (this.pendingMappedFilterSearch) {
-            this.pendingMappedFilterSearch = false;
-            this.runSearch(true);
-          }
-        })
-      )
-      .subscribe({
-        next: (res) => {
-          if (!res.success) {
-            this.toast.presentToast('Search failed. Please try again.');
-            this.hits = reset ? [] : this.hits;
-            this.infiniteDisabled = true;
-            return;
-          }
-
-          const newHits = res.hits ?? [];
-          this.totalPages = res.totalPages ?? this.totalPages ?? 1;
-          const allGroups = this.buildFacetGroups(res.facets);
-          this.applySortOptionsFromGroups(allGroups);
-          if (this.facetsEnabled) {
-            this.facetGroups = allGroups.filter((g) => g.field !== 'sort_by');
-            this.reconcileCollapsedFacetGroups();
-            this.rebuildFacetDisplayMap();
-            if (this.tryApplyPendingExternalFilters()) {
-              this.pendingMappedFilterSearch = true;
-              return;
-            }
-          } else {
-            this.facetGroups = [];
-            this.collapsedFacetGroups = {};
-            this.facetDisplayByFilter.clear();
-          }
-
-          if (reset) {
-            this.hits = newHits;
-          } else {
-            // append for infinite scroll
-            this.hits = [...this.hits, ...newHits];
-          }
-
-          // enable infinite scroll if there are more pages
-          this.infiniteDisabled = !(this.page < this.totalPages);
-        },
-        error: () => {
-          this.toast.presentToast(this.globals.server_error_msg);
-          this.infiniteDisabled = true;
-        },
-      });
+    this.requestSearch(criteria, this.page, !reset, complete);
   }
 
-  loadMore(ev: any) {
-    // if already done, just complete the UI gesture
-    if (this.globals.api_loading || this.infiniteDisabled) {
-      ev?.target?.complete();
+  refreshSearch(event: Event) {
+    const target = event.target as HTMLIonRefresherElement | null;
+    this.runSearch(true, () => { void target?.complete(); });
+  }
+
+  onSearchOptionsChanged() {
+    if (this.activeCriteria) this.runSearch(true);
+  }
+
+  loadMore(event: Event) {
+    const target = event.target as HTMLIonInfiniteScrollElement | null;
+    const complete = () => { void target?.complete(); };
+    if (this.searchLoading || this.infiniteDisabled || !this.activeCriteria) {
+      complete();
       return;
     }
 
     if (this.page >= this.totalPages) {
       this.infiniteDisabled = true;
-      ev?.target?.complete();
+      complete();
       return;
     }
 
-    this.page += 1;
-    const sortValue = this.normalizedSortValue(this.sort);
-    if (sortValue !== this.sort) this.sort = sortValue;
+    this.requestSearch(this.activeCriteria, this.page + 1, true, complete);
+  }
 
-    this.globals.api_loading = true;
-    this.searchService
+  retrySearch() {
+    if (this.searchLoading || !this.activeCriteria || this.failedPage === null) return;
+    if (this.criteriaKey(this.activeCriteria) !== this.criteriaKey(this.currentSearchCriteria())) {
+      this.runSearch(true);
+      return;
+    }
+    this.requestSearch(this.activeCriteria, this.failedPage, this.failedPage > 1);
+  }
+
+  get showNoResults(): boolean {
+    return !this.searchLoading && !this.searchError && this.hits.length === 0 &&
+      !!this.successfulCriteriaKey &&
+      this.criteriaKey(this.currentSearchCriteria()) === this.successfulCriteriaKey;
+  }
+
+  get loadMoreFailed(): boolean {
+    return this.failedPage !== null && this.failedPage > 1;
+  }
+
+  private currentSearchCriteria(): SearchCriteria {
+    return {
+      lookfor: (this.lookfor ?? '').trim(),
+      searchIndex: this.searchIndex,
+      sort: this.normalizedSortValue(this.sort),
+      filters: [...this.filters],
+    };
+  }
+
+  private criteriaKey(criteria: SearchCriteria): string {
+    return JSON.stringify(criteria);
+  }
+
+  private cancelPendingSearch() {
+    this.searchRequestId += 1;
+    this.searchSub?.unsubscribe();
+    this.searchSub = undefined;
+    this.searchLoading = false;
+    this.loadingMore = false;
+  }
+
+  private requestSearch(criteria: SearchCriteria, page: number, append: boolean, complete?: () => void) {
+    if (this.destroyed) {
+      complete?.();
+      return;
+    }
+    this.cancelPendingSearch();
+    const requestId = this.searchRequestId;
+    const subscription = new Subscription();
+    this.searchSub = subscription;
+    this.activeCriteria = criteria;
+    this.searchLoading = true;
+    this.loadingMore = append;
+    this.searchError = null;
+    this.failedPage = null;
+    this.infiniteDisabled = true;
+    subscription.add(this.searchService
       .getAppSearchResults({
-        lookfor: (this.lookfor ?? '').trim(),
-        page: this.page,
+        ...criteria,
+        page,
         pageSize: this.pageSize,
-        searchIndex: this.searchIndex,
         source: 'local',
-        sort: sortValue,
         includeSortList: true,
-        filters: this.filters,
       })
       .pipe(
+        timeout(45_000),
         finalize(() => {
-          this.globals.api_loading = false;
-          ev?.target?.complete();
+          complete?.();
+          if (this.destroyed || requestId !== this.searchRequestId) return;
+          this.searchLoading = false;
+          this.loadingMore = false;
+          this.searchSub = undefined;
+          this.infiniteDisabled = !!this.searchError || this.page >= this.totalPages;
         })
       )
       .subscribe({
         next: (res) => {
+          if (this.destroyed || requestId !== this.searchRequestId) return;
           if (!res.success) {
-            // roll back page if it failed
-            this.page = Math.max(1, this.page - 1);
-            this.toast.presentToast('Could not load more results.');
+            this.searchFailed(page, append);
             return;
           }
-
-          this.totalPages = res.totalPages ?? this.totalPages ?? 1;
-          const allGroups = this.buildFacetGroups(res.facets);
-          this.applySortOptionsFromGroups(allGroups);
-          this.hits = [...this.hits, ...(res.hits ?? [])];
-          this.infiniteDisabled = !(this.page < this.totalPages);
+          this.applySearchResult(res, criteria, page, append);
         },
         error: () => {
-          this.page = Math.max(1, this.page - 1);
-          this.toast.presentToast(this.globals.server_error_msg);
+          if (this.destroyed || requestId !== this.searchRequestId) return;
+          this.searchFailed(page, append);
         },
-      });
+      }));
+  }
+
+  private searchFailed(page: number, append: boolean) {
+    this.failedPage = page;
+    this.searchError = append
+      ? 'Could not load more results. Your previous results are still shown.'
+      : this.hits.length
+        ? 'Could not refresh results. Your previous results are still shown.'
+        : 'Could not load search results. Please try again.';
+  }
+
+  private applySearchResult(result: AspenSearchResult, criteria: SearchCriteria, page: number, append: boolean) {
+    const allGroups = this.buildFacetGroups(result.facets);
+    this.applySortOptionsFromGroups(allGroups);
+    if (this.facetsEnabled) {
+      this.facetGroups = allGroups.filter((group) => group.field !== 'sort_by');
+      this.reconcileCollapsedFacetGroups();
+      this.rebuildFacetDisplayMap();
+      if (this.tryApplyPendingExternalFilters()) return;
+    } else {
+      this.facetGroups = [];
+      this.collapsedFacetGroups = {};
+      this.facetDisplayByFilter.clear();
+    }
+    this.hits = append ? [...this.hits, ...(result.hits ?? [])] : result.hits ?? [];
+    this.page = page;
+    this.totalPages = result.totalPages ?? 1;
+    this.activeCriteria = { ...criteria, sort: this.normalizedSortValue(this.sort) };
+    this.successfulCriteriaKey = this.criteriaKey(this.activeCriteria);
+    this.searchError = null;
+    this.failedPage = null;
   }
 
   onFacetsEnabledChanged(enabled: boolean) {
@@ -506,7 +559,7 @@ export class SearchPage implements OnInit, OnDestroy {
     }
 
     // Ensure facets are loaded for the current query before presenting the sheet.
-    if (!this.facetGroups.length && !this.globals.api_loading) {
+    if (!this.facetGroups.length && !this.searchLoading) {
       this.runSearch(true);
     }
     this.filtersSheetOpen = true;

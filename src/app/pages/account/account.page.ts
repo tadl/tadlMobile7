@@ -50,6 +50,7 @@ export class AccountPage implements OnInit {
   password = '';
   showPassword = false;
   myListsCount = 0;
+  private listsCountRequest = 0;
 
   storedAccounts: StoredAccountMeta[] = [];
   loadingAccounts = false;
@@ -262,13 +263,18 @@ export class AccountPage implements OnInit {
   }
 
   private async refreshMyListsCount(profile?: any) {
+    const request = ++this.listsCountRequest;
     const snap = this.auth.snapshot();
+    const session = this.auth.captureActiveProfileSession();
     if (!snap.isLoggedIn) {
       this.myListsCount = 0;
       return;
     }
 
     const cachedCount = await this.listLookup.cachedListCount();
+    const current = this.auth.captureActiveProfileSession();
+    if (request !== this.listsCountRequest || !session ||
+      current?.accountId !== session.accountId || current.revision !== session.revision) return;
     if (cachedCount !== null) {
       this.myListsCount = cachedCount;
       return;

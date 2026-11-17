@@ -26,6 +26,15 @@ Jasmine stays on the latest 6.x release with matching types because
 The existing Zone/fakeAsync tests remain enabled. `eslint.config.mjs` preserves
 the project's Angular and template rule policy, including inline templates.
 
+As of November 17, 2026, `npm audit --omit=dev` reports no vulnerabilities.
+The full audit reports 26 high-severity dependency entries stemming from one
+[picomatch advisory](https://github.com/advisories/GHSA-fc5q-39xc-vjpf)
+in the build, lint, and test toolchain. The advisory covers all published
+picomatch versions through the current 4.0.7 release; no patched version is
+available. These packages are development dependencies. Recheck for an upstream
+fix before the next release; do not apply the audit's suggested Angular/tooling
+downgrades or disable audit reporting.
+
 The secure-storage 0.14 update keeps the current storage namespace and changes
 handling of undecryptable Android backup values. Before the next native release,
 verify saved accounts when upgrading an installed 0.13 build and after Android

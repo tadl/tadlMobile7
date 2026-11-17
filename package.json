@@ -15,7 +15,10 @@
     "prep:both": "node scripts/release-prep.mjs both",
     "prep:ios:clean": "node scripts/release-prep.mjs ios --recreate",
     "prep:android:clean": "node scripts/release-prep.mjs android --recreate",
-    "prep:both:clean": "node scripts/release-prep.mjs both --recreate"
+    "prep:both:clean": "node scripts/release-prep.mjs both --recreate",
+    "prebuild": "node scripts/web-build-manifest.mjs begin",
+    "postbuild": "node scripts/web-build-manifest.mjs write",
+    "test:release": "node --test scripts/web-build-manifest.test.mjs"
   },
   "private": true,
   "dependencies": {

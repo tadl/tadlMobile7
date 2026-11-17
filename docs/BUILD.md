@@ -10,7 +10,8 @@ This project uses different app IDs per platform:
 ## Install toolchain once
 
 ```bash
-npm install
+fnm use
+npm ci
 ```
 
 This project expects `@capacitor/assets` for icon/splash generation.
@@ -49,10 +50,48 @@ npm run prep:android:clean -- --version 7.0.1 --build 70001
 
 ## Optional flags
 
-- `--skip-build` Skip `npm run build`
+- `--skip-build` Reuse web output only after its source, output, and release stamps pass validation
 - `--skip-assets` Skip `npx capacitor-assets generate --<platform>`
 - `--recreate` Remove and re-add native platform folder
 - `--update-stamp <YYYYMMDDNN>` Override `globals.update_version`
+
+## Reusing a verified web build
+
+`npm run build` records its input fingerprint before compilation and writes
+`www/build-manifest.json` after a successful build. The manifest includes the
+web version, update date, daily build number, source fingerprint, and output
+fingerprint. If the inputs or version stamps change during compilation, the
+post-build check fails and the assets must be rebuilt. Starting another build
+invalidates the previous manifest, including when that new build fails.
+
+For example, prepare iOS normally, then reuse those same web assets for Android:
+
+```bash
+npm run prep:ios -- --version 7.0.1
+npm run prep:android -- --version 7.0.1 --skip-build
+```
+
+With `--skip-build`, the existing web update date and daily build number are
+reused. An explicitly supplied version, date, or daily build number must match
+the built assets. The guard also detects source/configuration/dependency changes
+and modified, added, or removed files in `www`. It rejects missing or invalid
+manifests before changing globals, recreating a native platform, or invoking
+Capacitor. Rebuild by omitting `--skip-build` when validation fails.
+
+Use `npm run build` so its pre-build and post-build checks run. A direct
+`ng build` or watch build does not produce the required manifest. The temporary
+build-start snapshot lives under ignored `.angular/`; the output manifest lives
+under ignored `www/`.
+
+Run the release-guard regressions with:
+
+```bash
+npm run test:release
+```
+
+These Node tests use temporary synthetic projects and command stubs. They check
+stale sources/output, version mismatches, interrupted builds, and failure before
+native changes.
 
 ## Open native IDEs
 

@@ -2,6 +2,7 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { assertWebBuildCurrent } from './web-build-manifest.mjs';
 
 const IOS_APP_ID = 'org.tadl.tadl';
 const ANDROID_APP_ID = 'org.TADL.TADLMobile';
@@ -478,7 +479,7 @@ function printSummary(summary) {
   console.log(`[release-prep] Build: ${summary.build}`);
   console.log(`[release-prep] Update date: ${summary.updateDate}`);
   console.log(`[release-prep] Daily build number: ${summary.buildNum}`);
-  console.log(`[release-prep] Globals updated: app_version=${summary.version}, update_version=${summary.updateDate}, build_num=${summary.buildNum}`);
+  console.log(`[release-prep] Globals ${summary.webBuildRan ? 'updated' : 'reused'}: app_version=${summary.version}, update_version=${summary.updateDate}, build_num=${summary.buildNum}`);
   console.log(`[release-prep] Web build: ${summary.webBuildRan ? 'ran' : 'skipped'}`);
   console.log(`[release-prep] Platform dirs recreated: ${summary.recreated ? 'yes' : 'no'}`);
   console.log(`[release-prep] Asset generation: ${summary.assetsRan ? 'ran' : 'skipped'}`);
@@ -608,8 +609,8 @@ function main() {
   const versionWasDerived = !opts.build;
   const updateDateWasDerived = !opts.updateDate;
   const buildNumWasDerived = !opts.buildNum;
-  let updateDate = opts.updateDate || defaultUpdateDate();
-  let buildNum = opts.buildNum || '';
+  let updateDate = opts.updateDate || (opts.skipBuild ? currentGlobals.updateVersion : defaultUpdateDate());
+  let buildNum = opts.buildNum || (opts.skipBuild ? currentGlobals.buildNum : '');
 
   if (/^\d{10}$/.test(updateDate)) {
     buildNum = updateDate.slice(-2);
@@ -619,6 +620,14 @@ function main() {
   opts.build = opts.build || deriveBuildFromVersion(opts.version);
   buildNum = buildNum || nextBuildNum(currentGlobals.updateVersion, currentGlobals.buildNum, updateDate);
 
+  if (opts.skipBuild) {
+    try {
+      assertWebBuildCurrent(process.cwd(), { version: opts.version, updateDate, buildNum });
+    } catch (error) {
+      fail(error.message);
+    }
+  }
+
   console.log(`[release-prep] Version: ${opts.version}`);
   console.log(`[release-prep] Build: ${opts.build}`);
   console.log(`[release-prep] Update date: ${updateDate}`);
@@ -626,10 +635,12 @@ function main() {
   if (versionWasDerived) {
     console.log('[release-prep] Build was derived from the semantic version.');
   }
-  if (updateDateWasDerived) {
+  if (updateDateWasDerived && !opts.skipBuild) {
     console.log('[release-prep] Update date defaulted to today.');
   }
-  if (buildNumWasDerived) {
+  if (opts.skipBuild) {
+    console.log('[release-prep] Reusing verified web assets and their existing version stamps.');
+  } else if (buildNumWasDerived) {
     if (currentGlobals.updateVersion === updateDate) {
       console.log(`[release-prep] Daily build number incremented from existing globals value ${currentGlobals.buildNum}.`);
     } else {
@@ -637,7 +648,7 @@ function main() {
     }
   }
 
-  updateGlobalsVersion(opts.version, updateDate, buildNum);
+  if (!opts.skipBuild) updateGlobalsVersion(opts.version, updateDate, buildNum);
 
   const platforms = opts.platform === 'both' ? ['ios', 'android'] : [opts.platform];
   const assetsRan = !opts.skipAssets && existsSync(resolve('resources'));

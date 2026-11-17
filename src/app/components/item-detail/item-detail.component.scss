@@ -107,6 +107,52 @@
   cursor: pointer;
 }
 
+.edition-details {
+  margin-top: 6px;
+  border-top: 1px solid rgba(var(--ion-text-color-rgb), 0.15);
+}
+
+.edition-record {
+  margin: 0;
+  padding: 6px 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.edition-record + .edition-record {
+  border-top: 1px solid rgba(var(--ion-text-color-rgb), 0.15);
+}
+
+.edition-fact + .edition-fact {
+  margin-top: 3px;
+}
+
+.edition-fact dt {
+  display: inline;
+  font-weight: 600;
+  margin-inline-end: 4px;
+  opacity: 0.8;
+}
+
+.edition-fact dd {
+  display: inline;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.edition-physical-value {
+  display: inline;
+}
+
+.edition-physical-value + .edition-physical-value::before {
+  content: "; ";
+}
+
+.edition-value-context {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
 .list-memberships {
   margin: 8px 0;
 }
@@ -194,6 +240,17 @@
   --inner-padding-end: 10px;
   --min-height: 68px;
   align-items: flex-start;
+}
+
+.format-content {
+  width: 100%;
+  min-width: 0;
+}
+
+.format-overview {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
 }
 
 .format-label {

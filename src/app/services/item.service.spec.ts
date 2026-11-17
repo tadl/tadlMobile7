@@ -7,6 +7,7 @@ import { AppCacheService } from './app-cache.service';
 import {
   ItemService,
   type AspenFormatVariationsResult,
+  type AspenFormatRecordsResult,
   type AspenGroupedWork,
   type AspenItemAvailabilityResult,
 } from './item.service';
@@ -14,13 +15,14 @@ import {
 describe('ItemService Aspen API contracts', () => {
   let http: HttpTestingController;
   let service: ItemService;
+  let cache: jasmine.SpyObj<AppCacheService>;
 
   const workId = 'synthetic-grouped-work-eng';
   const legacyHold = "return AspenDiscovery.Record.showPlaceHold('Record', 'ils', '901001', '', '701', this);";
   const currentHold = "return AspenDiscovery.Record.showPlaceHold('Record', 'ils', '901001', '', '701', this, true, 'Book');";
 
   beforeEach(() => {
-    const cache = jasmine.createSpyObj<AppCacheService>('AppCacheService', ['read', 'write']);
+    cache = jasmine.createSpyObj<AppCacheService>('AppCacheService', ['read', 'write']);
     cache.read.and.resolveTo(null);
     cache.write.and.resolveTo();
     TestBed.configureTestingModule({ providers: [
@@ -114,7 +116,109 @@ describe('ItemService Aspen API contracts', () => {
         isAvailable: true, isEContent: false, groupedStatus: 'On Shelf', numHolds: 2,
       }));
     }));
+
+    it(`keeps bibliographic editions separate in a ${envelope} response`, fakeAsync(() => {
+      const fixture = {
+        success: true, id: workId, format: 'Book',
+        records: {
+          'ils:901001': {
+            id: 'ils:901001', source: 'ils', format: 'Book',
+            edition: 'First edition.', publisher: 'Example Press',
+            publicationDate: '2020', placeOfPublication: 'Example City',
+            physical: '388 pages ; 23 cm.',
+          },
+          'ils:901002': {
+            id: 'ils:901002', source: 'ils', format: 'Book',
+            edition: 'Revised edition.', publisher: 'Example Press',
+            publicationDate: '2025', placeOfPublication: 'Example City',
+            physical: '412 pages : illustrations ; 25 cm.',
+          },
+        },
+      };
+      const received: AspenFormatRecordsResult[] = [];
+      service.getFormatRecords(workId, 'Book', 'ils').subscribe(result => received.push(result));
+      flushMicrotasks();
+      const request = http.expectOne(req => req.url.endsWith('/ItemAPI'));
+      expect(request.request.method).toBe('GET');
+      expect(request.request.params.get('method')).toBe('getRecords');
+      expect(request.request.params.get('id')).toBe(workId);
+      expect(request.request.params.get('format')).toBe('Book');
+      expect(request.request.params.get('source')).toBe('ils');
+      request.flush(wrapped ? { result: fixture } : fixture);
+      flushMicrotasks();
+
+      expect(received[0].records.map(record => [record.id, record.edition, record.physical])).toEqual([
+        ['ils:901001', 'First edition.', '388 pages ; 23 cm.'],
+        ['ils:901002', 'Revised edition.', '412 pages : illustrations ; 25 cm.'],
+      ]);
+      expect(cache.write).toHaveBeenCalledWith(`item:records:${workId}:Book:ils`, received[0]);
+    }));
   }
+
+  it('normalizes numeric publication years, array metadata and missing physical details', fakeAsync(() => {
+    let result: AspenFormatRecordsResult | undefined;
+    service.getFormatRecords(workId, 'eAudiobook', 'hoopla').subscribe(value => result = value);
+    flushMicrotasks();
+    http.expectOne(req => req.params.get('method') === 'getRecords').flush({
+      success: true, id: workId, format: 'eAudiobook',
+      records: { 'hoopla:901003': {
+        source: 'hoopla', format: 'eAudiobook', edition: null,
+        publisher: ['Example Audio', 'Example Distributor'], publicationDate: 2025,
+        physical: null,
+      } },
+    });
+    flushMicrotasks();
+    expect(result?.records[0]).toEqual(jasmine.objectContaining({
+      id: 'hoopla:901003', recordId: '901003', source: 'hoopla',
+      publicationDate: '2025', publisher: 'Example Audio; Example Distributor',
+      edition: '', physical: '',
+    }));
+  }));
+
+  it('accepts empty record arrays and isolates caches by format and source', fakeAsync(() => {
+    for (const [format, source] of [['Book', 'ils'], ['Large Print', 'ils'], ['eBook', 'overdrive']]) {
+      let result: AspenFormatRecordsResult | undefined;
+      service.getFormatRecords(workId, format, source).subscribe(value => result = value);
+      flushMicrotasks();
+      const request = http.expectOne(req => req.params.get('format') === format);
+      expect(request.request.params.get('source')).toBe(source);
+      request.flush({ result: { success: true, id: workId, format, records: [] } });
+      flushMicrotasks();
+      expect(result?.records).toEqual([]);
+      expect(cache.read).toHaveBeenCalledWith(`item:records:${workId}:${format}:${source}`);
+      expect(cache.write).toHaveBeenCalledWith(`item:records:${workId}:${format}:${source}`, result);
+    }
+  }));
+
+  it('rejects responses for another work or format without caching them', fakeAsync(() => {
+    for (const identity of [{ id: 'other-work', format: 'Book' }, { id: workId, format: 'Large Print' }, { id: workId, format: 'Book', success: false }]) {
+      let result: AspenFormatRecordsResult | undefined;
+      service.getFormatRecords(workId, 'Book', 'ils').subscribe(value => result = value);
+      flushMicrotasks();
+      http.expectOne(req => req.params.get('method') === 'getRecords').flush({
+        success: true, ...identity, records: {},
+      });
+      flushMicrotasks();
+      expect(result?.success).toBeFalse();
+      expect(result?.records).toEqual([]);
+    }
+    expect(cache.write).not.toHaveBeenCalled();
+  }));
+
+  it('ignores records from another source or format', fakeAsync(() => {
+    let result: AspenFormatRecordsResult | undefined;
+    service.getFormatRecords(workId, 'Book', 'ils').subscribe(value => result = value);
+    flushMicrotasks();
+    http.expectOne(req => req.params.get('method') === 'getRecords').flush({
+      success: true, id: workId, format: 'Book', records: {
+        'ils:901001': { source: 'ils', format: 'Large Print', physical: '600 pages' },
+        'hoopla:901002': { source: 'hoopla', format: 'Book', physical: '300 pages' },
+        'ils:901003': { id: 'overdrive:901003', source: 'ils', format: 'Book', physical: '300 pages' },
+      },
+    });
+    flushMicrotasks();
+    expect(result?.records).toEqual([]);
+  }));
 
   it('extracts the same ILS ID from old, 26.08 and edition hold actions', () => {
     for (const onclick of [legacyHold, currentHold, legacyHold.replace('showPlaceHold(', 'showPlaceHoldEditions(')]) {

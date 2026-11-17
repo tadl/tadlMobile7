@@ -94,103 +94,140 @@
         @for (kv of ($any(fmts) | keyvalue : formatSortComparator); track
         kv.key) {
         <ion-item class="format-row">
-          <ion-label class="format-label ion-text-wrap">
-            <div class="format-title">
-              {{ $any(kv.value).label || "" + kv.key }}
-            </div>
-            @if (showBaseFormatMeta(('' + kv.key))) {
-            <div class="format-meta">
-              @if ($any(kv.value).category) {
-              <span>{{ $any(kv.value).category }}</span>
-              } @if ($any(kv.value).category) {
-              <span class="dot">•</span>
-              }
-              <span>{{
-                $any(kv.value).isAvailable ? "Available" : "Not available"
-              }}</span>
-            </div>
-            } @if (showBaseFormatSubMeta(('' + kv.key)) && (hit.lastCheckOut ||
-            (formatHoldingsCount(('' + kv.key)) || 0) > 0)) {
-            <ion-note class="format-sub">
-              @if (hit.lastCheckOut) {
-              <span>Last borrowed: {{ lastBorrowedText() }}</span>
-              } @if (hit.lastCheckOut && (formatHoldingsCount(('' + kv.key)) ||
-              0) > 0) {
-              <span class="dot">•</span>
-              } @if ((formatHoldingsCount(('' + kv.key)) || 0) > 0) {
-              <span>
-                {{ formatHoldingsText("" + kv.key) }}
-              </span>
-              }
-            </ion-note>
-            } @if (hasHoldForFormat(('' + kv.key))) {
-            <ion-note class="format-sub you-hold-it">
-              You have a hold on this format
-            </ion-note>
-            } @if (showShelfDetails(('' + kv.key)) && hasFormatShelfDetails((''
-            + kv.key))) {
-            <div class="shelf-details">
-              @for (d of visibleFormatShelfDetails(('' + kv.key)); track
-              d.location + '|' + d.callNumber + '|' + d.status) {
-              <div class="shelf-detail">
-                {{ formatShelfDetailText(d) }}
-              </div>
-              } @if (formatShelfDetailsRemaining(('' + kv.key)) > 0) {
-              <ion-note class="shelf-more">
-                + {{ formatShelfDetailsRemaining("" + kv.key) }} more
-              </ion-note>
-              }
-            </div>
-            } @if (hasProviderStatuses(('' + kv.key))) {
-            <div class="provider-status-list">
-              @for (ps of providerStatusesForFormat(('' + kv.key)); track
-              ps.source + '|' + ps.providerLabel) {
-              <div class="provider-status">
-                <span class="provider-name">{{ ps.providerLabel }}</span>
-                <span class="dot">•</span>
-                <span>{{ providerStatusSummary(ps) }}</span>
-                @if (ps.numCopiesMessage) {
-                <ion-note class="provider-copies">
-                  {{ ps.numCopiesMessage }}
+          <div class="format-content">
+            <div class="format-overview">
+              <ion-label class="format-label ion-text-wrap">
+                <div class="format-title">
+                  {{ $any(kv.value).label || "" + kv.key }}
+                </div>
+                @if (showBaseFormatMeta(('' + kv.key))) {
+                <div class="format-meta">
+                  @if ($any(kv.value).category) {
+                  <span>{{ $any(kv.value).category }}</span>
+                  } @if ($any(kv.value).category) {
+                  <span class="dot">•</span>
+                  }
+                  <span>{{
+                    $any(kv.value).isAvailable ? "Available" : "Not available"
+                  }}</span>
+                </div>
+                } @if (showBaseFormatSubMeta(('' + kv.key)) && (hit.lastCheckOut ||
+                (formatHoldingsCount(('' + kv.key)) || 0) > 0)) {
+                <ion-note class="format-sub">
+                  @if (hit.lastCheckOut) {
+                  <span>Last borrowed: {{ lastBorrowedText() }}</span>
+                  } @if (hit.lastCheckOut && (formatHoldingsCount(('' + kv.key)) ||
+                  0) > 0) {
+                  <span class="dot">•</span>
+                  } @if ((formatHoldingsCount(('' + kv.key)) || 0) > 0) {
+                  <span>
+                    {{ formatHoldingsText("" + kv.key) }}
+                  </span>
+                  }
                 </ion-note>
+                } @if (hasHoldForFormat(('' + kv.key))) {
+                <ion-note class="format-sub you-hold-it">
+                  You have a hold on this format
+                </ion-note>
+                } @if (showShelfDetails(('' + kv.key)) && hasFormatShelfDetails((''
+                + kv.key))) {
+                <div class="shelf-details">
+                  @for (d of visibleFormatShelfDetails(('' + kv.key)); track
+                  d.location + '|' + d.callNumber + '|' + d.status) {
+                  <div class="shelf-detail">
+                    {{ formatShelfDetailText(d) }}
+                  </div>
+                  } @if (formatShelfDetailsRemaining(('' + kv.key)) > 0) {
+                  <ion-note class="shelf-more">
+                    + {{ formatShelfDetailsRemaining("" + kv.key) }} more
+                  </ion-note>
+                  }
+                </div>
+                } @if (hasProviderStatuses(('' + kv.key))) {
+                <div class="provider-status-list">
+                  @for (ps of providerStatusesForFormat(('' + kv.key)); track
+                  ps.source + '|' + ps.providerLabel) {
+                  <div class="provider-status">
+                    <span class="provider-name">{{ ps.providerLabel }}</span>
+                    <span class="dot">•</span>
+                    <span>{{ providerStatusSummary(ps) }}</span>
+                    @if (ps.numCopiesMessage) {
+                    <ion-note class="provider-copies">
+                      {{ ps.numCopiesMessage }}
+                    </ion-note>
+                    }
+                  </div>
+                  }
+                </div>
+                }
+              </ion-label>
+              <div class="format-actions">
+                <div class="primary-actions">
+                  @for (a of effectiveFormatActions(('' + kv.key),
+                  ($any(kv.value).actions || [])); track a.source + '|' + a.url +
+                  '|' + a.title) {
+                  <ion-button
+                    size="small"
+                    fill="solid"
+                    [disabled]="
+                      holdActionBusy ||
+                      (hasHoldForFormat('' + kv.key) && isIlsHoldAction(a))
+                    "
+                    (click)="handleFormatAction(a, '' + kv.key)"
+                  >
+                    {{
+                      hasHoldForFormat("" + kv.key) && isIlsHoldAction(a)
+                        ? "On Hold"
+                        : a.title || "Action"
+                    }}
+                  </ion-button>
+                  }
+                </div>
+                @if (showShelfDetails(('' + kv.key)) &&
+                formatShelfDetailsRemaining(('' + kv.key)) > 0) {
+                <ion-button
+                  size="small"
+                  fill="outline"
+                  class="copy-details-button"
+                  (click)="openCopyDetails('' + kv.key, $event)"
+                >
+                  Copy details
+                </ion-button>
                 }
               </div>
+            </div>
+            @if (editionDetailsByFormat['' + kv.key]; as records) {
+            <div class="edition-details">
+              @for (record of records; track record.key) {
+              <dl class="edition-record">
+                @if (record.edition) {
+                <div class="edition-fact">
+                  <dt>Edition:</dt>
+                  <dd>{{ record.edition }}</dd>
+                </div>
+                } @if (record.published) {
+                <div class="edition-fact">
+                  <dt>Publisher:</dt>
+                  <dd>{{ record.published }}</dd>
+                </div>
+                } @if (record.physicalValues.length) {
+                <div class="edition-fact">
+                  <dt>{{ record.physicalLabel }}:</dt>
+                  <dd>
+                    @for (physical of record.physicalValues; track physical.value) {
+                    <span class="edition-physical-value">
+                      {{ physical.value }}
+                      @if (physical.context) {
+                      <span class="edition-value-context">({{ physical.context }})</span>
+                      }
+                    </span>
+                    }
+                  </dd>
+                </div>
+                }
+              </dl>
               }
             </div>
-            }
-          </ion-label>
-          <div class="format-actions" slot="end">
-            <div class="primary-actions">
-              @for (a of effectiveFormatActions(('' + kv.key),
-              ($any(kv.value).actions || [])); track a.source + '|' + a.url +
-              '|' + a.title) {
-              <ion-button
-                size="small"
-                fill="solid"
-                [disabled]="
-                  holdActionBusy ||
-                  (hasHoldForFormat('' + kv.key) && isIlsHoldAction(a))
-                "
-                (click)="handleFormatAction(a, '' + kv.key)"
-              >
-                {{
-                  hasHoldForFormat("" + kv.key) && isIlsHoldAction(a)
-                    ? "On Hold"
-                    : a.title || "Action"
-                }}
-              </ion-button>
-              }
-            </div>
-            @if (showShelfDetails(('' + kv.key)) &&
-            formatShelfDetailsRemaining(('' + kv.key)) > 0) {
-            <ion-button
-              size="small"
-              fill="outline"
-              class="copy-details-button"
-              (click)="openCopyDetails('' + kv.key, $event)"
-            >
-              Copy details
-            </ion-button>
             }
           </div>
         </ion-item>

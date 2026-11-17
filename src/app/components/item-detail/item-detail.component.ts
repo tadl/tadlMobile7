@@ -16,6 +16,7 @@ import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
 import {
   ItemService,
+  AspenEditionRecord,
   AspenGroupedWork,
   AspenFormatVariationsResult,
 } from '../../services/item.service';
@@ -70,6 +71,14 @@ interface DetailFact {
   value: string;
 }
 
+interface EditionDetail {
+  key: string;
+  edition: string;
+  published: string;
+  physicalValues: Array<{ value: string; context: string }>;
+  physicalLabel: string;
+}
+
 @Component({
   standalone: true,
   selector: 'app-item-detail',
@@ -99,6 +108,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   work: AspenGroupedWork | null = null;
   displayCoverUrl = '';
   detailFacts: DetailFact[] = [];
+  editionDetailsByFormat: Record<string, EditionDetail[]> = {};
 
   /** if we got here from HoldsPage, it passes the hold as hit.raw */
   hold: AspenHold | null = null;
@@ -116,6 +126,17 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   private loadedWorkId: string | null = null;
   private requestedHoldings = new Set<string>();
   private requestedVariations = new Set<string>();
+  private requestedRecords = new Set<string>();
+  private editionRecordsByFormat: Record<
+    string,
+    Record<string, AspenEditionRecord[]>
+  > = {};
+  private editionSourcesByFormat: Record<string, Set<string>> = {};
+  private editionProviderLabelsByFormat: Record<string, Record<string, string>> = {};
+  private recordSubscriptions = new Map<string, Subscription>();
+  private metadataSubscriptions = new Subscription();
+  private workSub?: Subscription;
+  private destroyed = false;
   private copyDetailsModalOpen = false;
   private readonly descriptionPreviewChars = 320;
   descriptionExpanded = false;
@@ -183,7 +204,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     this.detailFacts = this.buildDetailFacts();
     if (!key) return;
 
-    this.items.getGroupedWork(key).subscribe({
+    this.workSub = this.items.getGroupedWork(key).subscribe({
       next: (w) => {
         this.work = w ?? null;
         this.detailFacts = this.buildDetailFacts();
@@ -193,7 +214,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
         this.descriptionExpanded = false;
         this.prepareWorkLoadState(this.work);
         this.loadHoldingsCountsForWork(this.work);
-        this.loadProviderStatusesForWork(this.work);
+        this.loadFormatDetailsForWork(this.work);
 
         // Attach hold/checkout for this grouped work so cards appear even when opened from Search
         this.refreshHoldForThisItem();
@@ -204,6 +225,9 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    this.destroyed = true;
+    this.workSub?.unsubscribe();
+    this.metadataSubscriptions.unsubscribe();
     this.authStateSub?.unsubscribe();
   }
 
@@ -2017,42 +2041,212 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     });
   }
 
-  private loadProviderStatusesForWork(work: AspenGroupedWork | null) {
+  private loadFormatDetailsForWork(work: AspenGroupedWork | null) {
     if (!work?.id || !work?.formats) return;
 
     const groupedWorkId = (work.id ?? '').toString().trim();
-    if (!groupedWorkId) return;
+    if (!groupedWorkId || this.destroyed) return;
 
     for (const [formatKey, fmt] of Object.entries(work.formats)) {
-      if (!this.shouldFetchVariationDetails(formatKey, fmt)) continue;
       const requestKey = `${groupedWorkId}:${formatKey}`;
       if (this.requestedVariations.has(requestKey)) continue;
       this.requestedVariations.add(requestKey);
 
-      this.items
+      const subscription = this.items
         .getFormatVariations(groupedWorkId, formatKey)
         .pipe(catchError(() => of(null)))
         .subscribe({
           next: (res) => {
-            const statuses = this.extractDigitalProviderStatuses(res);
-            if (statuses.length) {
+            if (
+              this.destroyed ||
+              this.loadedWorkId !== groupedWorkId ||
+              !res?.success ||
+              res.id !== groupedWorkId
+            ) {
+              return;
+            }
+
+            if (this.isLikelyDigitalFormat(formatKey, fmt)) {
               this.providerStatusesByFormat = {
                 ...this.providerStatusesByFormat,
-                [formatKey]: statuses,
+                [formatKey]: this.extractDigitalProviderStatuses(res),
+              };
+              this.providerActionsByFormat = {
+                ...this.providerActionsByFormat,
+                [formatKey]: this.extractDigitalProviderActions(res),
               };
             }
 
-            const actions = this.extractDigitalProviderActions(res);
-            if (actions.length) {
-              this.providerActionsByFormat = {
-                ...this.providerActionsByFormat,
-                [formatKey]: actions,
-              };
+            const sources = new Set(
+              Object.values(res.variations)
+                .map((variation) => (variation.source ?? '').trim())
+                .filter((source) => !!source)
+            );
+            const previousSources =
+              this.editionSourcesByFormat[formatKey] ?? new Set<string>();
+            this.editionSourcesByFormat[formatKey] = sources;
+            this.editionProviderLabelsByFormat[formatKey] = Object.fromEntries(
+              Object.entries(res.variations).map(([label, variation]) => [
+                (variation.source ?? '').trim(),
+                label,
+              ])
+            );
+            const previousRecords = this.editionRecordsByFormat[formatKey] ?? {};
+            for (const previousSource of previousSources) {
+              if (sources.has(previousSource)) continue;
+              const previousKey = `${groupedWorkId}:${formatKey}:${previousSource}`;
+              this.recordSubscriptions.get(previousKey)?.unsubscribe();
+              this.recordSubscriptions.delete(previousKey);
+              this.requestedRecords.delete(previousKey);
+            }
+            this.editionRecordsByFormat[formatKey] = Object.fromEntries(
+              Object.entries(previousRecords).filter(([source]) =>
+                sources.has(source)
+              )
+            );
+            this.updateEditionDetails();
+            for (const source of sources) {
+              this.loadEditionRecords(groupedWorkId, formatKey, source);
             }
           },
-          error: () => {},
         });
+      this.metadataSubscriptions.add(subscription);
     }
+  }
+
+  private loadEditionRecords(
+    groupedWorkId: string,
+    formatKey: string,
+    source: string
+  ) {
+    const requestKey = `${groupedWorkId}:${formatKey}:${source}`;
+    if (this.requestedRecords.has(requestKey)) return;
+    this.requestedRecords.add(requestKey);
+
+    const subscription = this.items
+      .getFormatRecords(groupedWorkId, formatKey, source)
+      .pipe(catchError(() => of(null)))
+      .subscribe((result) => {
+        if (
+          this.destroyed ||
+          this.loadedWorkId !== groupedWorkId ||
+          !result?.success ||
+          result.id !== groupedWorkId ||
+          result.format !== formatKey ||
+          result.source !== source ||
+          !this.editionSourcesByFormat[formatKey]?.has(source)
+        ) {
+          return;
+        }
+
+        const recordsById = new Map<string, AspenEditionRecord>();
+        for (const record of result.records) {
+          if (record.source !== source || record.format !== formatKey) continue;
+          recordsById.set(record.id, record);
+        }
+        this.editionRecordsByFormat[formatKey] = {
+          ...this.editionRecordsByFormat[formatKey],
+          [source]: [...recordsById.values()],
+        };
+        this.updateEditionDetails();
+      });
+    this.recordSubscriptions.set(requestKey, subscription);
+    this.metadataSubscriptions.add(subscription);
+  }
+
+  private updateEditionDetails() {
+    const detailsByFormat: Record<string, EditionDetail[]> = {};
+    const uniqueText = (values: string[]) => [
+      ...new Set(values.map((value) => value.trim()).filter((value) => !!value)),
+    ];
+    const runtimePattern = /^(?:\d+(?:\.\d+)?\s*(?:hours?|hrs?|h|minutes?|mins?|m|seconds?|secs?|s)\s*)+$/i;
+    for (const formatKey of Object.keys(this.work?.formats ?? {})) {
+      const digital = this.isLikelyDigitalFormat(
+        formatKey,
+        this.work?.formats?.[formatKey]
+      );
+      const records = Object.values(
+        this.editionRecordsByFormat[formatKey] ?? {}
+      ).flat();
+      const groups = new Map<string, AspenEditionRecord[]>();
+      for (const record of records) {
+        const identity = [
+          record.edition,
+          record.publisher,
+          record.placeOfPublication,
+        ].map((value) => value.trim());
+        // Digital providers may list the same edition in several years.
+        // Physical editions combine only when all displayed details match.
+        const key =
+          digital && identity.some((value) => !!value)
+            ? JSON.stringify(identity)
+            : JSON.stringify([
+                ...identity,
+                record.publicationDate.trim(),
+                record.physical.trim(),
+              ]);
+        groups.set(key, [...(groups.get(key) ?? []), record]);
+      }
+
+      const details: EditionDetail[] = [];
+      for (const [key, editions] of groups) {
+        const first = editions[0];
+        const values = new Map<string, Set<string>>();
+        for (const record of editions) {
+          const value = record.physical.trim();
+          if (!value) continue;
+          const contexts = values.get(value) ?? new Set<string>();
+          if (digital) {
+            const context = [
+              this.editionProviderLabel(formatKey, record.source),
+              record.publicationDate.trim(),
+            ]
+              .filter((part) => !!part)
+              .join(' · ');
+            if (context) contexts.add(context);
+          }
+          values.set(value, contexts);
+        }
+        const detail: EditionDetail = {
+          key,
+          edition: first.edition.trim(),
+          published: [
+            first.publisher.trim(),
+            first.placeOfPublication.trim(),
+            uniqueText(editions.map((record) => record.publicationDate)).join(', '),
+          ]
+            .filter((value) => !!value)
+            .join(' · '),
+          physicalValues: [...values].map(([value, contexts]) => ({
+            value,
+            context: [...contexts].join('; '),
+          })),
+          physicalLabel:
+            digital &&
+            formatKey.toLowerCase().includes('audio') &&
+            [...values.keys()].every((value) => runtimePattern.test(value))
+              ? 'Duration'
+              : 'Physical description',
+        };
+        if (detail.edition || detail.published || detail.physicalValues.length) {
+          details.push(detail);
+        }
+      }
+
+      if (details.length) detailsByFormat[formatKey] = details;
+    }
+    this.editionDetailsByFormat = detailsByFormat;
+  }
+
+  private editionProviderLabel(formatKey: string, source: string): string {
+    if (source.toLowerCase() === 'ils') return '';
+    const provider = this.providerStatusesByFormat[formatKey]?.find(
+      (status) => status.source === source.toLowerCase()
+    );
+    if (provider?.providerLabel) return provider.providerLabel;
+    if (source.toLowerCase() === 'overdrive') return 'Libby';
+    if (source.toLowerCase() === 'hoopla') return 'Hoopla';
+    return this.editionProviderLabelsByFormat[formatKey]?.[source] ?? '';
   }
 
   private extractDigitalProviderStatuses(
@@ -2113,16 +2307,20 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     if (!workId || workId === this.loadedWorkId) return;
 
     this.loadedWorkId = workId;
+    this.metadataSubscriptions.unsubscribe();
+    this.metadataSubscriptions = new Subscription();
     this.requestedHoldings.clear();
     this.requestedVariations.clear();
+    this.requestedRecords.clear();
+    this.editionRecordsByFormat = {};
+    this.editionSourcesByFormat = {};
+    this.editionProviderLabelsByFormat = {};
+    this.recordSubscriptions.clear();
+    this.editionDetailsByFormat = {};
     this.holdingsCountByFormat = {};
     this.holdingsDetailsByFormat = {};
     this.providerStatusesByFormat = {};
     this.providerActionsByFormat = {};
-  }
-
-  private shouldFetchVariationDetails(formatKey: string, fmt: any): boolean {
-    return this.isLikelyDigitalFormat(formatKey, fmt);
   }
 
   private isLikelyDigitalFormat(formatKey: string, fmt: any): boolean {

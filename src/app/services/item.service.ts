@@ -94,6 +94,26 @@ export interface AspenFormatVariationsResult {
   message?: string;
 }
 
+export interface AspenEditionRecord {
+  id: string;
+  source: string;
+  recordId: string;
+  format: string;
+  edition: string;
+  publisher: string;
+  publicationDate: string;
+  placeOfPublication: string;
+  physical: string;
+}
+
+export interface AspenFormatRecordsResult {
+  success: boolean;
+  id: string;
+  format: string;
+  source: string;
+  records: AspenEditionRecord[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class ItemService {
   private http = inject(HttpClient);
@@ -204,6 +224,46 @@ export class ItemService {
     return concat(cached$, network$);
   }
 
+  /** Bibliographic editions within one grouped work, format, and source. */
+  getFormatRecords(
+    groupedWorkKey: string,
+    formatKey: string,
+    recordSource: string
+  ): Observable<AspenFormatRecordsResult> {
+    const key = groupedWorkKey.trim();
+    const format = formatKey.trim();
+    const source = recordSource.trim();
+    const params = new HttpParams()
+      .set('method', 'getRecords')
+      .set('id', key)
+      .set('format', format)
+      .set('source', source);
+
+    const cacheKey = `item:records:${key}:${format}:${source}`;
+    const cached$ = from(
+      this.cache.read<AspenFormatRecordsResult>(cacheKey)
+    ).pipe(
+      filter(
+        (value): value is AspenFormatRecordsResult =>
+          value?.success === true &&
+          value.id === key &&
+          value.format === format &&
+          value.source === source &&
+          Array.isArray(value.records)
+      )
+    );
+    const network$ = this.http
+      .get<unknown>(`${this.globals.aspen_api_base}/ItemAPI`, { params })
+      .pipe(
+        map((raw) => this.normalizeFormatRecords(raw, key, format, source)),
+        tap((result) => {
+          if (result.success) this.cache.write(cacheKey, result).catch(() => {});
+        })
+      );
+
+    return concat(cached$, network$);
+  }
+
   stripIlsPrefix(id: string): string {
     const s = (id || '').trim();
     if (s.startsWith('ils:')) return s.slice(4);
@@ -303,6 +363,68 @@ export class ItemService {
       variations,
       message: typeof input?.message === 'string' ? input.message : undefined,
     };
+  }
+
+  private normalizeFormatRecords(
+    raw: unknown,
+    id: string,
+    format: string,
+    source: string
+  ): AspenFormatRecordsResult {
+    const envelope = this.recordObject(raw);
+    const input = this.recordObject(envelope['result'] ?? raw);
+    const success =
+      input['success'] === true &&
+      input['id'] === id &&
+      input['format'] === format;
+    const records: AspenEditionRecord[] = [];
+    const rawRecords = this.recordObject(input['records']);
+
+    if (success) {
+      for (const [recordKey, value] of Object.entries(rawRecords)) {
+        const record = this.recordObject(value);
+        const recordId = this.metadataText(record['id']) || recordKey;
+        if (
+          record['source'] !== source ||
+          record['format'] !== format ||
+          !recordId.startsWith(`${source}:`) ||
+          recordId.length <= source.length + 1
+        ) continue;
+
+        records.push({
+          id: recordId,
+          source,
+          recordId: recordId.slice(source.length + 1),
+          format,
+          edition: this.metadataText(record['edition']),
+          publisher: this.metadataText(record['publisher']),
+          publicationDate: this.metadataText(record['publicationDate']),
+          placeOfPublication: this.metadataText(record['placeOfPublication']),
+          physical: this.metadataText(record['physical']),
+        });
+      }
+    }
+
+    return { success, id, format, source, records };
+  }
+
+  private recordObject(value: unknown): Record<string, unknown> {
+    return value !== null && typeof value === 'object' && !Array.isArray(value)
+      ? value as Record<string, unknown>
+      : {};
+  }
+
+  private metadataText(value: unknown): string {
+    if (typeof value === 'string') return value.trim();
+    if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+    if (Array.isArray(value)) {
+      return value
+        .filter((part): part is string => typeof part === 'string')
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .join('; ');
+    }
+    return '';
   }
 
   private normalizeGroupedWork(input: any): AspenGroupedWork {

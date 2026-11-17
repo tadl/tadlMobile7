@@ -52,6 +52,12 @@ interface KnownListMembership {
   listTitle: string;
 }
 
+interface ItemListActionContext {
+  accountId: string | null;
+  revision: number;
+  recordId: string;
+}
+
 interface FormatProviderStatus {
   providerLabel: string;
   source: string;
@@ -159,6 +165,8 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   private circulationAccountId: string | null = null;
   private listsHydrated = false;
   private listsAccountId: string | null = null;
+  private listAccountRevision = 0;
+  private listContextAccountId: string | null = null;
 
   holdActionBusy = false;
   checkoutActionBusy = false;
@@ -183,11 +191,11 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.circulationAccountId = this.auth.snapshot().activeAccountId;
+    this.listContextAccountId = this.circulationAccountId;
     // If opened from Holds/Checkouts pages, we already have the object in hit.raw
     this.hold = this.extractHoldFromHit(this.hit);
     this.holdsForItem = this.hold ? [this.hold] : [];
     this.checkout = this.extractCheckoutFromHit(this.hit);
-    void this.refreshAvailableLists();
     void this.seedKnownListMemberships();
     this.authStateSub = this.auth.authState().subscribe((state) => {
       const accountId = state?.isLoggedIn
@@ -195,11 +203,20 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
         : null;
       if (this.circulationAccountId !== accountId) {
         this.circulationAccountId = accountId;
+        this.listAccountRevision += 1;
+        this.availableLists = [];
+        this.knownListMemberships = [];
+        this.ownedListIds.clear();
+        this.ownedListIdsLoaded = false;
+        this.listsHydrated = false;
+        this.listActionBusy = false;
+        this.needsListRefresh = false;
         this.hold = null;
         this.holdsForItem = [];
         this.checkout = null;
         this.needsHoldsRefresh = false;
         this.needsCheckoutsRefresh = false;
+        if (accountId) void this.seedKnownListMemberships();
       }
       if (!accountId) {
         this.availableLists = [];
@@ -360,14 +377,16 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     const recordId = this.listRecordId();
     if (!recordId) return;
 
-    const lists = await this.getListsForAction();
+    const context = this.listActionContext();
+    const lists = await this.getListsForAction(context);
+    if (!this.isListContextCurrent(context) || !lists) return;
     if (!lists.length) {
-      await this.createListAndAddRecord(recordId);
+      await this.createListAndAddRecord(recordId, context);
       return;
     }
 
     if (lists.length === 1) {
-      this.addRecordToList(lists[0], recordId);
+      this.addRecordToList(lists[0], recordId, context);
       return;
     }
 
@@ -377,13 +396,17 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
         ...lists.map(
           (list): ActionSheetButton => ({
             text: this.actionListLabel(list),
-            handler: () => this.addRecordToList(list, recordId),
+            handler: () => this.addRecordToList(list, recordId, context),
           })
         ),
         { text: 'Close', role: 'cancel' },
       ],
     });
 
+    if (!this.isListContextCurrent(context)) {
+      await sheet.dismiss();
+      return;
+    }
     await sheet.present();
   }
 
@@ -392,8 +415,9 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     const recordId = this.listRecordId();
     if (!recordId) return;
 
-    const lists = await this.getListsForAction();
-    if (!lists.length) return;
+    const context = this.listActionContext();
+    const lists = await this.getListsForAction(context);
+    if (!this.isListContextCurrent(context) || !lists?.length) return;
 
     const pickSheet = await this.actionSheet.create({
       header: 'Remove from which list?',
@@ -402,13 +426,17 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
           (list): ActionSheetButton => ({
             text: this.actionListLabel(list),
             role: 'destructive',
-            handler: () => this.confirmRemoveFromNamedList(list, recordId),
+            handler: () => this.confirmRemoveFromNamedList(list, recordId, context),
           })
         ),
         { text: 'Close', role: 'cancel' },
       ],
     });
 
+    if (!this.isListContextCurrent(context)) {
+      await pickSheet.dismiss();
+      return;
+    }
     await pickSheet.present();
   }
 
@@ -418,15 +446,30 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     return (this.hit?.key ?? '').toString().trim();
   }
 
-  private async getListsForAction(): Promise<AspenUserList[]> {
+  private listActionContext(): ItemListActionContext {
+    const snapshot = this.auth.snapshot();
+    return {
+      accountId: snapshot.isLoggedIn ? snapshot.activeAccountId : null,
+      revision: this.listAccountRevision,
+      recordId: this.listRecordId(),
+    };
+  }
+
+  private isListContextCurrent(context: ItemListActionContext): boolean {
+    const current = this.listActionContext();
+    return !this.destroyed && current.accountId === context.accountId &&
+      current.revision === context.revision && current.recordId === context.recordId;
+  }
+
+  private async getListsForAction(context: ItemListActionContext): Promise<AspenUserList[] | null> {
     const loggedIn = await this.ensureLoggedInForInteractiveAction(
       'Log in to manage lists'
     );
-    if (!loggedIn) return [];
+    if (!loggedIn || !this.isListContextCurrent(context)) return null;
 
     try {
       const lookup = await this.listLookup.lookup([]);
-      if (!lookup) return [];
+      if (!lookup || !this.isListContextCurrent(context)) return null;
       const lists = this.orderListsForAction(lookup.lists, lookup.lastListUsed);
       if (!lists?.length) {
         return [];
@@ -434,8 +477,8 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
       this.availableLists = lists.slice();
       return lists;
     } catch {
-      this.toast.presentToast('Could not load your lists.');
-      return [];
+      if (this.isListContextCurrent(context)) this.toast.presentToast('Could not load your lists.');
+      return null;
     }
   }
 
@@ -446,9 +489,9 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     return base;
   }
 
-  private addRecordToList(list: AspenUserList, recordId: string) {
+  private addRecordToList(list: AspenUserList, recordId: string, context: ItemListActionContext) {
     const listId = (list?.id ?? '').toString().trim();
-    if (!listId || !recordId) return;
+    if (!listId || !recordId || !this.isListContextCurrent(context)) return;
     if (this.listActionBusy) return;
     if (
       this.listLookup
@@ -462,9 +505,12 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     this.listActionBusy = true;
     this.lists
       .addTitlesToList(listId, [recordId])
-      .pipe(finalize(() => (this.listActionBusy = false)))
+      .pipe(finalize(() => {
+        if (this.isListContextCurrent(context)) this.listActionBusy = false;
+      }))
       .subscribe({
         next: (res) => {
+          if (!this.isListContextCurrent(context)) return;
           if (!res?.success) {
             this.toast.presentToast(res?.message || 'Could not add to list.');
             return;
@@ -481,17 +527,20 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
           this.needsListRefresh = true;
           this.toast.presentToast(res?.message || 'Added to list.');
         },
-        error: () => this.toast.presentToast('Could not add to list.'),
+        error: () => {
+          if (this.isListContextCurrent(context)) this.toast.presentToast('Could not add to list.');
+        },
       });
   }
 
   private async confirmRemoveFromNamedList(
     list: AspenUserList,
-    recordId: string
+    recordId: string,
+    context: ItemListActionContext
   ) {
     const listId = (list?.id ?? '').toString().trim();
     const title = (list?.title ?? '').toString().trim() || 'This list';
-    if (!listId || !recordId) return;
+    if (!listId || !recordId || !this.isListContextCurrent(context)) return;
 
     const confirmSheet = await this.actionSheet.create({
       header: 'Remove from list?',
@@ -500,24 +549,31 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
         {
           text: 'Remove',
           role: 'destructive',
-          handler: () => this.removeRecordFromList(listId, recordId),
+          handler: () => this.removeRecordFromList(listId, recordId, context),
         },
         { text: 'Close', role: 'cancel' },
       ],
     });
 
+    if (!this.isListContextCurrent(context)) {
+      await confirmSheet.dismiss();
+      return;
+    }
     await confirmSheet.present();
   }
 
-  private removeRecordFromList(listId: string, recordId: string) {
-    if (this.listActionBusy) return;
+  private removeRecordFromList(listId: string, recordId: string, context: ItemListActionContext) {
+    if (this.listActionBusy || !this.isListContextCurrent(context)) return;
 
     this.listActionBusy = true;
     this.lists
       .removeTitlesFromList(listId, [recordId])
-      .pipe(finalize(() => (this.listActionBusy = false)))
+      .pipe(finalize(() => {
+        if (this.isListContextCurrent(context)) this.listActionBusy = false;
+      }))
       .subscribe({
         next: (res) => {
+          if (!this.isListContextCurrent(context)) return;
           if (!res?.success) {
             this.toast.presentToast(
               res?.message || 'Could not remove from list.'
@@ -530,13 +586,16 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
           this.listLookup.removeMembership(recordId, listId);
           this.toast.presentToast(res?.message || 'Removed from list.');
         },
-        error: () => this.toast.presentToast('Could not remove from list.'),
+        error: () => {
+          if (this.isListContextCurrent(context)) this.toast.presentToast('Could not remove from list.');
+        },
       });
   }
 
   private async seedKnownListMemberships() {
+    const context = this.listActionContext();
     const listId = (this.listContext?.listId ?? '').toString().trim();
-    if (listId) {
+    if (listId && context.accountId === this.listContextAccountId) {
       const listTitle =
         (this.listContext?.listTitle ?? '').toString().trim() || 'This list';
       this.mergeKnownListMemberships([{ listId, listTitle }]);
@@ -544,9 +603,9 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
 
     try {
       const recordId = this.listRecordId();
-      if (!recordId) return;
+      if (!recordId || !context.accountId) return;
       const indexed = await this.listLookup.membershipsForRecord(recordId);
-      if (!indexed.length) return;
+      if (!this.isListContextCurrent(context) || !indexed.length) return;
       this.mergeKnownListMemberships(
         indexed
           .map((x) => ({
@@ -622,12 +681,17 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     ev?.stopPropagation?.();
     if (!m?.listId) return;
 
+    const context = this.listActionContext();
     await this.ensureOwnedListIdsLoaded();
+    if (!this.isListContextCurrent(context)) return;
     const canEdit = this.canEditKnownListMembership(m.listId);
     const buttons: ActionSheetButton[] = [
       {
         text: 'View list',
-        handler: () => this.openKnownList(m.listId, m.listTitle),
+        handler: () => {
+          if (this.isListContextCurrent(context)) return this.openKnownList(m.listId, m.listTitle);
+          return;
+        },
       },
     ];
     if (canEdit) {
@@ -637,7 +701,8 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
         handler: () =>
           this.confirmRemoveFromNamedList(
             { id: m.listId, title: m.listTitle } as AspenUserList,
-            this.listRecordId()
+            context.recordId,
+            context
           ),
       });
     }
@@ -648,6 +713,10 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
       buttons,
     });
 
+    if (!this.isListContextCurrent(context)) {
+      await sheet.dismiss();
+      return;
+    }
     await sheet.present();
   }
 
@@ -655,15 +724,18 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     const id = (listId ?? '').toString().trim();
     if (!id) return false;
     const contextListId = (this.listContext?.listId ?? '').toString().trim();
-    if (contextListId && contextListId === id) {
+    if (contextListId && contextListId === id && this.listContextAccountId === this.auth.snapshot().activeAccountId) {
       return this.listContext?.canEdit !== false;
     }
     return this.ownedListIds.has(id);
   }
 
   private async refreshOwnedListIds(): Promise<void> {
+    const context = this.listActionContext();
+    if (!context.accountId) return;
     try {
       const lists = await lastValueFrom(this.lists.fetchUserLists());
+      if (!this.isListContextCurrent(context)) return;
       this.ownedListIds = new Set(
         (lists ?? [])
           .map((x) => (x?.id ?? '').toString().trim())
@@ -671,6 +743,7 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
       );
       this.ownedListIdsLoaded = true;
     } catch {
+      if (!this.isListContextCurrent(context)) return;
       this.ownedListIds = new Set<string>();
       this.ownedListIdsLoaded = false;
     }
@@ -682,8 +755,11 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   }
 
   private async refreshAvailableLists(): Promise<void> {
+    const context = this.listActionContext();
+    if (!context.accountId) return;
     try {
       const lookup = await this.listLookup.lookup([]);
+      if (!this.isListContextCurrent(context)) return;
       this.availableLists = this.orderListsForAction(
         lookup.lists,
         lookup.lastListUsed
@@ -692,50 +768,55 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
       this.listsAccountId =
         (this.auth.snapshot()?.activeAccountId ?? '').toString().trim() || null;
     } catch {
+      if (!this.isListContextCurrent(context)) return;
       this.availableLists = [];
       this.listsHydrated = false;
     }
   }
 
-  private async createListAndAddRecord(recordId: string): Promise<void> {
-    const basics = await this.promptListBasics('Create List');
-    if (!basics) return;
+  private async createListAndAddRecord(recordId: string, context: ItemListActionContext): Promise<void> {
+    const basics = await this.promptListBasics('Create List', context);
+    if (!basics || !this.isListContextCurrent(context)) return;
 
-    const isPublic = await this.promptVisibility(false);
-    if (isPublic === null) return;
+    const isPublic = await this.promptVisibility(false, context);
+    if (isPublic === null || !this.isListContextCurrent(context)) return;
 
     if (this.listActionBusy) return;
     this.listActionBusy = true;
-    this.lists
-      .createList(basics.title, basics.description, isPublic)
-      .pipe(finalize(() => (this.listActionBusy = false)))
-      .subscribe({
-        next: (res) => {
-          if (!res?.success || !res?.listId) {
-            this.toast.presentToast(res?.message || 'Could not create list.');
-            return;
-          }
+    try {
+      const res = await lastValueFrom(this.lists
+        .createList(basics.title, basics.description, isPublic)
+        .pipe(finalize(() => {
+          if (this.isListContextCurrent(context)) this.listActionBusy = false;
+        })));
+      if (!this.isListContextCurrent(context)) return;
+      if (!res?.success || !res?.listId) {
+        this.toast.presentToast(res?.message || 'Could not create list.');
+        return;
+      }
 
-          const createdList: AspenUserList = {
-            id: res.listId,
-            title: res.listTitle || basics.title,
-            description: basics.description,
-            public: isPublic,
-            numTitles: 0,
-          };
-          this.availableLists = this.orderListsForAction(
-            [createdList, ...this.availableLists],
-            res.listId
-          );
-          this.listLookup.replaceLists(this.availableLists);
-          this.addRecordToList(createdList, recordId);
-        },
-        error: () => this.toast.presentToast('Could not create list.'),
-      });
+      const createdList: AspenUserList = {
+        id: res.listId,
+        title: res.listTitle || basics.title,
+        description: basics.description,
+        public: isPublic,
+        numTitles: 0,
+      };
+      this.availableLists = this.orderListsForAction(
+        [createdList, ...this.availableLists],
+        res.listId
+      );
+      this.listLookup.replaceLists(this.availableLists);
+      // Creation must finish and release its busy state before adding the title.
+      this.addRecordToList(createdList, recordId, context);
+    } catch {
+      if (this.isListContextCurrent(context)) this.toast.presentToast('Could not create list.');
+    }
   }
 
   private async promptListBasics(
     header: string,
+    context: ItemListActionContext,
     initialTitle = '',
     initialDescription = ''
   ): Promise<{ title: string; description: string } | null> {
@@ -761,6 +842,10 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
           {
             text: 'Continue',
             handler: (data) => {
+              if (!this.isListContextCurrent(context)) {
+                resolve(null);
+                return true;
+              }
               const title = (data?.title ?? '').toString().trim();
               const description = (data?.description ?? '').toString().trim();
               if (!title) {
@@ -773,12 +858,18 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
           },
         ],
       });
+      if (!this.isListContextCurrent(context)) {
+        await alert.dismiss();
+        resolve(null);
+        return;
+      }
       await alert.present();
     });
   }
 
   private async promptVisibility(
-    initialPublic: boolean
+    initialPublic: boolean,
+    context: ItemListActionContext
   ): Promise<boolean | null> {
     return new Promise(async (resolve) => {
       const alert = await this.alertCtrl.create({
@@ -803,12 +894,21 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
           {
             text: 'Save',
             handler: (value) => {
+              if (!this.isListContextCurrent(context)) {
+                resolve(null);
+                return true;
+              }
               resolve((value ?? 'private').toString() === 'public');
               return true;
             },
           },
         ],
       });
+      if (!this.isListContextCurrent(context)) {
+        await alert.dismiss();
+        resolve(null);
+        return;
+      }
       await alert.present();
     });
   }

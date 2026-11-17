@@ -33,6 +33,7 @@ describe('CacheWarm first account hydration', () => {
   let cache: jasmine.SpyObj<AppCacheService>;
   let locations: jasmine.SpyObj<LocationsService>;
   let activeSnapshot: AuthState;
+  let sessionRevision: number;
 
   const snapshot: AuthState = {
     isLoggedIn: true,
@@ -69,12 +70,22 @@ describe('CacheWarm first account hydration', () => {
 
   beforeEach(() => {
     activeSnapshot = snapshot;
+    sessionRevision = 0;
     auth = jasmine.createSpyObj<AuthService>('AuthService', [
       'snapshot',
       'applyActiveProfile',
       'refreshActiveProfile',
+      'captureActiveProfileSession',
+      'commitProfileForSession',
     ]);
     auth.snapshot.and.callFake(() => activeSnapshot);
+    auth.captureActiveProfileSession.and.callFake(() => activeSnapshot.isLoggedIn && activeSnapshot.activeAccountId
+      ? { accountId: activeSnapshot.activeAccountId, revision: sessionRevision } : null);
+    auth.commitProfileForSession.and.callFake(async (session, warmedProfile) => {
+      if (session.accountId !== activeSnapshot.activeAccountId || session.revision !== sessionRevision) return false;
+      auth.applyActiveProfile(warmedProfile);
+      return true;
+    });
     auth.refreshActiveProfile.and.returnValue(of(snapshot));
     accounts = jasmine.createSpyObj<AccountStoreService>(
       'AccountStoreService',
@@ -147,10 +158,10 @@ describe('CacheWarm first account hydration', () => {
     });
     flushMicrotasks();
 
-    expect(accounts.cacheProfile).toHaveBeenCalledOnceWith(
-      'synthetic-account',
-      profile
+    expect(auth.commitProfileForSession).toHaveBeenCalledOnceWith(
+      { accountId: 'synthetic-account', revision: 0 }, profile
     );
+    expect(accounts.cacheProfile).not.toHaveBeenCalled();
     expect(auth.applyActiveProfile).toHaveBeenCalledOnceWith(profile);
     expect(cache.write).toHaveBeenCalledOnceWith(
       'lists:user:synthetic-account',
@@ -282,6 +293,7 @@ describe('CacheWarm first account hydration', () => {
   }));
 
   function switchAccount() {
+    sessionRevision += 1;
     activeSnapshot = {
       ...snapshot,
       activeAccountId: 'synthetic-second-account',
@@ -301,10 +313,10 @@ describe('CacheWarm first account hydration', () => {
       userapi: { result: { success: true, profile } },
     });
     flushMicrotasks();
-    expect(accounts.cacheProfile).toHaveBeenCalledOnceWith(
-      'synthetic-account',
-      profile
+    expect(auth.commitProfileForSession).toHaveBeenCalledOnceWith(
+      { accountId: 'synthetic-account', revision: 0 }, profile
     );
+    expect(accounts.cacheProfile).not.toHaveBeenCalled();
     expect(auth.applyActiveProfile).not.toHaveBeenCalled();
     expect(preferences.fetchForAccount).toHaveBeenCalledOnceWith(
       'synthetic-account',
@@ -313,13 +325,13 @@ describe('CacheWarm first account hydration', () => {
     );
   }));
 
-  it('checks the active account again after profile cache persistence finishes', fakeAsync(() => {
+  it('awaits the guarded profile commit before continuing bundle hydration', fakeAsync(() => {
     let finishProfile: () => void = () => {
       throw new Error('Profile persistence not started');
     };
-    accounts.cacheProfile.and.returnValue(
-      new Promise<void>((resolve) => {
-        finishProfile = resolve;
+    auth.commitProfileForSession.and.returnValue(
+      new Promise<boolean>((resolve) => {
+        finishProfile = () => resolve(false);
       })
     );
     warmRequest().flush({
@@ -328,6 +340,7 @@ describe('CacheWarm first account hydration', () => {
       preferences: { preferences: prefs },
     });
     flushMicrotasks();
+    expect(preferences.persistPreferencesForAccount).not.toHaveBeenCalled();
     switchAccount();
     finishProfile();
     flushMicrotasks();
@@ -370,8 +383,12 @@ describe('CacheWarm first account hydration', () => {
       'synthetic-user'
     );
     expect(accounts.getPassword).toHaveBeenCalledOnceWith('synthetic-account');
-    request.flush({ ok: true, preferences: { preferences: prefs } });
+    request.flush({ ok: true, userapi: { result: { success: true, profile } }, preferences: { preferences: prefs } });
     flushMicrotasks();
+    expect(auth.commitProfileForSession).toHaveBeenCalledOnceWith(
+      { accountId: 'synthetic-account', revision: 0 }, profile
+    );
+    expect(auth.applyActiveProfile).not.toHaveBeenCalled();
     expect(preferences.persistPreferencesForAccount).toHaveBeenCalledOnceWith(
       'synthetic-account',
       prefs
@@ -428,4 +445,41 @@ describe('CacheWarm first account hydration', () => {
     );
     expect(locations.getLocations).toHaveBeenCalledTimes(1);
   }));
+
+  it('rejects a warm profile from a previous session even when the same account is active again', fakeAsync(() => {
+    const request = warmRequest();
+    switchAccount();
+    activeSnapshot = snapshot;
+    sessionRevision += 1;
+    request.flush({ ok: true, userapi: { result: { success: true, profile } } });
+    flushMicrotasks();
+    expect(auth.commitProfileForSession).toHaveBeenCalledOnceWith(
+      { accountId: 'synthetic-account', revision: 0 }, profile
+    );
+    expect(accounts.cacheProfile).not.toHaveBeenCalled();
+    expect(auth.applyActiveProfile).not.toHaveBeenCalled();
+  }));
+
+  it('does not start profile or list fallbacks for a previous same-account session', fakeAsync(() => {
+    const request = warmRequest();
+    switchAccount();
+    activeSnapshot = snapshot;
+    sessionRevision += 1;
+    request.flush('Unavailable', { status: 503, statusText: 'Unavailable' });
+    flushMicrotasks();
+    expect(auth.refreshActiveProfile).not.toHaveBeenCalled();
+    expect(lists.fetchUserLists).not.toHaveBeenCalled();
+    expect(preferences.fetchForAccount).toHaveBeenCalledOnceWith(
+      'synthetic-account', 'synthetic-user', 'synthetic-password'
+    );
+  }));
+
+  it('does not commit profile data from an unsuccessful bundled section', fakeAsync(() => {
+    warmRequest().flush({ ok: true, userapi: { result: { success: false, profile } } });
+    flushMicrotasks();
+    expect(auth.commitProfileForSession).not.toHaveBeenCalled();
+    expect(accounts.cacheProfile).not.toHaveBeenCalled();
+    expect(auth.applyActiveProfile).not.toHaveBeenCalled();
+  }));
+
 });

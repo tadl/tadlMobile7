@@ -1,12 +1,12 @@
 import { Injectable, inject } from '@angular/core';
 
-import { AccountStoreService } from './account-store.service';
+import { AuthService } from './auth.service';
 import { AppCacheService } from './app-cache.service';
 import { ListLookupService } from './list-lookup.service';
 
 @Injectable({ providedIn: 'root' })
 export class AccountCacheCleanupService {
-  private accounts = inject(AccountStoreService);
+  private auth = inject(AuthService);
   private cache = inject(AppCacheService);
   private listLookup = inject(ListLookupService);
 
@@ -15,7 +15,7 @@ export class AccountCacheCleanupService {
     if (!id) return;
 
     await Promise.all([
-      this.accounts.clearCachedProfile(id),
+      this.auth.clearInactiveCachedProfile(id),
       this.cache.removeByPrefixes([
         `accounts:holds:${id}`,
         `checkouts:${id}`,

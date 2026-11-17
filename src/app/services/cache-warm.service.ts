@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { lastValueFrom } from 'rxjs';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 
-import { AuthService } from './auth.service';
+import { AuthService, type ActiveProfileSession } from './auth.service';
 import { AccountStoreService } from './account-store.service';
 import { ListsService } from './lists.service';
 import { AccountPreferencesService } from './account-preferences.service';
@@ -30,7 +30,8 @@ export class CacheWarmService {
     const snap = this.auth.snapshot();
     const accountId = (snap?.activeAccountId ?? '').toString().trim();
     const username = (snap?.activeAccountMeta?.username ?? '').toString().trim();
-    if (!accountId || !username) return;
+    const session = this.auth.captureActiveProfileSession();
+    if (!accountId || !username || session?.accountId !== accountId) return;
 
     const now = Date.now();
     if (
@@ -47,10 +48,12 @@ export class CacheWarmService {
     void this.safeRun(async () => {
       const password = await this.accounts.getPassword(accountId);
       if (!password) return;
-      const warmed = await this.warmFromBundledEndpoint(accountId, username, password);
+      const warmed = await this.warmFromBundledEndpoint(session, username, password);
       if (warmed) return;
 
-      const accountStillActive = this.auth.snapshot().activeAccountId === accountId;
+      const currentSession = this.auth.captureActiveProfileSession();
+      const accountStillActive = currentSession?.accountId === session.accountId &&
+        currentSession.revision === session.revision;
       await Promise.all([
         ...(accountStillActive ? [
           this.settle(lastValueFrom(this.auth.refreshActiveProfile())),
@@ -84,7 +87,8 @@ export class CacheWarmService {
     );
   }
 
-  private async warmFromBundledEndpoint(accountId: string, username: string, password: string): Promise<boolean> {
+  private async warmFromBundledEndpoint(session: ActiveProfileSession, username: string, password: string): Promise<boolean> {
+    const accountId = session.accountId;
     const body = new URLSearchParams();
     body.set('username', username);
     body.set('password', password);
@@ -110,11 +114,8 @@ export class CacheWarmService {
     if (!raw?.ok) return false;
 
     const profile = raw?.userapi?.result?.profile;
-    if (profile && typeof profile === 'object') {
-      await this.accounts.cacheProfile(accountId, profile);
-      if (this.auth.snapshot().activeAccountId === accountId) {
-        this.auth.applyActiveProfile(profile);
-      }
+    if (raw?.userapi?.result?.success === true && profile && typeof profile === 'object' && !Array.isArray(profile)) {
+      await this.auth.commitProfileForSession(session, profile);
     }
 
     const listResult = raw?.listapi?.result;

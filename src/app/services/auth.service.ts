@@ -27,6 +27,11 @@ export interface AuthState {
   profile: any | null; // raw Aspen profile
 }
 
+export interface ActiveProfileSession {
+  readonly accountId: string;
+  readonly revision: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private accounts = inject(AccountStoreService);
@@ -51,6 +56,36 @@ export class AuthService {
 
   snapshot(): AuthState {
     return this.state$.value;
+  }
+
+  captureActiveProfileSession(): ActiveProfileSession | null {
+    const snapshot = this.snapshot();
+    return snapshot.isLoggedIn && snapshot.activeAccountId
+      ? { accountId: snapshot.activeAccountId, revision: this.sessionRevision }
+      : null;
+  }
+
+  async commitProfileForSession(session: ActiveProfileSession, profile: any): Promise<boolean> {
+    return this.queueSessionStorage(async () => {
+      if (!this.isCurrentSession(session.accountId, session.revision)) return false;
+      let completed = false;
+      try {
+        await this.accounts.cacheProfile(session.accountId, profile);
+        if (!this.isCurrentSession(session.accountId, session.revision)) return false;
+        this.applyActiveProfile(profile);
+        completed = true;
+        return true;
+      } finally {
+        if (!completed) await this.reconcilePublishedSession();
+      }
+    });
+  }
+
+  async clearInactiveCachedProfile(accountId: string): Promise<void> {
+    await this.queueSessionStorage(async () => {
+      if (this.snapshot().activeAccountId === accountId) return;
+      await this.accounts.clearCachedProfile(accountId);
+    });
   }
 
   applyActiveProfile(profile: any): void {
@@ -363,22 +398,9 @@ export class AuthService {
                 );
               }
 
-              return from(this.queueSessionStorage(async () => {
-                if (!this.isCurrentSession(accountId, revision)) return this.snapshot();
-                let completed = false;
-                try {
-                  await this.accounts.cacheProfile(accountId, res.profile);
-                  if (!this.isCurrentSession(accountId, revision)) return this.snapshot();
-                  const next: AuthState = {
-                    ...this.snapshot(), isLoggedIn: true, profile: res.profile,
-                  };
-                  this.state$.next(next);
-                  completed = true;
-                  return next;
-                } finally {
-                  if (!completed) await this.reconcilePublishedSession();
-                }
-              }));
+              return from(this.commitProfileForSession({ accountId, revision }, res.profile)).pipe(
+                map(() => this.snapshot())
+              );
             }),
             catchError(() => of(this.snapshot()))
           );

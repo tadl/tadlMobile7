@@ -511,4 +511,49 @@ describe('AuthService profile refresh account isolation', () => {
     expect(accounts.setPassword).not.toHaveBeenCalled();
   }));
 
+
+  it('rejects a warm profile captured before switching away and back to the same account', fakeAsync(() => {
+    const captured = service.captureActiveProfileSession()!;
+    switchToB();
+    service.login(accountA.username, 'synthetic-password').subscribe();
+    refresh.next({ success: true, profile: updatedA });
+    flushMicrotasks();
+    const staleProfile = { ...profileA, numReadingHistory: 999 };
+    let committed: boolean | undefined;
+    void service.commitProfileForSession(captured, staleProfile).then(value => { committed = value; });
+    flushMicrotasks();
+    expect(committed).toBeFalse();
+    expect(service.snapshot().profile).toEqual(updatedA);
+    expect(accounts.cacheProfile).not.toHaveBeenCalledWith(accountA.id, staleProfile);
+  }));
+
+  it('reconciles an already-started warm profile write if newer credentials fail', fakeAsync(() => {
+    const saved = deferred<void>();
+    let persistedProfile: unknown = profileA;
+    accounts.cacheProfile.and.callFake(async (_id, profile) => {
+      if (profile === updatedA) await saved.promise;
+      persistedProfile = profile;
+    });
+    let committed: boolean | undefined;
+    void service.commitProfileForSession(service.captureActiveProfileSession()!, updatedA).then(value => { committed = value; });
+    flushMicrotasks();
+    patron.getPatronProfile.and.returnValue(of({ success: false }));
+    service.login(accountB.username, 'synthetic-invalid-password').subscribe({ error: () => {} });
+    saved.resolve();
+    flushMicrotasks();
+    expect(committed).toBeFalse();
+    expect(service.snapshot().profile).toEqual(profileA);
+    expect(persistedProfile).toEqual(profileA);
+    expect(storedActive).toBe(accountA.id);
+  }));
+
+  it('persists and publishes a warm profile for the captured current session', fakeAsync(() => {
+    let committed: boolean | undefined;
+    void service.commitProfileForSession(service.captureActiveProfileSession()!, updatedA).then(value => { committed = value; });
+    flushMicrotasks();
+    expect(committed).toBeTrue();
+    expect(accounts.cacheProfile).toHaveBeenCalledOnceWith(accountA.id, updatedA);
+    expect(service.snapshot().profile).toEqual(updatedA);
+  }));
+
 });

@@ -182,6 +182,50 @@ describe('ItemDetailComponent edition details', () => {
     expect(durations[1].textContent).not.toContain('Libby');
   });
 
+  for (const sourceOrder of [['hoopla', 'overdrive'], ['overdrive', 'hoopla']]) {
+    it(`shows shared publication details once when ${sourceOrder[0]} arrives first and the other provider omits edition`, () => {
+      workUpdates.next(work(['eBook']));
+      emitVariations(workId, 'eBook', ['hoopla', 'overdrive']);
+      const shared = { publisher: 'Example Ebooks', publicationDate: '2015' };
+      const editionsBySource: Record<string, AspenEditionRecord[]> = {
+        hoopla: [record('901005', 'eBook', {
+          ...shared, id: 'hoopla:901005', source: 'hoopla', edition: 'Unabridged',
+        })],
+        overdrive: [record('901006', 'eBook', {
+          ...shared, id: 'overdrive:901006', source: 'overdrive',
+        })],
+      };
+
+      for (const source of sourceOrder) {
+        emitRecords(workId, 'eBook', source, editionsBySource[source]);
+        render();
+        expect(formatRow('eBook').textContent?.match(/Example Ebooks · 2015/g)?.length).toBe(1);
+      }
+
+      const row = formatRow('eBook');
+      expect(row.querySelectorAll('.edition-record').length).toBe(1);
+      expect(row.textContent?.match(/Unabridged/g)?.length).toBe(1);
+      expect(row.querySelectorAll('.edition-physical-value').length).toBe(0);
+      expect(row.textContent).not.toContain('Physical description');
+    });
+  }
+
+  it('retains different pagination for records with otherwise identical publication details', () => {
+    workUpdates.next(work(['Book']));
+    emitVariations(workId, 'Book', ['ils']);
+    const shared = { publisher: 'Example Press', publicationDate: '2024' };
+    emitRecords(workId, 'Book', 'ils', [
+      record('901001', 'Book', { ...shared, physical: '388 pages ; 23 cm.' }),
+      record('901002', 'Book', { ...shared, physical: '402 pages ; 25 cm.' }),
+    ]);
+    render();
+
+    const row = formatRow('Book');
+    expect(row.querySelectorAll('.edition-record').length).toBe(2);
+    expect(row.textContent).toContain('388 pages ; 23 cm.');
+    expect(row.textContent).toContain('402 pages ; 25 cm.');
+  });
+
   it('removes cached sources absent from refreshed variations and ignores their later records', () => {
     workUpdates.next(work(['eBook']));
     emitVariations(workId, 'eBook', ['hoopla', 'overdrive']);

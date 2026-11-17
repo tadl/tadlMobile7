@@ -2233,7 +2233,17 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
         }
       }
 
-      if (details.length) detailsByFormat[formatKey] = details;
+      // Some providers supply only publication data already shown with an edition.
+      const visibleDetails = details.filter((detail) =>
+        detail.edition ||
+        detail.physicalValues.length ||
+        !details.some((other) =>
+          other !== detail &&
+          other.published === detail.published &&
+          (other.edition || other.physicalValues.length)
+        )
+      );
+      if (visibleDetails.length) detailsByFormat[formatKey] = visibleDetails;
     }
     this.editionDetailsByFormat = detailsByFormat;
   }

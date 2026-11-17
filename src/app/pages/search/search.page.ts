@@ -16,7 +16,7 @@ import {
 } from '@ionic/angular/lazy';
 import { ActivatedRoute, ParamMap } from '@angular/router';
 import { Router } from '@angular/router';
-import { Subscription, finalize, timeout } from 'rxjs';
+import { EMPTY, Subscription, finalize, switchMap, timeout } from 'rxjs';
 import { Capacitor } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
 
@@ -33,7 +33,7 @@ import { ItemDetailComponent } from '../../components/item-detail/item-detail.co
 import { FormatFamilyService } from '../../services/format-family.service';
 import { ListsService, AspenUserList } from '../../services/lists.service';
 import { HoldsService } from '../../services/holds.service';
-import { AuthService } from '../../services/auth.service';
+import { AuthService, type ActiveProfileSession } from '../../services/auth.service';
 import { ListLookupService } from '../../services/list-lookup.service';
 import { SwitchUserModalComponent } from '../../components/switch-user-modal/switch-user-modal.component';
 import {
@@ -133,6 +133,7 @@ export class SearchPage implements OnInit, OnDestroy {
   infiniteDisabled = true;
   scanningIsbn = false;
   actionBusyByKey: Record<string, boolean> = {};
+  private rowActionSessions = new Map<string, ActiveProfileSession>();
   private queryParamSub: Subscription | null = null;
   private lastAppliedRouteCoreState = '';
   private lastHandledDeepLinkToken = '';
@@ -757,7 +758,9 @@ export class SearchPage implements OnInit, OnDestroy {
 
   rowActionBusy(hit: AspenSearchHit): boolean {
     const key = (hit?.key ?? '').toString().trim();
-    return !!(key && this.actionBusyByKey[key]);
+    const session = this.rowActionSessions.get(key);
+    return !!(key && this.actionBusyByKey[key] &&
+      (!session || this.isCurrentActionSession(session)));
   }
 
   trackFacetGroup(_idx: number, g: SearchFacetGroup) {
@@ -939,7 +942,8 @@ export class SearchPage implements OnInit, OnDestroy {
       return;
     }
 
-    if (!this.auth.snapshot()?.isLoggedIn) {
+    const session = this.auth.captureActiveProfileSession();
+    if (!session) {
       this.toast.presentToast('Log in to add items to lists.');
       return;
     }
@@ -951,17 +955,18 @@ export class SearchPage implements OnInit, OnDestroy {
       lists = this.orderListsForAction(lookup.lists, lookup.lastListUsed);
       lastListUsed = lookup.lastListUsed;
     } catch {
-      this.toast.presentToast('Could not load your lists.');
+      if (this.isCurrentActionSession(session)) this.toast.presentToast('Could not load your lists.');
       return;
     }
+    if (!this.isCurrentActionSession(session)) return;
 
     if (!lists.length) {
-      await this.createListAndAddHit(hit);
+      await this.createListAndAddHit(hit, session);
       return;
     }
 
     if (lists.length === 1) {
-      this.addRecordToNamedList(lists[0], hit);
+      this.addRecordToNamedList(lists[0], hit, session);
       return;
     }
 
@@ -974,13 +979,20 @@ export class SearchPage implements OnInit, OnDestroy {
         ...lists.map(
           (list): ActionSheetButton => ({
             text: this.actionListLabel(list),
-            handler: () => this.addRecordToNamedList(list, hit),
+            handler: () => this.addRecordToNamedList(list, hit, session),
           })
         ),
         { text: 'Close', role: 'cancel' },
       ],
     });
+    if (!this.isCurrentActionSession(session)) { sheet.remove(); return; }
     await sheet.present();
+  }
+
+  private isCurrentActionSession(session: ActiveProfileSession | null): session is ActiveProfileSession {
+    const current = this.auth.captureActiveProfileSession();
+    return !this.destroyed && !!session && current?.accountId === session.accountId &&
+      current.revision === session.revision;
   }
 
   private actionListLabel(list: AspenUserList): string {
@@ -990,7 +1002,12 @@ export class SearchPage implements OnInit, OnDestroy {
     return base;
   }
 
-  private addRecordToNamedList(list: AspenUserList, hit: AspenSearchHit): void {
+  private addRecordToNamedList(
+    list: AspenUserList,
+    hit: AspenSearchHit,
+    session = this.auth.captureActiveProfileSession()
+  ): void {
+    if (!this.isCurrentActionSession(session)) return;
     const listId = (list?.id ?? '').toString().trim();
     const recordId = (hit?.key ?? '').toString().trim();
     if (!listId || !recordId) return;
@@ -1004,12 +1021,13 @@ export class SearchPage implements OnInit, OnDestroy {
       return;
     }
 
-    this.setRowBusy(hit, true);
+    this.setRowBusy(hit, true, session);
     this.listsService
       .addTitlesToList(listId, [recordId])
-      .pipe(finalize(() => this.setRowBusy(hit, false)))
+      .pipe(finalize(() => this.setRowBusy(hit, false, session)))
       .subscribe({
         next: (res) => {
+          if (!this.isCurrentActionSession(session)) return;
           if (!res?.success) {
             this.toast.presentToast(res?.message || 'Could not add to list.');
             return;
@@ -1019,7 +1037,9 @@ export class SearchPage implements OnInit, OnDestroy {
           this.listLookup.upsertMembership(recordId, listId, listTitle);
           this.toast.presentToast(res?.message || 'Added to list.');
         },
-        error: () => this.toast.presentToast('Could not add to list.'),
+        error: () => {
+          if (this.isCurrentActionSession(session)) this.toast.presentToast('Could not add to list.');
+        },
       });
   }
 
@@ -1047,25 +1067,31 @@ export class SearchPage implements OnInit, OnDestroy {
     }
   }
 
-  private async createListAndAddHit(hit: AspenSearchHit): Promise<void> {
+  private async createListAndAddHit(
+    hit: AspenSearchHit,
+    session = this.auth.captureActiveProfileSession()
+  ): Promise<void> {
+    const recordId = (hit?.key ?? '').toString().trim();
+    if (!recordId || !this.isCurrentActionSession(session)) return;
     const basics = await this.promptListBasics('Create List');
-    if (!basics) return;
+    if (!basics || !this.isCurrentActionSession(session)) return;
 
     const isPublic = await this.promptVisibility(false);
-    if (isPublic === null) return;
+    if (isPublic === null || !this.isCurrentActionSession(session)) return;
 
     if (this.rowActionBusy(hit)) return;
-    this.setRowBusy(hit, true);
+    this.setRowBusy(hit, true, session);
+    let createdList: AspenUserList | undefined;
     this.listsService
       .createList(basics.title, basics.description, isPublic)
-      .pipe(finalize(() => this.setRowBusy(hit, false)))
-      .subscribe({
-        next: (res) => {
+      .pipe(
+        switchMap((res) => {
+          if (!this.isCurrentActionSession(session)) return EMPTY;
           if (!res?.success || !res?.listId) {
             this.toast.presentToast(res?.message || 'Could not create list.');
-            return;
+            return EMPTY;
           }
-          const createdList: AspenUserList = {
+          createdList = {
             id: res.listId,
             title: res.listTitle || basics.title,
             description: basics.description,
@@ -1073,9 +1099,27 @@ export class SearchPage implements OnInit, OnDestroy {
             numTitles: 0,
           };
           this.listLookup.replaceLists([createdList]);
-          this.addRecordToNamedList(createdList, hit);
+          return this.listsService.addTitlesToList(createdList.id, [recordId]);
+        }),
+        finalize(() => this.setRowBusy(hit, false, session))
+      )
+      .subscribe({
+        next: (res) => {
+          if (!createdList || !this.isCurrentActionSession(session)) return;
+          if (!res?.success) {
+            this.toast.presentToast('List created, but could not add this title. Please try again.');
+            return;
+          }
+          this.listLookup.upsertMembership(
+            recordId, String(createdList.id), createdList.title || basics.title
+          );
+          this.toast.presentToast(res.message || 'Added to list.');
         },
-        error: () => this.toast.presentToast('Could not create list.'),
+        error: () => {
+          if (this.isCurrentActionSession(session)) this.toast.presentToast(createdList
+            ? 'List created, but could not add this title. Please try again.'
+            : 'Could not create list.');
+        },
       });
   }
 
@@ -1164,6 +1208,8 @@ export class SearchPage implements OnInit, OnDestroy {
   ): Promise<void> {
     const loggedIn = await this.ensureLoggedInForHoldAction();
     if (!loggedIn) return;
+    const session = this.auth.captureActiveProfileSession();
+    if (!this.isCurrentActionSession(session)) return;
     if (!this.canPlaceHoldFromHit(hit)) {
       this.toast.presentToast(
         'No physical holdable format found for this result.'
@@ -1174,6 +1220,7 @@ export class SearchPage implements OnInit, OnDestroy {
 
     const holdTargets =
       precomputedTargets ?? (await this.holdTargetsWithStatusForHit(hit));
+    if (!this.isCurrentActionSession(session)) return;
     const availableTargets = holdTargets.filter((x) => !x.isOnHold);
 
     if (!availableTargets.length) {
@@ -1184,17 +1231,19 @@ export class SearchPage implements OnInit, OnDestroy {
     let selectedTarget = availableTargets[0];
     if (holdTargets.length > 1) {
       const picked = await this.pickHoldTarget(holdTargets);
-      if (!picked) return;
+      if (!picked || !this.isCurrentActionSession(session)) return;
       selectedTarget = picked;
     }
 
     const defaultPickup = await this.holdSupport.defaultPickupBranchCode();
+    if (!this.isCurrentActionSession(session)) return;
     if (defaultPickup) {
       this.placeHoldNow(
         hit,
         selectedTarget.recordId,
         defaultPickup,
-        selectedTarget.formatLabel || selectedTarget.label
+        selectedTarget.formatLabel || selectedTarget.label,
+        session
       );
       return;
     }
@@ -1207,7 +1256,8 @@ export class SearchPage implements OnInit, OnDestroy {
             hit,
             selectedTarget.recordId,
             loc.code,
-            selectedTarget.formatLabel || selectedTarget.label
+            selectedTarget.formatLabel || selectedTarget.label,
+            session
           ),
       })
     );
@@ -1217,6 +1267,7 @@ export class SearchPage implements OnInit, OnDestroy {
       header: 'Pick up where?',
       buttons,
     });
+    if (!this.isCurrentActionSession(session)) { sheet.remove(); return; }
     await sheet.present();
   }
 
@@ -1246,17 +1297,18 @@ export class SearchPage implements OnInit, OnDestroy {
     hit: AspenSearchHit,
     recordId: string,
     pickupBranch: string,
-    selectedFormatLabel?: string
+    selectedFormatLabel?: string,
+    session = this.auth.captureActiveProfileSession()
   ): void {
-    const accountId = this.auth.snapshot().activeAccountId;
+    if (!this.isCurrentActionSession(session)) return;
     if (this.rowActionBusy(hit)) return;
-    this.setRowBusy(hit, true);
+    this.setRowBusy(hit, true, session);
     this.holds
       .placeHold(recordId, pickupBranch, null)
-      .pipe(finalize(() => this.setRowBusy(hit, false)))
+      .pipe(finalize(() => this.setRowBusy(hit, false, session)))
       .subscribe({
         next: (res) => {
-          if (this.auth.snapshot().activeAccountId !== accountId) return;
+          if (!this.isCurrentActionSession(session)) return;
           if (!res?.success) {
             this.toast.presentToast(res?.message || 'Could not place hold.');
             return;
@@ -1292,7 +1344,7 @@ export class SearchPage implements OnInit, OnDestroy {
           );
         },
         error: () => {
-          if (this.auth.snapshot().activeAccountId !== accountId) return;
+          if (!this.isCurrentActionSession(session)) return;
           this.toast.presentToast('Could not place hold.');
         },
       });
@@ -1390,9 +1442,15 @@ export class SearchPage implements OnInit, OnDestroy {
     });
   }
 
-  private setRowBusy(hit: AspenSearchHit, busy: boolean) {
+  private setRowBusy(hit: AspenSearchHit, busy: boolean, session: ActiveProfileSession) {
     const key = (hit?.key ?? '').toString().trim();
     if (!key) return;
+    if (busy) {
+      this.rowActionSessions.set(key, session);
+    } else {
+      if (this.rowActionSessions.get(key) !== session) return;
+      this.rowActionSessions.delete(key);
+    }
     this.actionBusyByKey = {
       ...this.actionBusyByKey,
       [key]: busy,

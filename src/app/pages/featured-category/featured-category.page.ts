@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 
 import { ActivatedRoute, Router } from '@angular/router';
 import {
@@ -34,6 +34,7 @@ import {
   selector: 'app-featured-category',
   templateUrl: './featured-category.page.html',
   styleUrls: ['./featured-category.page.scss'],
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [IonicModule],
 })
 export class FeaturedCategoryPage {

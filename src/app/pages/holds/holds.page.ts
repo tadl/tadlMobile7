@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   IonicModule,
@@ -22,6 +22,7 @@ import { FormatFamilyService } from '../../services/format-family.service';
   selector: 'app-holds',
   templateUrl: './holds.page.html',
   styleUrls: ['./holds.page.scss'],
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [CommonModule, IonicModule],
 })
 export class HoldsPage {
@@ -108,7 +109,8 @@ export class HoldsPage {
       )
       .subscribe({
         next: async (allHolds) => {
-          if (this.auth.snapshot().activeAccountId !== snap.activeAccountId) return;
+          if (this.auth.snapshot().activeAccountId !== snap.activeAccountId)
+            return;
           const ilsOnly = (allHolds ?? []).filter(
             (h) => h?.type === 'ils' || h?.source === 'ils'
           );
@@ -122,7 +124,8 @@ export class HoldsPage {
           }
         },
         error: () => {
-          if (this.auth.snapshot().activeAccountId !== snap.activeAccountId) return;
+          if (this.auth.snapshot().activeAccountId !== snap.activeAccountId)
+            return;
           if (!opts?.suppressErrorToast) {
             this.toast.presentToast('Could not refresh holds.');
           }

@@ -1,4 +1,9 @@
-import { Component, OnInit, inject } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  inject,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   IonicModule,
@@ -27,6 +32,7 @@ import { ListLookupService } from '../../services/list-lookup.service';
   selector: 'app-account-page',
   templateUrl: './account.page.html',
   styleUrls: ['./account.page.scss'],
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [CommonModule, IonicModule, FormsModule],
 })
 export class AccountPage implements OnInit {

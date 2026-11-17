@@ -1,4 +1,9 @@
-import { Component, Input, inject } from '@angular/core';
+import {
+  Component,
+  Input,
+  inject,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 
 import {
   IonicModule,
@@ -45,6 +50,7 @@ type UpcomingScheduleRow = {
   selector: 'app-location-detail',
   templateUrl: './location-detail.component.html',
   styleUrls: ['./location-detail.component.scss'],
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [IonicModule],
 })
 export class LocationDetailComponent {

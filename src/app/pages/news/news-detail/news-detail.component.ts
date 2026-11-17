@@ -1,4 +1,9 @@
-import { Component, Input, inject } from '@angular/core';
+import {
+  Component,
+  Input,
+  inject,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 
 import { SecurityContext } from '@angular/core';
 import { IonicModule, ModalController } from '@ionic/angular/lazy';
@@ -12,6 +17,7 @@ import { DiscoveryLinkRouterService } from '../../../services/discovery-link-rou
   selector: 'app-news-detail',
   templateUrl: './news-detail.component.html',
   styleUrls: ['./news-detail.component.scss'],
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [IonicModule],
 })
 export class NewsDetailComponent {

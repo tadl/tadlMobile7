@@ -1,4 +1,9 @@
-import { Component, OnInit, inject } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  inject,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonicModule, ModalController } from '@ionic/angular/lazy';
@@ -17,6 +22,7 @@ import { PasswordResetModalComponent } from '../password-reset-modal/password-re
   selector: 'app-switch-user-modal',
   templateUrl: './switch-user-modal.component.html',
   styleUrls: ['./switch-user-modal.component.scss'],
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [CommonModule, IonicModule, FormsModule],
 })
 export class SwitchUserModalComponent implements OnInit {

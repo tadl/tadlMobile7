@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 
 import { ActivatedRoute, Router } from '@angular/router';
 import { IonicModule, ModalController } from '@ionic/angular/lazy';
@@ -13,6 +13,7 @@ import type { AspenSearchHit } from '../../services/search.service';
   selector: 'app-item-page',
   templateUrl: './item.page.html',
   styleUrls: ['./item.page.scss'],
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [IonicModule],
 })
 export class ItemPage {

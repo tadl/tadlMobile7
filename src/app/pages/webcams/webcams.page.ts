@@ -1,4 +1,9 @@
-import { Component, OnInit, inject } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  inject,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 
 import { IonicModule } from '@ionic/angular/lazy';
 import { finalize } from 'rxjs';
@@ -17,6 +22,7 @@ interface WebcamStreamViewModel {
   selector: 'app-webcams',
   templateUrl: './webcams.page.html',
   styleUrls: ['./webcams.page.scss'],
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [IonicModule],
 })
 export class WebcamsPage implements OnInit {

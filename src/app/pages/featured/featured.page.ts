@@ -1,4 +1,9 @@
-import { Component, ViewChild, inject } from '@angular/core';
+import {
+  Component,
+  ViewChild,
+  inject,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 
 import { IonicModule, IonContent } from '@ionic/angular/lazy';
 import { Router } from '@angular/router';
@@ -23,6 +28,7 @@ interface FeaturedTile {
   selector: 'app-featured',
   templateUrl: './featured.page.html',
   styleUrls: ['./featured.page.scss'],
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [IonicModule],
 })
 export class FeaturedPage {

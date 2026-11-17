@@ -1,4 +1,10 @@
-import { Component, OnDestroy, OnInit, inject } from '@angular/core';
+import {
+  Component,
+  OnDestroy,
+  OnInit,
+  inject,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 
 import {
   IonicModule,
@@ -24,6 +30,7 @@ interface ListViewContext {
   selector: 'app-my-lists',
   templateUrl: './my-lists.page.html',
   styleUrls: ['./my-lists.page.scss'],
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [IonicModule],
 })
 export class MyListsPage implements OnInit, OnDestroy {
@@ -46,7 +53,7 @@ export class MyListsPage implements OnInit, OnDestroy {
 
   ngOnInit() {
     let accountId = this.auth.snapshot().activeAccountId;
-    this.authSubscription = this.auth.authState().subscribe(state => {
+    this.authSubscription = this.auth.authState().subscribe((state) => {
       const nextAccountId = state.isLoggedIn ? state.activeAccountId : null;
       if (accountId === nextAccountId) return;
       accountId = nextAccountId;
@@ -84,8 +91,12 @@ export class MyListsPage implements OnInit, OnDestroy {
 
   private isCurrentView(context: ListViewContext | null): boolean {
     const snapshot = this.auth.snapshot();
-    return !!context && snapshot.isLoggedIn && snapshot.activeAccountId === context.accountId &&
-      this.viewRevision === context.revision;
+    return (
+      !!context &&
+      snapshot.isLoggedIn &&
+      snapshot.activeAccountId === context.accountId &&
+      this.viewRevision === context.revision
+    );
   }
 
   refresh(ev?: any) {
@@ -186,7 +197,10 @@ export class MyListsPage implements OnInit, OnDestroy {
           this.toast.presentToast(res?.message || 'List created.');
           this.refresh();
         },
-        error: () => { if (this.isCurrentView(context)) this.toast.presentToast('Could not create list.'); },
+        error: () => {
+          if (this.isCurrentView(context))
+            this.toast.presentToast('Could not create list.');
+        },
       });
   }
 
@@ -200,16 +214,22 @@ export class MyListsPage implements OnInit, OnDestroy {
       buttons: [
         {
           text: 'Open List',
-          handler: () => { if (this.isCurrentView(context)) this.openList(list); },
+          handler: () => {
+            if (this.isCurrentView(context)) this.openList(list);
+          },
         },
         {
           text: 'Edit List',
-          handler: () => { if (this.isCurrentView(context)) void this.editList(list); },
+          handler: () => {
+            if (this.isCurrentView(context)) void this.editList(list);
+          },
         },
         {
           text: 'Delete List',
           role: 'destructive',
-          handler: () => { if (this.isCurrentView(context)) void this.confirmDeleteList(list); },
+          handler: () => {
+            if (this.isCurrentView(context)) void this.confirmDeleteList(list);
+          },
         },
         {
           text: 'Close',
@@ -218,7 +238,10 @@ export class MyListsPage implements OnInit, OnDestroy {
       ],
     });
 
-    if (!this.isCurrentView(context)) { sheet.remove(); return; }
+    if (!this.isCurrentView(context)) {
+      sheet.remove();
+      return;
+    }
     await sheet.present();
   }
 
@@ -266,7 +289,10 @@ export class MyListsPage implements OnInit, OnDestroy {
           this.toast.presentToast(res?.message || 'List updated.');
           this.refresh();
         },
-        error: () => { if (this.isCurrentView(context)) this.toast.presentToast('Could not update list.'); },
+        error: () => {
+          if (this.isCurrentView(context))
+            this.toast.presentToast('Could not update list.');
+        },
       });
   }
 
@@ -296,7 +322,10 @@ export class MyListsPage implements OnInit, OnDestroy {
       ],
     });
 
-    if (!this.isCurrentView(context)) { alert.remove(); return; }
+    if (!this.isCurrentView(context)) {
+      alert.remove();
+      return;
+    }
     await alert.present();
   }
 
@@ -330,7 +359,10 @@ export class MyListsPage implements OnInit, OnDestroy {
           this.listLookup.removeList(listId);
           this.toast.presentToast(res?.message || 'List deleted.');
         },
-        error: () => { if (this.isCurrentView(context)) this.toast.presentToast('Could not delete list.'); },
+        error: () => {
+          if (this.isCurrentView(context))
+            this.toast.presentToast('Could not delete list.');
+        },
       });
   }
 
@@ -362,7 +394,10 @@ export class MyListsPage implements OnInit, OnDestroy {
           {
             text: 'Continue',
             handler: (data) => {
-              if (!this.isCurrentView(context)) { resolve(null); return true; }
+              if (!this.isCurrentView(context)) {
+                resolve(null);
+                return true;
+              }
               const title = (data?.title ?? '').toString().trim();
               const description = (data?.description ?? '').toString().trim();
 
@@ -378,7 +413,11 @@ export class MyListsPage implements OnInit, OnDestroy {
         ],
       });
 
-      if (!this.isCurrentView(context)) { alert.remove(); resolve(null); return; }
+      if (!this.isCurrentView(context)) {
+        alert.remove();
+        resolve(null);
+        return;
+      }
       void alert.onDidDismiss().then(() => resolve(null));
       await alert.present();
     });
@@ -411,7 +450,10 @@ export class MyListsPage implements OnInit, OnDestroy {
           {
             text: 'Save',
             handler: (value) => {
-              if (!this.isCurrentView(context)) { resolve(null); return true; }
+              if (!this.isCurrentView(context)) {
+                resolve(null);
+                return true;
+              }
               resolve((value ?? 'private').toString() === 'public');
               return true;
             },
@@ -419,7 +461,11 @@ export class MyListsPage implements OnInit, OnDestroy {
         ],
       });
 
-      if (!this.isCurrentView(context)) { alert.remove(); resolve(null); return; }
+      if (!this.isCurrentView(context)) {
+        alert.remove();
+        resolve(null);
+        return;
+      }
       void alert.onDidDismiss().then(() => resolve(null));
       await alert.present();
     });

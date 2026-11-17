@@ -5,6 +5,7 @@ import {
   OnChanges,
   SimpleChanges,
   inject,
+  ChangeDetectionStrategy,
 } from '@angular/core';
 
 import { IonicModule, ModalController } from '@ionic/angular/lazy';
@@ -19,6 +20,7 @@ import JsBarcode from 'jsbarcode';
   selector: 'app-show-card-modal',
   templateUrl: './show-card-modal.component.html',
   styleUrls: ['./show-card-modal.component.scss'],
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [IonicModule],
 })
 export class ShowCardModalComponent implements AfterViewInit, OnChanges {

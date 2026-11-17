@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 
 import {
   IonicModule,
@@ -36,6 +36,7 @@ import { FormatFamilyService } from '../../services/format-family.service';
   selector: 'app-checkouts',
   templateUrl: './checkouts.page.html',
   styleUrls: ['./checkouts.page.scss'],
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [IonicModule],
 })
 export class CheckoutsPage {
@@ -100,12 +101,14 @@ export class CheckoutsPage {
       )
       .subscribe({
         next: (list) => {
-          if (this.auth.snapshot().activeAccountId !== snap.activeAccountId) return;
+          if (this.auth.snapshot().activeAccountId !== snap.activeAccountId)
+            return;
           this.ilsCheckouts = this.sortCheckouts((list ?? []).slice());
           this.syncProfileCheckoutCount(this.ilsCheckouts.length);
         },
         error: () => {
-          if (this.auth.snapshot().activeAccountId !== snap.activeAccountId) return;
+          if (this.auth.snapshot().activeAccountId !== snap.activeAccountId)
+            return;
           this.toast.presentToast('Could not refresh checkouts.');
         },
       });
@@ -354,8 +357,11 @@ export class CheckoutsPage {
       .pipe(
         concatMap((checkout, idx) =>
           timer(idx === 0 ? 0 : CheckoutsPage.BULK_ACTION_DELAY_MS).pipe(
-            switchMap(() => this.auth.snapshot().activeAccountId === accountId
-              ? this.checkouts.renewCheckout(checkout) : of(null)),
+            switchMap(() =>
+              this.auth.snapshot().activeAccountId === accountId
+                ? this.checkouts.renewCheckout(checkout)
+                : of(null)
+            ),
             map((res) => ({
               checkout,
               success: !!res?.success,

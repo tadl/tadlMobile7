@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 
 import { IonicModule } from '@ionic/angular/lazy';
 import { Globals } from '../../globals';
@@ -27,6 +27,7 @@ type LocationStatusDisplay = {
   selector: 'app-locations',
   templateUrl: './locations.page.html',
   styleUrls: ['./locations.page.scss'],
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [IonicModule],
 })
 export class LocationsPage {

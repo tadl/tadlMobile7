@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 
 import { IonicModule } from '@ionic/angular/lazy';
 import { finalize, Subscription } from 'rxjs';
@@ -13,6 +13,7 @@ import { AspenFine, FinesService } from '../../services/fines.service';
   selector: 'app-fines',
   templateUrl: './fines.page.html',
   styleUrls: ['./fines.page.scss'],
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [IonicModule],
 })
 export class FinesPage {

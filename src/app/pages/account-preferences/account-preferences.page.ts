@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import type { PopoverOptions } from '@ionic/core';
 
 import { FormsModule } from '@angular/forms';
@@ -7,7 +7,15 @@ import {
   ActionSheetController,
   AlertController,
 } from '@ionic/angular/lazy';
-import { exhaustMap, finalize, switchMap, takeUntil, takeWhile, timer, of } from 'rxjs';
+import {
+  exhaustMap,
+  finalize,
+  switchMap,
+  takeUntil,
+  takeWhile,
+  timer,
+  of,
+} from 'rxjs';
 import { HistorySettingsService } from '../../services/history-settings.service';
 
 import { Globals } from '../../globals';
@@ -30,6 +38,7 @@ interface SelectOption {
   selector: 'app-account-preferences',
   templateUrl: './account-preferences.page.html',
   styleUrls: ['./account-preferences.page.scss'],
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [FormsModule, IonicModule],
 })
 export class AccountPreferencesPage {
@@ -64,7 +73,10 @@ export class AccountPreferencesPage {
   get pickupOptions(): SelectOption[] {
     const selected = this.preferences?.pickup_library;
     return this.globals.locationRegistry
-      .filter((location) => location.pickupEnabled || String(location.evergreenId) === selected)
+      .filter(
+        (location) =>
+          location.pickupEnabled || String(location.evergreenId) === selected
+      )
       .map((location) => ({
         code: String(location.evergreenId),
         name: location.name,
@@ -101,7 +113,12 @@ export class AccountPreferencesPage {
   onPickupLibraryChanged(ev: CustomEvent) {
     const next = (ev?.detail as any)?.value?.toString?.() ?? '';
     if (!this.preferences || !next || this.saving) return;
-    if (!this.pickupOptions.some((option) => option.code === next && !option.disabled)) return;
+    if (
+      !this.pickupOptions.some(
+        (option) => option.code === next && !option.disabled
+      )
+    )
+      return;
 
     this.submitUpdate(
       {
@@ -161,34 +178,50 @@ export class AccountPreferencesPage {
     this.saving = true;
     this.historyRetryEnabled = null;
     this.historyUpdateMessage = 'Updating checkout history…';
-    this.historySettings.update(accountId, username, password, enabled).pipe(
-      switchMap(result => result.success && !result.complete
-        ? timer(0, 5000).pipe(
-            exhaustMap(() => this.historySettings.status(accountId, username, password)),
-            takeWhile(status => status.success && !status.complete, true),
-            takeUntil(timer(600000)),
-          )
-        : of(result)),
-      finalize(() => { this.saving = false; }),
-    ).subscribe({
-      next: result => {
-        if (this.auth.snapshot().activeAccountId !== accountId) return;
-        this.historyUpdateMessage = result.message;
-        const confirmed = result.success && result.complete &&
-          result.historyStatus === (enabled ? 'ready' : 'disabled');
-        this.historyRetryEnabled = confirmed ? null : enabled;
-        if (confirmed && this.preferences) {
-          this.preferences.keep_circ_history = enabled;
-          void this.prefsService.persistPreferencesForAccount(accountId, this.preferences);
-        }
-        if (result.complete || !result.success) void this.refreshPreferencesFromServer();
-      },
-      error: () => {
-        if (this.auth.snapshot().activeAccountId !== accountId) return;
-        this.historyUpdateMessage = 'Could not confirm the change in both systems. Please retry.';
-        this.historyRetryEnabled = enabled;
-      },
-    });
+    this.historySettings
+      .update(accountId, username, password, enabled)
+      .pipe(
+        switchMap((result) =>
+          result.success && !result.complete
+            ? timer(0, 5000).pipe(
+                exhaustMap(() =>
+                  this.historySettings.status(accountId, username, password)
+                ),
+                takeWhile((status) => status.success && !status.complete, true),
+                takeUntil(timer(600000))
+              )
+            : of(result)
+        ),
+        finalize(() => {
+          this.saving = false;
+        })
+      )
+      .subscribe({
+        next: (result) => {
+          if (this.auth.snapshot().activeAccountId !== accountId) return;
+          this.historyUpdateMessage = result.message;
+          const confirmed =
+            result.success &&
+            result.complete &&
+            result.historyStatus === (enabled ? 'ready' : 'disabled');
+          this.historyRetryEnabled = confirmed ? null : enabled;
+          if (confirmed && this.preferences) {
+            this.preferences.keep_circ_history = enabled;
+            void this.prefsService.persistPreferencesForAccount(
+              accountId,
+              this.preferences
+            );
+          }
+          if (result.complete || !result.success)
+            void this.refreshPreferencesFromServer();
+        },
+        error: () => {
+          if (this.auth.snapshot().activeAccountId !== accountId) return;
+          this.historyUpdateMessage =
+            'Could not confirm the change in both systems. Please retry.';
+          this.historyRetryEnabled = enabled;
+        },
+      });
   }
 
   async updateUsername() {

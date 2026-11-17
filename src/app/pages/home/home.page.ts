@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { IonicModule, ModalController } from '@ionic/angular/lazy';
 import { RouterModule } from '@angular/router';
@@ -29,6 +29,7 @@ type HomeClosureNotice = {
   selector: 'app-home',
   templateUrl: './home.page.html',
   styleUrls: ['./home.page.scss'],
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [CommonModule, IonicModule, RouterModule, FormsModule],
 })
 export class HomePage {

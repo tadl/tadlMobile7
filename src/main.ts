@@ -1,4 +1,9 @@
-import { importProvidersFrom, provideZoneChangeDetection, provideAppInitializer, inject } from '@angular/core';
+import {
+  importProvidersFrom,
+  provideZoneChangeDetection,
+  provideAppInitializer,
+  inject,
+} from '@angular/core';
 import { bootstrapApplication } from '@angular/platform-browser';
 import {
   PreloadAllModules,
@@ -9,6 +14,7 @@ import {
 import {
   provideHttpClient,
   withInterceptorsFromDi,
+  withXhr,
 } from '@angular/common/http';
 import { HTTP_INTERCEPTORS } from '@angular/common/http';
 
@@ -146,6 +152,6 @@ bootstrapApplication(AppComponent, {
     { provide: HTTP_INTERCEPTORS, useClass: LoadingInterceptor, multi: true },
 
     provideRouter(routes, withPreloading(PreloadAllModules)),
-    provideHttpClient(withInterceptorsFromDi()),
+    provideHttpClient(withXhr(), withInterceptorsFromDi()),
   ],
 }).catch((err) => console.error(err));

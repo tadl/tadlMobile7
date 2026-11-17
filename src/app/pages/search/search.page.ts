@@ -1,4 +1,10 @@
-import { Component, OnDestroy, OnInit, inject } from '@angular/core';
+import {
+  Component,
+  OnDestroy,
+  OnInit,
+  inject,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
 import {
@@ -69,6 +75,7 @@ interface SearchCriteria {
   selector: 'app-search',
   templateUrl: './search.page.html',
   styleUrls: ['./search.page.scss'],
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [FormsModule, IonicModule],
 })
 export class SearchPage implements OnInit, OnDestroy {
@@ -386,7 +393,9 @@ export class SearchPage implements OnInit, OnDestroy {
 
   refreshSearch(event: Event) {
     const target = event.target as HTMLIonRefresherElement | null;
-    this.runSearch(true, () => { void target?.complete(); });
+    this.runSearch(true, () => {
+      void target?.complete();
+    });
   }
 
   onSearchOptionsChanged() {
@@ -395,7 +404,9 @@ export class SearchPage implements OnInit, OnDestroy {
 
   loadMore(event: Event) {
     const target = event.target as HTMLIonInfiniteScrollElement | null;
-    const complete = () => { void target?.complete(); };
+    const complete = () => {
+      void target?.complete();
+    };
     if (this.searchLoading || this.infiniteDisabled || !this.activeCriteria) {
       complete();
       return;
@@ -411,18 +422,31 @@ export class SearchPage implements OnInit, OnDestroy {
   }
 
   retrySearch() {
-    if (this.searchLoading || !this.activeCriteria || this.failedPage === null) return;
-    if (this.criteriaKey(this.activeCriteria) !== this.criteriaKey(this.currentSearchCriteria())) {
+    if (this.searchLoading || !this.activeCriteria || this.failedPage === null)
+      return;
+    if (
+      this.criteriaKey(this.activeCriteria) !==
+      this.criteriaKey(this.currentSearchCriteria())
+    ) {
       this.runSearch(true);
       return;
     }
-    this.requestSearch(this.activeCriteria, this.failedPage, this.failedPage > 1);
+    this.requestSearch(
+      this.activeCriteria,
+      this.failedPage,
+      this.failedPage > 1
+    );
   }
 
   get showNoResults(): boolean {
-    return !this.searchLoading && !this.searchError && this.hits.length === 0 &&
+    return (
+      !this.searchLoading &&
+      !this.searchError &&
+      this.hits.length === 0 &&
       !!this.successfulCriteriaKey &&
-      this.criteriaKey(this.currentSearchCriteria()) === this.successfulCriteriaKey;
+      this.criteriaKey(this.currentSearchCriteria()) ===
+        this.successfulCriteriaKey
+    );
   }
 
   get loadMoreFailed(): boolean {
@@ -450,7 +474,12 @@ export class SearchPage implements OnInit, OnDestroy {
     this.loadingMore = false;
   }
 
-  private requestSearch(criteria: SearchCriteria, page: number, append: boolean, complete?: () => void) {
+  private requestSearch(
+    criteria: SearchCriteria,
+    page: number,
+    append: boolean,
+    complete?: () => void
+  ) {
     if (this.destroyed) {
       complete?.();
       return;
@@ -465,39 +494,42 @@ export class SearchPage implements OnInit, OnDestroy {
     this.searchError = null;
     this.failedPage = null;
     this.infiniteDisabled = true;
-    subscription.add(this.searchService
-      .getAppSearchResults({
-        ...criteria,
-        page,
-        pageSize: this.pageSize,
-        source: 'local',
-        includeSortList: true,
-      })
-      .pipe(
-        timeout(45_000),
-        finalize(() => {
-          complete?.();
-          if (this.destroyed || requestId !== this.searchRequestId) return;
-          this.searchLoading = false;
-          this.loadingMore = false;
-          this.searchSub = undefined;
-          this.infiniteDisabled = !!this.searchError || this.page >= this.totalPages;
+    subscription.add(
+      this.searchService
+        .getAppSearchResults({
+          ...criteria,
+          page,
+          pageSize: this.pageSize,
+          source: 'local',
+          includeSortList: true,
         })
-      )
-      .subscribe({
-        next: (res) => {
-          if (this.destroyed || requestId !== this.searchRequestId) return;
-          if (!res.success) {
+        .pipe(
+          timeout(45_000),
+          finalize(() => {
+            complete?.();
+            if (this.destroyed || requestId !== this.searchRequestId) return;
+            this.searchLoading = false;
+            this.loadingMore = false;
+            this.searchSub = undefined;
+            this.infiniteDisabled =
+              !!this.searchError || this.page >= this.totalPages;
+          })
+        )
+        .subscribe({
+          next: (res) => {
+            if (this.destroyed || requestId !== this.searchRequestId) return;
+            if (!res.success) {
+              this.searchFailed(page, append);
+              return;
+            }
+            this.applySearchResult(res, criteria, page, append);
+          },
+          error: () => {
+            if (this.destroyed || requestId !== this.searchRequestId) return;
             this.searchFailed(page, append);
-            return;
-          }
-          this.applySearchResult(res, criteria, page, append);
-        },
-        error: () => {
-          if (this.destroyed || requestId !== this.searchRequestId) return;
-          this.searchFailed(page, append);
-        },
-      }));
+          },
+        })
+    );
   }
 
   private searchFailed(page: number, append: boolean) {
@@ -505,11 +537,16 @@ export class SearchPage implements OnInit, OnDestroy {
     this.searchError = append
       ? 'Could not load more results. Your previous results are still shown.'
       : this.hits.length
-        ? 'Could not refresh results. Your previous results are still shown.'
-        : 'Could not load search results. Please try again.';
+      ? 'Could not refresh results. Your previous results are still shown.'
+      : 'Could not load search results. Please try again.';
   }
 
-  private applySearchResult(result: AspenSearchResult, criteria: SearchCriteria, page: number, append: boolean) {
+  private applySearchResult(
+    result: AspenSearchResult,
+    criteria: SearchCriteria,
+    page: number,
+    append: boolean
+  ) {
     const allGroups = this.buildFacetGroups(result.facets);
     this.applySortOptionsFromGroups(allGroups);
     if (this.facetsEnabled) {
@@ -522,10 +559,15 @@ export class SearchPage implements OnInit, OnDestroy {
       this.collapsedFacetGroups = {};
       this.facetDisplayByFilter.clear();
     }
-    this.hits = append ? [...this.hits, ...(result.hits ?? [])] : result.hits ?? [];
+    this.hits = append
+      ? [...this.hits, ...(result.hits ?? [])]
+      : result.hits ?? [];
     this.page = page;
     this.totalPages = result.totalPages ?? 1;
-    this.activeCriteria = { ...criteria, sort: this.normalizedSortValue(this.sort) };
+    this.activeCriteria = {
+      ...criteria,
+      sort: this.normalizedSortValue(this.sort),
+    };
     this.successfulCriteriaKey = this.criteriaKey(this.activeCriteria);
     this.searchError = null;
     this.failedPage = null;

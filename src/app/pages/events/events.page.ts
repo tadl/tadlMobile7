@@ -1,5 +1,11 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit, inject } from '@angular/core';
+import {
+  Component,
+  OnDestroy,
+  OnInit,
+  inject,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { IonicModule } from '@ionic/angular/lazy';
 import { ModalController } from '@ionic/angular/lazy';
 import { Subject, takeUntil } from 'rxjs';
@@ -21,6 +27,7 @@ type VenueCode = 'all' | string; // what ion-select uses (string codes)
   selector: 'app-events',
   templateUrl: './events.page.html',
   styleUrls: ['./events.page.scss'],
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [CommonModule, IonicModule],
 })
 export class EventsPage implements OnInit, OnDestroy {

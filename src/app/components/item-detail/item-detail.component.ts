@@ -1,4 +1,11 @@
-import { Component, Input, OnDestroy, OnInit, inject } from '@angular/core';
+import {
+  Component,
+  Input,
+  OnDestroy,
+  OnInit,
+  inject,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { CommonModule, KeyValue } from '@angular/common';
 import {
   IonicModule,
@@ -84,6 +91,7 @@ interface EditionDetail {
   selector: 'app-item-detail',
   templateUrl: './item-detail.component.html',
   styleUrls: ['./item-detail.component.scss'],
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [CommonModule, IonicModule],
 })
 export class ItemDetailComponent implements OnInit, OnDestroy {
@@ -124,7 +132,10 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   private providerStatusesByFormat: Record<string, FormatProviderStatus[]> = {};
   private providerActionsByFormat: Record<string, FormatProviderAction[]> = {};
   private loadedWorkId: string | null = null;
-  private holdingsRequestsByFormat: Record<string, { id: string; subscription?: Subscription }> = {};
+  private holdingsRequestsByFormat: Record<
+    string,
+    { id: string; subscription?: Subscription }
+  > = {};
   private holdingsRefreshFailures = new Set<string>();
   private requestedVariations = new Set<string>();
   private requestedRecords = new Set<string>();
@@ -133,7 +144,10 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     Record<string, AspenEditionRecord[]>
   > = {};
   private editionSourcesByFormat: Record<string, Set<string>> = {};
-  private editionProviderLabelsByFormat: Record<string, Record<string, string>> = {};
+  private editionProviderLabelsByFormat: Record<
+    string,
+    Record<string, string>
+  > = {};
   private recordSubscriptions = new Map<string, Subscription>();
   private metadataSubscriptions = new Subscription();
   private workSub?: Subscription;
@@ -850,25 +864,29 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
       .renewCheckout(checkout)
       .pipe(
         switchMap((res) => {
-          if (this.auth.snapshot().activeAccountId !== accountId) return of(null);
+          if (this.auth.snapshot().activeAccountId !== accountId)
+            return of(null);
           if (!res?.success) return of(res);
 
           this.needsCheckoutsRefresh = true;
           // renewItem returns a message, not the updated due date or renewal count.
           return this.checkouts.fetchFreshActiveCheckouts(true).pipe(
             map((list) => {
-              if (this.auth.snapshot().activeAccountId !== accountId) return null;
-              this.checkout = list.find((candidate) =>
-                checkout.itemId != null
-                  ? candidate.itemId === checkout.itemId
-                  : checkout.barcode
-                  ? candidate.barcode === checkout.barcode
-                  : candidate.id === checkout.id
-              ) ?? null;
+              if (this.auth.snapshot().activeAccountId !== accountId)
+                return null;
+              this.checkout =
+                list.find((candidate) =>
+                  checkout.itemId != null
+                    ? candidate.itemId === checkout.itemId
+                    : checkout.barcode
+                    ? candidate.barcode === checkout.barcode
+                    : candidate.id === checkout.id
+                ) ?? null;
               return res;
             }),
             catchError(() => {
-              if (this.auth.snapshot().activeAccountId !== accountId) return of(null);
+              if (this.auth.snapshot().activeAccountId !== accountId)
+                return of(null);
               this.toast.presentToast(
                 'Renewed, but could not refresh the due date. Close details and pull to refresh.'
               );
@@ -1464,7 +1482,10 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
 
   formatHoldingsRefreshNote(formatLabel: string): string {
     if (!this.holdingsRefreshFailures.has(formatLabel)) return '';
-    return Object.prototype.hasOwnProperty.call(this.holdingsCountByFormat, formatLabel)
+    return Object.prototype.hasOwnProperty.call(
+      this.holdingsCountByFormat,
+      formatLabel
+    )
       ? 'Could not refresh copy details. Showing saved details.'
       : 'Copy details are unavailable.';
   }
@@ -1856,7 +1877,8 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
     if (!loggedIn) return;
 
     const accountId = this.auth.snapshot().activeAccountId;
-    const defaultPickupBranch = await this.holdSupport.defaultPickupBranchCode();
+    const defaultPickupBranch =
+      await this.holdSupport.defaultPickupBranchCode();
     if (this.auth.snapshot().activeAccountId !== accountId) return;
     if (defaultPickupBranch) {
       this.placeHoldNow(recordId, defaultPickupBranch);
@@ -1968,7 +1990,9 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
       delete this.holdingsDetailsByFormat[formatKey];
       this.holdingsRefreshFailures.delete(formatKey);
 
-      const request: { id: string; subscription?: Subscription } = { id: ilsId };
+      const request: { id: string; subscription?: Subscription } = {
+        id: ilsId,
+      };
       this.holdingsRequestsByFormat[formatKey] = request;
       const isCurrent = () =>
         !this.destroyed &&
@@ -1976,40 +2000,51 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
         !!this.work?.formats?.[formatKey] &&
         this.holdingsRequestsByFormat[formatKey] === request;
 
-      request.subscription = this.items.getIlsItemAvailability(ilsId).subscribe({
-        next: (result) => {
-          if (!isCurrent() || result.id !== ilsId) return;
-          let total = 0;
-          const details: FormatShelfDetail[] = [];
-          for (const copies of Object.values(result.holdings)) {
-            total += copies.length;
-            for (const copy of copies) {
-              const location = (copy.libraryDisplayName ?? copy.location ?? '').trim();
-              const callNumber = (copy.callnumber ?? '').trim();
-              const status = (copy.statusFull ?? copy.statusfull ?? copy.status ?? '').trim();
-              if (!location && !callNumber && !status) continue;
-              details.push({
-                location,
-                callNumber,
-                status,
-                availability: copy.availability ?? null,
-              });
+      request.subscription = this.items
+        .getIlsItemAvailability(ilsId)
+        .subscribe({
+          next: (result) => {
+            if (!isCurrent() || result.id !== ilsId) return;
+            let total = 0;
+            const details: FormatShelfDetail[] = [];
+            for (const copies of Object.values(result.holdings)) {
+              total += copies.length;
+              for (const copy of copies) {
+                const location = (
+                  copy.libraryDisplayName ??
+                  copy.location ??
+                  ''
+                ).trim();
+                const callNumber = (copy.callnumber ?? '').trim();
+                const status = (
+                  copy.statusFull ??
+                  copy.statusfull ??
+                  copy.status ??
+                  ''
+                ).trim();
+                if (!location && !callNumber && !status) continue;
+                details.push({
+                  location,
+                  callNumber,
+                  status,
+                  availability: copy.availability ?? null,
+                });
+              }
             }
-          }
-          this.holdingsRefreshFailures.delete(formatKey);
-          this.holdingsCountByFormat = {
-            ...this.holdingsCountByFormat,
-            [formatKey]: total,
-          };
-          this.holdingsDetailsByFormat = {
-            ...this.holdingsDetailsByFormat,
-            [formatKey]: this.dedupeShelfDetails(details),
-          };
-        },
-        error: () => {
-          if (isCurrent()) this.holdingsRefreshFailures.add(formatKey);
-        },
-      });
+            this.holdingsRefreshFailures.delete(formatKey);
+            this.holdingsCountByFormat = {
+              ...this.holdingsCountByFormat,
+              [formatKey]: total,
+            };
+            this.holdingsDetailsByFormat = {
+              ...this.holdingsDetailsByFormat,
+              [formatKey]: this.dedupeShelfDetails(details),
+            };
+          },
+          error: () => {
+            if (isCurrent()) this.holdingsRefreshFailures.add(formatKey);
+          },
+        });
       this.metadataSubscriptions.add(request.subscription);
     }
   }
@@ -2064,7 +2099,8 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
                 label,
               ])
             );
-            const previousRecords = this.editionRecordsByFormat[formatKey] ?? {};
+            const previousRecords =
+              this.editionRecordsByFormat[formatKey] ?? {};
             for (const previousSource of previousSources) {
               if (sources.has(previousSource)) continue;
               const previousKey = `${groupedWorkId}:${formatKey}:${previousSource}`;
@@ -2130,9 +2166,12 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
   private updateEditionDetails() {
     const detailsByFormat: Record<string, EditionDetail[]> = {};
     const uniqueText = (values: string[]) => [
-      ...new Set(values.map((value) => value.trim()).filter((value) => !!value)),
+      ...new Set(
+        values.map((value) => value.trim()).filter((value) => !!value)
+      ),
     ];
-    const runtimePattern = /^(?:\d+(?:\.\d+)?\s*(?:hours?|hrs?|h|minutes?|mins?|m|seconds?|secs?|s)\s*)+$/i;
+    const runtimePattern =
+      /^(?:\d+(?:\.\d+)?\s*(?:hours?|hrs?|h|minutes?|mins?|m|seconds?|secs?|s)\s*)+$/i;
     for (const formatKey of Object.keys(this.work?.formats ?? {})) {
       const digital = this.isLikelyDigitalFormat(
         formatKey,
@@ -2186,7 +2225,9 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
           published: [
             first.publisher.trim(),
             first.placeOfPublication.trim(),
-            uniqueText(editions.map((record) => record.publicationDate)).join(', '),
+            uniqueText(editions.map((record) => record.publicationDate)).join(
+              ', '
+            ),
           ]
             .filter((value) => !!value)
             .join(' · '),
@@ -2201,20 +2242,26 @@ export class ItemDetailComponent implements OnInit, OnDestroy {
               ? 'Duration'
               : 'Physical description',
         };
-        if (detail.edition || detail.published || detail.physicalValues.length) {
+        if (
+          detail.edition ||
+          detail.published ||
+          detail.physicalValues.length
+        ) {
           details.push(detail);
         }
       }
 
       // Some providers supply only publication data already shown with an edition.
-      const visibleDetails = details.filter((detail) =>
-        detail.edition ||
-        detail.physicalValues.length ||
-        !details.some((other) =>
-          other !== detail &&
-          other.published === detail.published &&
-          (other.edition || other.physicalValues.length)
-        )
+      const visibleDetails = details.filter(
+        (detail) =>
+          detail.edition ||
+          detail.physicalValues.length ||
+          !details.some(
+            (other) =>
+              other !== detail &&
+              other.published === detail.published &&
+              (other.edition || other.physicalValues.length)
+          )
       );
       if (visibleDetails.length) detailsByFormat[formatKey] = visibleDetails;
     }

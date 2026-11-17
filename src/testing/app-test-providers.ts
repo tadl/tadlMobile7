@@ -1,4 +1,4 @@
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withXhr } from '@angular/common/http';
 import {
   EnvironmentProviders,
   importProvidersFrom,
@@ -18,7 +18,7 @@ import {
 } from '@ionic/angular/lazy';
 
 export const APP_TEST_PROVIDERS: Array<Provider | EnvironmentProviders> = [
-  provideHttpClient(),
+  provideHttpClient(withXhr()),
   provideRouter([]),
   importProvidersFrom(IonicModule.forRoot()),
   ActionSheetController,

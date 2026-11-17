@@ -1,7 +1,17 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 
 import { IonicModule, ModalController } from '@ionic/angular/lazy';
-import { concat, concatMap, exhaustMap, finalize, of, Subject, takeUntil, takeWhile, timer } from 'rxjs';
+import {
+  concat,
+  concatMap,
+  exhaustMap,
+  finalize,
+  of,
+  Subject,
+  takeUntil,
+  takeWhile,
+  timer,
+} from 'rxjs';
 
 import { Globals } from '../../globals';
 import { ToastService } from '../../services/toast.service';
@@ -19,6 +29,7 @@ import { FormatFamilyService } from '../../services/format-family.service';
   selector: 'app-checkout-history',
   templateUrl: './checkout-history.page.html',
   styleUrls: ['./checkout-history.page.scss'],
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [IonicModule],
 })
 export class CheckoutHistoryPage {
@@ -92,14 +103,33 @@ export class CheckoutHistoryPage {
             false
           );
         }),
-        concatMap(res => ['pending', 'importing'].includes(res.historyStatus || '')
-          // Newer Aspen versions queue the initial import on a five-minute cron.
-          ? concat(of(res), timer(5000, 5000).pipe(
-              exhaustMap(() => this.history.fetchReadingHistoryPage(1, this.pageSize, this.sort, '', false)),
-              takeWhile(status => ['pending', 'importing'].includes(status.historyStatus || ''), true),
-              takeUntil(timer(600000)),
-            ))
-          : of(res)),
+        concatMap((res) =>
+          ['pending', 'importing'].includes(res.historyStatus || '')
+            ? // Newer Aspen versions queue the initial import on a five-minute cron.
+              concat(
+                of(res),
+                timer(5000, 5000).pipe(
+                  exhaustMap(() =>
+                    this.history.fetchReadingHistoryPage(
+                      1,
+                      this.pageSize,
+                      this.sort,
+                      '',
+                      false
+                    )
+                  ),
+                  takeWhile(
+                    (status) =>
+                      ['pending', 'importing'].includes(
+                        status.historyStatus || ''
+                      ),
+                    true
+                  ),
+                  takeUntil(timer(600000))
+                )
+              )
+            : of(res)
+        ),
         takeUntil(this.viewLeft),
         finalize(() => {
           this.loading = false;
@@ -108,9 +138,12 @@ export class CheckoutHistoryPage {
       )
       .subscribe({
         next: (res) => {
-          if (this.auth.snapshot().activeAccountId !== snap.activeAccountId) return;
-          this.historyMessage = res.historyStatus && res.historyStatus !== 'ready'
-            ? (res.message || 'Checkout history is unavailable.') : '';
+          if (this.auth.snapshot().activeAccountId !== snap.activeAccountId)
+            return;
+          this.historyMessage =
+            res.historyStatus && res.historyStatus !== 'ready'
+              ? res.message || 'Checkout history is unavailable.'
+              : '';
           if (!res?.success) {
             this.items = [];
             this.toast.presentToast(
@@ -125,7 +158,8 @@ export class CheckoutHistoryPage {
           this.infiniteDisabled = !(this.page < this.totalPages);
         },
         error: () => {
-          this.historyMessage = 'Could not load checkout history. Pull to refresh and try again.';
+          this.historyMessage =
+            'Could not load checkout history. Pull to refresh and try again.';
           this.items = [];
           this.toast.presentToast('Could not load checkout history.');
         },
@@ -160,7 +194,8 @@ export class CheckoutHistoryPage {
           if (this.auth.snapshot().activeAccountId !== accountId) return;
           if (res.historyStatus && res.historyStatus !== 'ready') {
             this.items = [];
-            this.historyMessage = res.message || 'Checkout history is unavailable.';
+            this.historyMessage =
+              res.message || 'Checkout history is unavailable.';
             this.infiniteDisabled = true;
             return;
           }

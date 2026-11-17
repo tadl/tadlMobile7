@@ -1,4 +1,10 @@
-import { Component, NgZone, OnInit, inject } from '@angular/core';
+import {
+  Component,
+  NgZone,
+  OnInit,
+  inject,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import {
@@ -37,6 +43,7 @@ import { APP_PROFILE } from './app-profile';
   selector: 'app-root',
   templateUrl: 'app.component.html',
   styleUrls: ['app.component.scss'],
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [CommonModule, RouterModule, IonicModule],
 })
 export class AppComponent implements OnInit {
@@ -207,7 +214,8 @@ export class AppComponent implements OnInit {
           : Math.pow((srgb + 0.055) / 1.055, 2.4);
       })
       .reduce(
-        (sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index],
+        (sum, channel, index) =>
+          sum + channel * [0.2126, 0.7152, 0.0722][index],
         0
       );
     const contrast = luminance > 0.179 ? '#000000' : '#ffffff';
@@ -222,7 +230,9 @@ export class AppComponent implements OnInit {
   }
 
   ngOnInit() {
-    fromEvent(window, 'online').subscribe(() => { void this.appConfig.refresh(); });
+    fromEvent(window, 'online').subscribe(() => {
+      void this.appConfig.refresh();
+    });
     fromEvent(document, 'visibilitychange').subscribe(() => {
       if (document.visibilityState === 'visible') void this.appConfig.refresh();
     });

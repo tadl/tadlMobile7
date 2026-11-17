@@ -1,4 +1,10 @@
-import { Component, OnDestroy, OnInit, inject } from '@angular/core';
+import {
+  Component,
+  OnDestroy,
+  OnInit,
+  inject,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 
 import { Router } from '@angular/router';
 import { ActivatedRoute } from '@angular/router';
@@ -40,6 +46,7 @@ interface ListMutationContext {
   selector: 'app-my-list-detail',
   templateUrl: './my-list-detail.page.html',
   styleUrls: ['./my-list-detail.page.scss'],
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [IonicModule],
 })
 export class MyListDetailPage implements OnInit, OnDestroy {
@@ -79,7 +86,7 @@ export class MyListDetailPage implements OnInit, OnDestroy {
 
   ngOnInit() {
     let accountId = this.auth.snapshot().activeAccountId;
-    this.authSubscription = this.auth.authState().subscribe(state => {
+    this.authSubscription = this.auth.authState().subscribe((state) => {
       const nextAccountId = state.isLoggedIn ? state.activeAccountId : null;
       if (accountId === nextAccountId) return;
       accountId = nextAccountId;
@@ -122,14 +129,25 @@ export class MyListDetailPage implements OnInit, OnDestroy {
   private mutationContext(): ListMutationContext | null {
     const snapshot = this.auth.snapshot();
     return snapshot.isLoggedIn && snapshot.activeAccountId
-      ? { accountId: snapshot.activeAccountId, listId: this.listId, revision: this.viewRevision }
+      ? {
+          accountId: snapshot.activeAccountId,
+          listId: this.listId,
+          revision: this.viewRevision,
+        }
       : null;
   }
 
-  private isCurrentMutation(context: ListMutationContext | null): context is ListMutationContext {
+  private isCurrentMutation(
+    context: ListMutationContext | null
+  ): context is ListMutationContext {
     const snapshot = this.auth.snapshot();
-    return !!context && snapshot.isLoggedIn && snapshot.activeAccountId === context.accountId &&
-      this.listId === context.listId && this.viewRevision === context.revision;
+    return (
+      !!context &&
+      snapshot.isLoggedIn &&
+      snapshot.activeAccountId === context.accountId &&
+      this.listId === context.listId &&
+      this.viewRevision === context.revision
+    );
   }
 
   private cancelReadRequests() {
@@ -184,7 +202,11 @@ export class MyListDetailPage implements OnInit, OnDestroy {
       )
       .subscribe({
         next: (res) => {
-          if (this.auth.snapshot().activeAccountId !== accountId || this.listId !== listId) return;
+          if (
+            this.auth.snapshot().activeAccountId !== accountId ||
+            this.listId !== listId
+          )
+            return;
           if (!res?.success) {
             this.titles = [];
             this.toast.presentToast(
@@ -207,7 +229,11 @@ export class MyListDetailPage implements OnInit, OnDestroy {
           this.infiniteDisabled = !(this.page < this.totalPages);
         },
         error: () => {
-          if (this.auth.snapshot().activeAccountId !== accountId || this.listId !== listId) return;
+          if (
+            this.auth.snapshot().activeAccountId !== accountId ||
+            this.listId !== listId
+          )
+            return;
           this.titles = [];
           this.infiniteDisabled = true;
           this.toast.presentToast('Could not load this list.');
@@ -245,7 +271,11 @@ export class MyListDetailPage implements OnInit, OnDestroy {
       )
       .subscribe({
         next: (res) => {
-          if (this.auth.snapshot().activeAccountId !== accountId || this.listId !== listId) return;
+          if (
+            this.auth.snapshot().activeAccountId !== accountId ||
+            this.listId !== listId
+          )
+            return;
           if (!res?.success) {
             this.toast.presentToast(
               res?.message || 'Could not load more list titles.'
@@ -278,7 +308,11 @@ export class MyListDetailPage implements OnInit, OnDestroy {
           this.infiniteDisabled = !(this.page < this.totalPages);
         },
         error: () => {
-          if (this.auth.snapshot().activeAccountId !== accountId || this.listId !== listId) return;
+          if (
+            this.auth.snapshot().activeAccountId !== accountId ||
+            this.listId !== listId
+          )
+            return;
           this.toast.presentToast('Could not load more list titles.');
         },
       });
@@ -369,19 +403,27 @@ export class MyListDetailPage implements OnInit, OnDestroy {
       } else {
         buttons.push({
           text: 'Place Hold',
-          handler: () => { if (this.isCurrentMutation(context)) void this.placeHoldFromTitle(t); },
+          handler: () => {
+            if (this.isCurrentMutation(context))
+              void this.placeHoldFromTitle(t);
+          },
         });
       }
     }
     buttons.push({
       text: 'Open Details',
-      handler: () => { if (this.isCurrentMutation(context)) void this.openTitle(t); },
+      handler: () => {
+        if (this.isCurrentMutation(context)) void this.openTitle(t);
+      },
     });
     if (this.canEditList) {
       buttons.push({
         text: 'Remove from List',
         role: 'destructive',
-        handler: () => { if (this.isCurrentMutation(context)) void this.confirmRemoveFromList(t); },
+        handler: () => {
+          if (this.isCurrentMutation(context))
+            void this.confirmRemoveFromList(t);
+        },
       });
     }
     buttons.push({ text: 'Close', role: 'cancel' });
@@ -391,7 +433,10 @@ export class MyListDetailPage implements OnInit, OnDestroy {
       buttons,
     });
 
-    if (!this.isCurrentMutation(context)) { sheet.remove(); return; }
+    if (!this.isCurrentMutation(context)) {
+      sheet.remove();
+      return;
+    }
     await sheet.present();
   }
 
@@ -507,7 +552,10 @@ export class MyListDetailPage implements OnInit, OnDestroy {
       .placeHold(recordId, pickupBranch, null)
       .pipe(
         finalize(() => {
-          if (this.auth.snapshot().activeAccountId === accountId && this.actionRecordId === groupedKey) {
+          if (
+            this.auth.snapshot().activeAccountId === accountId &&
+            this.actionRecordId === groupedKey
+          ) {
             this.actionRecordId = '';
           }
         })
@@ -648,7 +696,10 @@ export class MyListDetailPage implements OnInit, OnDestroy {
       ],
     });
 
-    if (!this.isCurrentMutation(context)) { confirmSheet.remove(); return; }
+    if (!this.isCurrentMutation(context)) {
+      confirmSheet.remove();
+      return;
+    }
     await confirmSheet.present();
   }
 
@@ -656,7 +707,10 @@ export class MyListDetailPage implements OnInit, OnDestroy {
     return this.removeBusyFor(t);
   }
 
-  private removeFromListNow(t: AspenListTitle, context = this.mutationContext()) {
+  private removeFromListNow(
+    t: AspenListTitle,
+    context = this.mutationContext()
+  ) {
     if (!this.isCurrentMutation(context)) return;
     if (!this.canEditList) {
       this.toast.presentToast('You can only edit lists that you own.');
@@ -679,7 +733,10 @@ export class MyListDetailPage implements OnInit, OnDestroy {
       .removeTitlesFromList(context.listId, [recordId])
       .pipe(
         finalize(() => {
-          if (this.isCurrentMutation(context) && this.removingRecordId === recordId) {
+          if (
+            this.isCurrentMutation(context) &&
+            this.removingRecordId === recordId
+          ) {
             this.removingRecordId = '';
           }
         })
@@ -701,7 +758,8 @@ export class MyListDetailPage implements OnInit, OnDestroy {
           this.toast.presentToast(res?.message || 'Removed from list.');
         },
         error: () => {
-          if (this.isCurrentMutation(context)) this.toast.presentToast('Could not remove title from list.');
+          if (this.isCurrentMutation(context))
+            this.toast.presentToast('Could not remove title from list.');
         },
       });
   }
@@ -764,7 +822,10 @@ export class MyListDetailPage implements OnInit, OnDestroy {
       ],
     });
 
-    if (!this.isCurrentMutation(context)) { alert.remove(); return; }
+    if (!this.isCurrentMutation(context)) {
+      alert.remove();
+      return;
+    }
     await alert.present();
   }
 
@@ -792,12 +853,24 @@ export class MyListDetailPage implements OnInit, OnDestroy {
       ],
     });
 
-    if (!this.isCurrentMutation(context)) { alert.remove(); return; }
+    if (!this.isCurrentMutation(context)) {
+      alert.remove();
+      return;
+    }
     await alert.present();
   }
 
-  private saveListMeta(title: string, description: string, context = this.mutationContext()) {
-    if (!this.isCurrentMutation(context) || !context.listId || this.mutatingList) return;
+  private saveListMeta(
+    title: string,
+    description: string,
+    context = this.mutationContext()
+  ) {
+    if (
+      !this.isCurrentMutation(context) ||
+      !context.listId ||
+      this.mutatingList
+    )
+      return;
 
     this.mutatingList = true;
     this.listsService
@@ -820,12 +893,20 @@ export class MyListDetailPage implements OnInit, OnDestroy {
           this.listLookup.renameList(context.listId, title);
           this.toast.presentToast(res?.message || 'List updated.');
         },
-        error: () => { if (this.isCurrentMutation(context)) this.toast.presentToast('Could not update list.'); },
+        error: () => {
+          if (this.isCurrentMutation(context))
+            this.toast.presentToast('Could not update list.');
+        },
       });
   }
 
   private deleteListNow(context = this.mutationContext()) {
-    if (!this.isCurrentMutation(context) || !context.listId || this.mutatingList) return;
+    if (
+      !this.isCurrentMutation(context) ||
+      !context.listId ||
+      this.mutatingList
+    )
+      return;
 
     const listId = context.listId;
     this.mutatingList = true;
@@ -848,7 +929,10 @@ export class MyListDetailPage implements OnInit, OnDestroy {
           this.toast.presentToast(res?.message || 'List deleted.');
           this.router.navigate(['/my-lists']);
         },
-        error: () => { if (this.isCurrentMutation(context)) this.toast.presentToast('Could not delete list.'); },
+        error: () => {
+          if (this.isCurrentMutation(context))
+            this.toast.presentToast('Could not delete list.');
+        },
       });
   }
 
@@ -862,7 +946,11 @@ export class MyListDetailPage implements OnInit, OnDestroy {
 
     try {
       const userLists = await lastValueFrom(this.listsService.fetchUserLists());
-      if (this.auth.snapshot().activeAccountId !== accountId || this.listId !== listId) return;
+      if (
+        this.auth.snapshot().activeAccountId !== accountId ||
+        this.listId !== listId
+      )
+        return;
       const ownedIds = new Set(
         (userLists ?? [])
           .map((x) => (x?.id ?? '').toString().trim())
@@ -870,7 +958,11 @@ export class MyListDetailPage implements OnInit, OnDestroy {
       );
       this.canEditList = ownedIds.has(listId);
     } catch {
-      if (this.auth.snapshot().activeAccountId !== accountId || this.listId !== listId) return;
+      if (
+        this.auth.snapshot().activeAccountId !== accountId ||
+        this.listId !== listId
+      )
+        return;
       this.canEditList = false;
     }
   }

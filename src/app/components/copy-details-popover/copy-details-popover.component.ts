@@ -5,6 +5,7 @@ import {
   OnInit,
   SimpleChanges,
   inject,
+  ChangeDetectionStrategy,
 } from '@angular/core';
 
 import { IonicModule, ModalController } from '@ionic/angular/lazy';
@@ -28,6 +29,7 @@ interface GroupedCopyDetailRow {
   selector: 'app-copy-details-popover',
   templateUrl: './copy-details-popover.component.html',
   styleUrls: ['./copy-details-popover.component.scss'],
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [IonicModule],
 })
 export class CopyDetailsPopoverComponent implements OnChanges, OnInit {

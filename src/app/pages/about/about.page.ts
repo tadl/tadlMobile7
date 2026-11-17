@@ -1,4 +1,9 @@
-import { Component, OnInit, inject } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  inject,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 
 import { IonicModule } from '@ionic/angular/lazy';
 import { Platform } from '@ionic/angular/lazy';
@@ -10,6 +15,7 @@ import { Globals } from '../../globals';
   selector: 'app-about',
   templateUrl: './about.page.html',
   styleUrls: ['./about.page.scss'],
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [IonicModule],
 })
 export class AboutPage implements OnInit {

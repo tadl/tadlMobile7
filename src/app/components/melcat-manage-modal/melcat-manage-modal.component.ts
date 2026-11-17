@@ -1,4 +1,10 @@
-import { Component, Input, OnInit, inject } from '@angular/core';
+import {
+  Component,
+  Input,
+  OnInit,
+  inject,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 
 import { IonicModule, ModalController } from '@ionic/angular/lazy';
 
@@ -12,6 +18,7 @@ import { AuthService } from '../../services/auth.service';
   selector: 'app-melcat-manage-modal',
   templateUrl: './melcat-manage-modal.component.html',
   styleUrls: ['./melcat-manage-modal.component.scss'],
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [IonicModule],
 })
 export class MelcatManageModalComponent implements OnInit {

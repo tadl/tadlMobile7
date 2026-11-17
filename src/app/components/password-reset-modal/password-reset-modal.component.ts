@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
 import { IonicModule, ModalController } from '@ionic/angular/lazy';
@@ -12,6 +12,7 @@ import { PasswordResetService } from '../../services/password-reset.service';
   selector: 'app-password-reset-modal',
   templateUrl: './password-reset-modal.component.html',
   styleUrls: ['./password-reset-modal.component.scss'],
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [IonicModule, FormsModule],
 })
 export class PasswordResetModalComponent {

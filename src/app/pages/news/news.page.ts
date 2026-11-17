@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 
 import { IonicModule, ModalController } from '@ionic/angular/lazy';
 import { Globals } from '../../globals';
@@ -11,6 +11,7 @@ import { NewsService, NewsletterItem } from '../../services/news.service';
   selector: 'app-news',
   templateUrl: './news.page.html',
   styleUrls: ['./news.page.scss'],
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [IonicModule],
 })
 export class NewsPage {
